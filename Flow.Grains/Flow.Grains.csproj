@@ -9,13 +9,13 @@
     <Compile Remove="Plan\PlanItem\Behaviors\EventListenerBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\HumanTaskBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\IMigrateBehavior.cs" />
-    <Compile Remove="Plan\PlanItem\Behaviors\StageBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\TaskBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\TimerEventListenerBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\UserEventListenerBehavior.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="8.0.0" />
     <PackageReference Include="Jint" Version="2.11.58" />
     <PackageReference Include="Microsoft.Orleans.CodeGenerator.MSBuild" Version="2.2.3">
       <PrivateAssets>all</PrivateAssets>
@@ -39,6 +39,7 @@
 
   <ItemGroup>
     <Folder Include="Executables\" />
+    <Folder Include="Plan\Case\" />
   </ItemGroup>
 
 </Project>

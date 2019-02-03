@@ -8,6 +8,8 @@ using Flow.Grains.Expressions;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors;
+using Flow.Grains.Plan.PlanItem.Events;
+using Flow.Grains.Plan.PlanItem.StateMachine;
 using Flow.Grains.Tests.Helpers;
 using FluentAssertions;
 using Moq;
@@ -28,12 +30,14 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 ItemControl = expectedItemControl
             };
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.Definition)
                 .Returns(planItem);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             var result = subject.GetItemControl();
 
@@ -46,6 +50,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var expectedItemControl = new PlanItemControl();
             var planItem = new Interfaces.Model.PlanItem();
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.Definition)
@@ -56,7 +62,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 DefaultControl = expectedItemControl
             };
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, def);
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, def, mockMachine.Object);
 
             var result = subject.GetItemControl();
 
@@ -68,6 +74,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         {
             var planItem = new Interfaces.Model.PlanItem();
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.Definition)
@@ -78,7 +86,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()))
                 .Callback<RequiredRuleEvaluated>(x => capturedEvent = x);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRequiredRule();
 
@@ -97,6 +105,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 ItemControl = new PlanItemControl()
             };
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.Definition)
@@ -107,7 +117,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()))
                 .Callback<RequiredRuleEvaluated>(x => capturedEvent = x);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRequiredRule();
 
@@ -128,6 +138,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     RequiredRule = Rules.NotRequiredRule
                 }
             };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -155,7 +167,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRequiredRule();
 
@@ -176,6 +188,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     RequiredRule = Rules.IsRequiredRule
                 }
             };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -203,7 +217,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRequiredRule();
 
@@ -219,6 +233,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         {
             var planItem = new Interfaces.Model.PlanItem();
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.CaseInstanceId)
@@ -232,7 +248,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
             
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRepetitionRule();
 
@@ -251,6 +267,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 ItemControl = new PlanItemControl()
             };
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.CaseInstanceId)
@@ -264,7 +282,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRepetitionRule();
 
@@ -285,6 +303,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     RepetitionRule = Rules.NotRepeatableRule
                 }
             };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -312,7 +332,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRepetitionRule();
 
@@ -333,6 +353,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     RepetitionRule = Rules.IsRepeatableRule
                 }
             };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -360,7 +382,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRepetitionRule();
 
@@ -375,6 +397,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         public async Task EvaluateManualActivationRule__Given_Host__When_NoItemControl__Then_True(Guid caseInstanceId)
         {
             var planItem = new Interfaces.Model.PlanItem();
+            
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -389,7 +413,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()))
                 .Callback<ManualActivationRuleEvaluated>(x => capturedEvent = x);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateManualActivationRule();
 
@@ -408,6 +432,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 ItemControl = new PlanItemControl()
             };
 
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
                 .Setup(x => x.CaseInstanceId)
@@ -421,7 +447,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()))
                 .Callback<ManualActivationRuleEvaluated>(x => capturedEvent = x);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateManualActivationRule();
 
@@ -442,6 +468,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     ManualActivationRule = Rules.NotManuallyActivated
                 }
             };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -469,7 +497,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateManualActivationRule();
 
@@ -490,6 +518,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     ManualActivationRule = Rules.IsManuallyActivated
                 }
             };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost
@@ -517,7 +547,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
-            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone());
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateManualActivationRule();
 
@@ -528,17 +558,43 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             capturedEvent.Result.Should().BeTrue();
         }
 
+        private PlanItemStore CreateStore(
+            Guid? caseDefId = null,
+            PlanItemDefinition piDef = null,
+            Interfaces.Model.PlanItem def = null,
+            PlanItemState initialState = PlanItemState.Available)
+        {
+            caseDefId = caseDefId ?? Guid.NewGuid();
+            piDef = piDef ?? new Milestone { Id = "Milestone" };
+            def = def ?? new Interfaces.Model.PlanItem
+            {
+                Id = "PlanItem",
+                DefinitionRef = piDef.Id
+            };
+
+            var store = new PlanItemStore();
+            store.Apply(new Defined
+            {
+                CaseDefinitionId = caseDefId.Value,
+                PlanItemDefinition = piDef,
+                Definition = def
+            });
+            store.Apply(new Transitioned
+            {
+                Destination = initialState
+            });
+            return store;
+        }
+
         private class BaseBehaviorTestHarness : BaseBehavior<Milestone>
         {
-            public BaseBehaviorTestHarness(IBehaviorHost host, Milestone planItemDefinition) :
-                base(host, planItemDefinition)
+            public BaseBehaviorTestHarness(IBehaviorHost host, Milestone planItemDefinition, IPlanItemStateMachine stateMachine) :
+                base(host, planItemDefinition, stateMachine)
             {
             }
 
-            public override Task Define() => Task.CompletedTask;
-            public override Task Activate() => Task.CompletedTask;
-            public override Task<bool> IsUserCompletable() => Task.FromResult(false);
             protected override Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null) => Task.CompletedTask;
+            protected override Task HandleParentTransitioned(PlanItemTransitionedEvent @event, StreamSequenceToken token = null) => Task.CompletedTask;
 
             public new Task EvaluateRequiredRule() => base.EvaluateRequiredRule();
             public new Task<bool> EvaluateRepetitionRule() => base.EvaluateRepetitionRule();

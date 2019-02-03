@@ -6,6 +6,7 @@ using Flow.Grains.Expressions;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.CmmnElement;
+using Flow.Grains.Plan.Sentry.Events;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
@@ -47,7 +48,7 @@ namespace Flow.Grains.Plan.Sentry
         {
             await base.OnActivateAsync();
 
-            if (TentativeState.IsDefined)
+            if (TentativeState.Defined)
             {
                 await SubscribeToOnPartTransitions(StreamFlags.Resume);
             }
@@ -58,8 +59,6 @@ namespace Flow.Grains.Plan.Sentry
             await base.Define(caseDefinitionId, definition);
             await SubscribeToOnPartTransitions(StreamFlags.Create);
         }
-
-        #region Streams
 
         private Task SubscribeToOnPartTransitions(StreamFlags flags) =>
             Task.WhenAll(Definition.OnParts
@@ -96,13 +95,13 @@ namespace Flow.Grains.Plan.Sentry
             var onPart = Definition.PlanItemOnParts
                 .SingleOrDefault(x =>
                     x.StandardEvent == @event.StandardEvent &&
-                    (string.IsNullOrWhiteSpace(x.SourceRef) || x.SourceRef.Equals(@event.SourceId) &&
+                    (string.IsNullOrWhiteSpace(x.SourceRef) || x.SourceRef.Equals(@event.SourceDefinitionId) &&
                     (string.IsNullOrWhiteSpace(x.ExitCriterionRef) || x.ExitCriterionRef.Equals(@event.ExitCriterionRef))));
 
             // no matching onPart
             if (onPart == null) return;
 
-            await HandleOnPartOccurred(onPart, @event.SourceScope, @event.SourceId, @event.StandardEvent);
+            await HandleOnPartOccurred(onPart, @event.SourceScope, @event.SourceDefinitionId, @event.StandardEvent);
         }
 
         private async Task HandleCaseFileItemTransitioned(CaseFileItemTransitionedEvent @event, StreamSequenceToken token = null)
@@ -110,12 +109,12 @@ namespace Flow.Grains.Plan.Sentry
             var onPart = Definition.CaseFileItemOnParts
                 .SingleOrDefault(x =>
                     x.StandardEvent == @event.StandardEvent &&
-                    (string.IsNullOrWhiteSpace(x.SourceRef) || x.SourceRef.Equals(@event.SourceId)));
+                    (string.IsNullOrWhiteSpace(x.SourceRef) || x.SourceRef.Equals(@event.SourceDefinitionId)));
 
             // no matching onPart
             if (onPart == null) return;
 
-            await HandleOnPartOccurred(onPart, @event.SourceScope, @event.SourceId, @event.StandardEvent);
+            await HandleOnPartOccurred(onPart, @event.SourceScope, @event.SourceDefinitionId, @event.StandardEvent);
         }
 
         private async Task HandleOnPartOccurred(OnPart onPart, string sourceScope, string sourceId, object standardEvent)
@@ -124,7 +123,7 @@ namespace Flow.Grains.Plan.Sentry
                 "{ElementType} {ElementScope}.{ElementId}: {OnPartType} {OnPartId} occurred via {EventSourceScope}.{EventSourceId} transition {StandardEvent}",
                 Definition.GetType().Name,
                 _scope,
-                _id,
+                _instanceId,
                 onPart.GetType().Name,
                 onPart.Id,
                 sourceScope,
@@ -149,13 +148,11 @@ namespace Flow.Grains.Plan.Sentry
                 "{ElementType} {ElementScope}.{ElementId}: sentry satisfied, notifying subscribers",
                 Definition.GetType().Name,
                 _scope,
-                _id));
+                _instanceId));
 
-            await Publish(new SentrySatisfiedEvent(_scope, Definition.Id, true));
+            await PublishEvent(new SentrySatisfiedEvent(_scope, Definition.Id, true));
         }
-
-        #endregion Streams
-
+        
         private async Task<bool> EvaluateIfPart()
         {
             if (Definition.IfPart?.Condition == null) return true;

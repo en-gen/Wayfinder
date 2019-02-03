@@ -1,5 +1,4 @@
-﻿using System;
-using Flow.Grains.Interfaces.Model;
+﻿using Flow.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Stateless;
 
@@ -41,10 +40,6 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
                 {
                     ConfigureForMilestoneOrEventListener();
                     break;
-                }
-                default:
-                {
-                    throw new InvalidOperationException();
                 }
             }
         }

@@ -6,6 +6,7 @@ namespace Flow.Grains.Events
     [Serializable]
     public class PlanItemTransitionedEvent : BaseEvent
     {
+        public string SourceInstanceId { get; }
         public PlanItemTransition StandardEvent { get; }
 
         public PlanItemState Source { get; }
@@ -15,13 +16,15 @@ namespace Flow.Grains.Events
 
         public PlanItemTransitionedEvent(
             string planItemScope,
-            string planItemId,
+            string planItemInstanceId,
+            string planItemDefinitionId,
             PlanItemTransition standardEvent,
             PlanItemState source,
             PlanItemState destination,
             string exitCriterionRef = null) :
-            base(planItemScope, planItemId)
+            base(planItemScope, planItemDefinitionId)
         {
+            SourceInstanceId = planItemInstanceId;
             StandardEvent = standardEvent;
             Source = source;
             Destination = destination;

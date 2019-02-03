@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using Flow.Grains.Plan.CmmnElement.Events;
 
 namespace Flow.Grains.Plan.CmmnElement
 {
@@ -10,7 +11,7 @@ namespace Flow.Grains.Plan.CmmnElement
         public TDefinition Definition { get; private set; }
 
         [IgnoreDataMember]
-        public bool IsDefined => Definition != null;
+        public bool Defined => Definition != null;
 
         public void Apply(CmmnElementDefined<TDefinition> @event)
         {
@@ -19,15 +20,5 @@ namespace Flow.Grains.Plan.CmmnElement
 
             Created = @event.Created;
         }
-    }
-
-    [Serializable]
-    public class CmmnElementDefined<TDefinition>
-        where TDefinition : Interfaces.Model.CmmnElement
-    {
-        public DateTime Created { get; set; } = DateTime.UtcNow;
-        public Guid? CaseDefinitionId { get; set; }
-
-        public TDefinition Definition { get; set; }
     }
 }

@@ -6,12 +6,12 @@ namespace Flow.Grains.Events
     public abstract class BaseEvent
     {
         public string SourceScope { get; }
-        public string SourceId { get; }
+        public string SourceDefinitionId { get; }
 
-        protected BaseEvent(string sourceScope, string sourceId)
+        protected BaseEvent(string sourceScope, string sourceDefinitionId)
         {
             SourceScope = sourceScope;
-            SourceId = sourceId;
+            SourceDefinitionId = sourceDefinitionId;
         }
     }
 }

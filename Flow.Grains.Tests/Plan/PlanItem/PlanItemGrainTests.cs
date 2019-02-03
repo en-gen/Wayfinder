@@ -31,23 +31,23 @@ namespace Flow.Grains.Tests.Plan.PlanItem
         {
             var subject = ClusterClient.GetGrain<IPlanItemGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
 
-            var result = await subject.GetState();
+            var result = await subject.GetSnapshot();
 
-            result.Should().BeEquivalentTo(PlanItemState.Uninitialized);
+            result.Should().NotBeNull();
+            result.PlanItemState.Should().BeEquivalentTo(PlanItemState.Uninitialized);
         }
 
         // TODO: these tests need to define the plan item first in order for StateMachine to be initialized
         [Theory, AutoData]
-        public async Task Trigger__When_Undefined__Then_NoStateChange
+        public async Task Trigger__When_Undefined__Then_InvalidOperationEx
             (Guid caseInstanceId)
         {
             var subject = ClusterClient.GetGrain<IPlanItemGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
 
-            await subject.Trigger(PlanItemTransition.Create);
-
-            var result = await subject.GetState();
-
-            result.Should().BeEquivalentTo(PlanItemState.Uninitialized);
+            await subject
+                .Awaiting(x => x.Trigger(PlanItemTransition.Create))
+                .Should()
+                .ThrowAsync<InvalidOperationException>();
         }
 
         [Theory, AutoData]
@@ -143,9 +143,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem
 
             await subject.Trigger(PlanItemTransition.Create);
 
-            var result = await subject.GetState();
+            var result = await subject.GetSnapshot();
 
-            result.Should().BeEquivalentTo(PlanItemState.Available);
+            result.Should().NotBeNull();
+            result.PlanItemState.Should().BeEquivalentTo(PlanItemState.Available);
         }
     }
 }

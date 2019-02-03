@@ -60,7 +60,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 .SubscribeAsync((e, t) =>
                 {
                     e.SourceScope.Should().Be(sourceScope);
-                    e.SourceId.Should().Be(sentry.Id);
+                    e.SourceDefinitionId.Should().Be(sentry.Id);
                     e.OnPartOccurred.Should().BeTrue();
 
                     tcs.SetResult(true);
@@ -72,6 +72,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
                 .OnNextAsync(new PlanItemTransitionedEvent(
                     sourceScope,
+                    ShortGuid.NewGuid(),
                     sourcePlanItemId,
                     PlanItemTransition.Occur,
                     PlanItemState.Available,
@@ -109,7 +110,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 .SubscribeAsync((e, t) =>
                 {
                     e.SourceScope.Should().Be(sourceScope);
-                    e.SourceId.Should().Be(sentry.Id);
+                    e.SourceDefinitionId.Should().Be(sentry.Id);
                     e.OnPartOccurred.Should().BeTrue();
 
                     tcs.SetResult(true);
@@ -121,6 +122,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
                 .OnNextAsync(new PlanItemTransitionedEvent(
                     sourceScope,
+                    ShortGuid.NewGuid(),
                     sourcePlanItemId,
                     PlanItemTransition.Occur,
                     PlanItemState.Available,
@@ -163,7 +165,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 .SubscribeAsync((e, t) =>
                 {
                     e.SourceScope.Should().Be(sourceScope);
-                    e.SourceId.Should().Be(sentry.Id);
+                    e.SourceDefinitionId.Should().Be(sentry.Id);
                     e.OnPartOccurred.Should().BeTrue();
 
                     tcs.SetResult(true);
@@ -175,6 +177,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
                 .OnNextAsync(new PlanItemTransitionedEvent(
                     sourceScope,
+                    ShortGuid.NewGuid(),
                     sourcePlanItemId,
                     PlanItemTransition.Occur,
                     PlanItemState.Available,

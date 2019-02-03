@@ -1,5 +1,6 @@
 ﻿using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.Sentry;
+using Flow.Grains.Plan.Sentry.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
 using Xunit;

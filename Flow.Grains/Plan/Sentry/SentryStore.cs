@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.CmmnElement;
+using Flow.Grains.Plan.Sentry.Events;
 
 namespace Flow.Grains.Plan.Sentry
 {
@@ -24,19 +25,5 @@ namespace Flow.Grains.Plan.Sentry
             Updated = @event.Updated;
             Satisfied = true;
         }
-    }
-
-    [Serializable]
-    public class OnPartOccurred
-    {
-        public DateTime Updated { get; } = DateTime.UtcNow;
-
-        public OnPart OnPart { get; set; }
-    }
-
-    [Serializable]
-    public class Satisfied
-    {
-        public DateTime Updated { get; } = DateTime.UtcNow;
     }
 }

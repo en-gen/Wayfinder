@@ -1,0 +1,36 @@
+﻿using System;
+using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem.Events;
+
+namespace Flow.Grains.Tests.Helpers
+{
+    public class TestPlanItemStore : PlanItemStore
+    {
+        public TestPlanItemStore(
+            Guid? caseDefId = null,
+            PlanItem def = null,
+            PlanItemDefinition piDef = null,
+            PlanItemState initialState = PlanItemState.Available)
+        {
+            caseDefId = caseDefId ?? Guid.NewGuid();
+            piDef = piDef ?? new Milestone { Id = "Milestone" };
+            def = def ?? new PlanItem
+            {
+                Id = "PlanItem",
+                DefinitionRef = piDef.Id
+            };
+
+            Apply(new Defined
+            {
+                CaseDefinitionId = caseDefId.Value,
+                PlanItemDefinition = piDef,
+                Definition = def
+            });
+            Apply(new Transitioned
+            {
+                Destination = initialState
+            });
+        }
+    }
+}

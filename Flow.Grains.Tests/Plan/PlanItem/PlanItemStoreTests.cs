@@ -1,6 +1,9 @@
 ﻿using System;
+using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
 using Xunit;
@@ -61,7 +64,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
 
             subject.Updated.Should().BeNull();
 
-            subject.IsDefined.Should().BeTrue();
+            subject.Defined.Should().BeTrue();
 
             subject.CaseDefinitionId.Should().NotBeEmpty()
                 .And.IsSameOrEqualTo(caseDefId);
@@ -273,6 +276,85 @@ namespace Flow.Grains.Tests.Plan.PlanItem
 
             subject.Updated.Should().HaveValue()
                 .And.IsSameOrEqualTo(@event.Updated);
+        }
+
+        [Fact]
+        public void Apply__Given_UserCompletableCriteriaMet__Then_Updated()
+        {
+            var subject = new PlanItemStore();
+
+            var @event = new UserCompletableCriteriaMet();
+
+            subject.Apply(@event);
+
+            subject.Updated.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Updated);
+
+            subject.UserCompletable.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Apply__Given_FullyCompleteCriteriaMet__Then_Updated()
+        {
+            var subject = new PlanItemStore();
+
+            var @event = new FullyCompleteCriteriaMet();
+
+            subject.Apply(@event);
+
+            subject.Updated.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Updated);
+        }
+
+        [Fact]
+        public void Apply__Given_Repeated__Then_UpdatedAndRepeated()
+        {
+            var subject = new PlanItemStore();
+
+            var @event = new Repeated();
+
+            subject.Apply(@event);
+
+            subject.Updated.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Updated);
+            subject.Repeated.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Apply__Given_ChildRepeated__Then_Updated()
+        {
+            var subject = new PlanItemStore();
+
+            var @event = new ChildRepeated();
+
+            subject.Apply(@event);
+
+            subject.Updated.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Updated);
+        }
+
+        [Theory, AutoData]
+        public void Apply__Given_ChildCreated__Then_UpdatedAndChildIndexed(string instanceId, string definitionId, int repetition)
+        {
+            var subject = new PlanItemStore();
+
+            var @event = new ChildCreated
+            {
+                PlanItemInstanceId = instanceId,
+                PlanItemDefinitionId = definitionId,
+                Repetition = repetition
+            };
+
+            subject.Apply(@event);
+
+            subject.Children.Should().NotBeEmpty()
+                .And.HaveCount(1)
+                .And.ContainKey(definitionId);
+
+            subject.Children[definitionId].Should().NotBeNull()
+                .And.HaveCount(1)
+                .And.ContainKey(instanceId)
+                .And.ContainValue(repetition);
         }
     }
 }

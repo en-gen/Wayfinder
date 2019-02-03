@@ -6,8 +6,8 @@ namespace Flow.Grains.Interfaces.Model
 {
     public partial class PlanningTable
     {
-        [IgnoreDataMember]
         [JsonIgnore]
+        [IgnoreDataMember]
         public IEnumerable<DiscretionaryItem> DiscretionaryItems => GetDiscretionaryItems(this);
         
         private static IEnumerable<DiscretionaryItem> GetDiscretionaryItems(PlanningTable table)

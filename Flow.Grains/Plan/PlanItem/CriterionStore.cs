@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Flow.Grains.Interfaces.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem.Events;
 
 namespace Flow.Grains.Plan.PlanItem
 {
@@ -7,7 +8,7 @@ namespace Flow.Grains.Plan.PlanItem
         public string SatisfiedByAddress { get; private set; }
         public CriterionState State { get; private set; }
 
-        public void Apply(EntryCriterionSatisfied @event)
+        public void Apply(CriterionSatisfied @event)
         {
             SatisfiedByAddress = $"{@event.SourceScope}.{@event.SourceId}";
             State = CriterionState.Satisfied;
@@ -16,24 +17,5 @@ namespace Flow.Grains.Plan.PlanItem
                 State |= CriterionState.OnPartOccurred;
             }
         }
-
-        public void Apply(ExitCriterionSatisfied @event)
-        {
-            SatisfiedByAddress = $"{@event.SourceScope}.{@event.SourceId}";
-            State = CriterionState.Satisfied;
-            if (@event.OnPartOccurred)
-            {
-                State |= CriterionState.OnPartOccurred;
-            }
-        }
-    }
-
-    [Flags]
-    public enum CriterionState
-    {
-        Unsatisfied = 0,
-
-        Satisfied = 1,
-        OnPartOccurred = 2
     }
 }

@@ -1,5 +1,8 @@
 ﻿using System;
-using AutoFixture;
+using System.Linq;
+using System.Reflection;
+using AutoMapper;
+using Flow.Grains.Infrastructure.AutoMapper;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces.Plan.Case;
 using Flow.Grains.Plan.PlanItem;
@@ -67,7 +70,8 @@ namespace Flow.Grains.Tests.SiloFixture
                 .AddSingleton<IClock>(SystemClock.Instance.InUtc())
                 .AddRuleExecutor()
                 .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
-                .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>();
+                .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
+                .AddAutoMapper(cfg => cfg.AddProfile<CaseFlowProfile>(), Enumerable.Empty<Assembly>());
         }
 
         private void ConfigureLogging(HostBuilderContext ctx, ILoggingBuilder logging)

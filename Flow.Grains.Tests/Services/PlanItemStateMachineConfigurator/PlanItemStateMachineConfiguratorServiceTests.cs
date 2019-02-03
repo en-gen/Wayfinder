@@ -4,6 +4,7 @@ using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan;
 using Flow.Grains.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
 using Flow.Grains.Tests.Infrastructure.Extensions;

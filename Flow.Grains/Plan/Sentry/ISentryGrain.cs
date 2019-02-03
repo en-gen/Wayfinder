@@ -2,7 +2,7 @@
 
 namespace Flow.Grains.Plan.Sentry
 {
-    public interface ISentryGrain : ICmmnElementActor<Interfaces.Model.Sentry>
+    public interface ISentryGrain : ICmmnElementGrain<Interfaces.Model.Sentry>
     {
     }
 }

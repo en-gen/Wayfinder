@@ -7,8 +7,8 @@ namespace Flow.Grains.Events
     {
         public bool OnPartOccurred { get; }
 
-        public SentrySatisfiedEvent(string scope, string sentryId, bool onPartOccurred) :
-            base(scope, sentryId)
+        public SentrySatisfiedEvent(string scope, string sentryDefinitionId, bool onPartOccurred) :
+            base(scope, sentryDefinitionId)
         {
             OnPartOccurred = onPartOccurred;
         }

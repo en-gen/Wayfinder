@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Flow.Grains.Tests.Infrastructure.Extensions;
 using FluentAssertions;
@@ -60,7 +61,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.StateMachine
             subject.State.Should().Be(preSuspendState);
             subject.ParentSuspendState.Should().BeNull();
         }
-
+        
         private PlanItemStore CreateStore(
             Guid? caseDefId = null,
             PlanItemDefinition piDef = null,

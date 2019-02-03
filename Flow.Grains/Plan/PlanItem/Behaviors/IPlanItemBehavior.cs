@@ -1,12 +1,10 @@
 ﻿using System.Threading.Tasks;
+using Flow.Grains.Interfaces.Model;
 
 namespace Flow.Grains.Plan.PlanItem.Behaviors
 {
     public interface IPlanItemBehavior
     {
-        // TODO: possibly adapt this interface into a grain lifecycle observer for define and activate
-        Task Define();
-        Task Activate();
-        Task<bool> IsUserCompletable();
+        Task Trigger(PlanItemTransition transition);
     }
 }

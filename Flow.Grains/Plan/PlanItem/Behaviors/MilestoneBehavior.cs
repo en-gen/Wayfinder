@@ -2,6 +2,8 @@
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Plan.PlanItem.Events;
+using Flow.Grains.Plan.PlanItem.StateMachine;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
@@ -9,33 +11,18 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 {
     public class MilestoneBehavior : BaseBehavior<Milestone>
     {
-        public MilestoneBehavior(IBehaviorHost host, Milestone planItemDefinition) :
-            base(host, planItemDefinition)
+        public MilestoneBehavior(IBehaviorHost host, Milestone planItemDefinition, IPlanItemStateMachine stateMachine) :
+            base(host, planItemDefinition, stateMachine)
         {
             // 8.10 - EventListener and Milestone instance states
             // ~~~~~
             // In this state an EventListener instance is waiting for the event to occur.
             // A Milestone instance in this state is waiting for the Sentry (as entry
             // criterion) to be satisfied.
-            Host.StateMachine.Configure(PlanItemState.Available)
+            StateMachine.Configure(PlanItemState.Available)
                 .OnEntryFromAsync(PlanItemTransition.Create, HandleEnterAvailableFromCreate);
         }
-
-        public override Task Define() => Task.CompletedTask;
-
-        public override Task Activate() => Task.WhenAll(
-            Host.SubscribeTo<PlanItemTransitionedEvent>(
-                Host.ParentId,
-                HandleParentTransitioned,
-                StreamFlags.Create | StreamFlags.Resume),
-            Task.WhenAll(Host.Definition.EntryCriteria
-                .Select(c => Host.SubscribeTo<SentrySatisfiedEvent>(
-                    c.SentryRef,
-                    HandleSentrySatisfied,
-                    StreamFlags.Resume))));
-
-        public override Task<bool> IsUserCompletable() => Task.FromResult(false);
-
+        
         // 8.11 - EventListener and Milestone instance transitions
         // ~~~~~
         // Create: Transition to the initial state (Available) when an EventListener
@@ -55,106 +42,113 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // ~~~~~
         // A PlanItem that is defined by an EventListener or Milestone MUST NOT have
         // exitCriteriaRefs.
-        private Task HandleEnterAvailableFromCreate()
-        {
-            return Task.WhenAll(
+        private Task HandleEnterAvailableFromCreate() =>
+            Task.WhenAll(
                 EvaluateRepetitionRule(),
                 EvaluateRequiredRule(),
-                Task.WhenAll(Host.Definition.EntryCriteria
-                    .Select(c => Host.SubscribeTo<SentrySatisfiedEvent>(
-                        c.SentryRef,
-                        HandleSentrySatisfied,
-                        StreamFlags.Create))));
-        }
-
-        private async Task HandleParentTransitioned(PlanItemTransitionedEvent @event, StreamSequenceToken token = null)
-        {
-            switch (@event.StandardEvent)
-            {
-                case PlanItemTransition.ParentSuspend:
-                {
-                    Host.RaiseEvent(new ParentSuspended());
-                    if (Host.StateMachine.CanFire(PlanItemTransition.Suspend))
-                    {
-                        await Host.StateMachine.FireAsync(PlanItemTransition.Suspend);
-                    }
-                    break;
-                }
-                case PlanItemTransition.ParentResume:
-                {
-                    Host.RaiseEvent(new ParentResumed());
-                    if (Host.StateMachine.CanFire(PlanItemTransition.Resume))
-                    {
-                        await Host.StateMachine.FireAsync(PlanItemTransition.Resume);
-                    }
-                    break;
-                }
-                case PlanItemTransition.ParentTerminate:
-                {
-                    Host.RaiseEvent(new ParentTerminated());
-                    if (Host.StateMachine.CanFire(PlanItemTransition.ParentTerminate))
-                    {
-                        await Host.StateMachine.FireAsync(PlanItemTransition.ParentTerminate);
-                    }
-                    break;
-                }
-            }
-        }
+                SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create));
 
         protected override async Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null)
         {
-            // ignore events that not in this plan item's hierarchy
-            if (!Host.Scope.StartsWith(@event.SourceScope)) return;
+            // 5.4.5.1 - Criterion, Table 5.25 - Criterion attributes
+            // ~~~~~
+            // Reference a Sentry that represents the PlanItem’s entry or exit criteria.
+            // Criteria of a PlanItem MUST refer to Sentries that are contained by the
+            // Stage or PlanFragment that contains that PlanItem.
+            if (Host.Scope != @event.SourceScope) return;
+
             var criterion = Host.Definition
                 .EntryCriteria
-                .Union<Criterion>(Host.Definition.ExitCriteria)
-                .SingleOrDefault(x => x.SentryRef.Equals(@event.SourceId));
+                .SingleOrDefault(x => x.SentryRef == @event.SourceDefinitionId);
 
-            // ignore events in our scope, but not our concern
+            // disregard events in our scope, but are not our concern
             if (criterion == null) return;
-            // ignore entry criteria if already repeated
-            // just being defensive - should never happen as entry subs are removed on repeat
-            if (criterion is EntryCriterion && Host.State.Repeated) return;
-
+            
             Host.LogWithContext(logger => logger.LogInformation(
-                "{ElementType} {ElementScope}.{ElementId} {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
                 Host.Definition.GetType().Name,
+                PlanItemDefinition.GetType().Name,
                 Host.Scope,
-                Host.Id,
+                Host.InstanceId,
                 criterion.GetType().Name,
                 criterion.Id,
-                @event.SourceId,
+                @event.SourceDefinitionId,
                 @event.OnPartOccurred));
+            
+            Host.RaiseEvent(new EntryCriterionSatisfied
+            {
+                SourceScope = @event.SourceScope,
+                SourceId = @event.SourceDefinitionId,
+                OnPartOccurred = @event.OnPartOccurred
+            });
 
-            if (criterion is EntryCriterion)
+            // disregard entry criteria if already repeated
+            //   - just being defensive. this should never happen as entry criteria
+            //     subs are removed on repeat
+            if (Host.State.Repeated) return;
+
+            if (StateMachine.CanFire(PlanItemTransition.Occur))
             {
-                Host.RaiseEvent(new EntryCriterionSatisfied
-                {
-                    SourceScope = @event.SourceScope,
-                    SourceId = @event.SourceId,
-                    OnPartOccurred = @event.OnPartOccurred
-                });
-                if (Host.StateMachine.CanFire(PlanItemTransition.Occur))
-                {
-                    await Host.StateMachine.FireAsync(PlanItemTransition.Occur);
-                }
-                else if (Host.State.PlanItemState.IsTerminal() &&
-                         @event.OnPartOccurred &&
-                         await EvaluateRepetitionRule())
-                {
-                    // TODO: tell host to repeat
-                }
+                await StateMachine.FireAsync(PlanItemTransition.Occur);
             }
-            else if (criterion is ExitCriterion)
+            // 8.6.4 RepetitionRule
+            // ~~~~~
+            // (after transitioning from Available), every time an entry criterion with an OnPart is satisfied
+            // the RepetitionRule’s condition is re-evaluated and if it evaluates to TRUE, a new instance of the
+            // Task, Stage, or Milestone is created and transition to Available
+            else if (Host.State.PlanItemState.IsTerminal() &&
+                     @event.OnPartOccurred &&
+                     await EvaluateRepetitionRule())
             {
-                Host.RaiseEvent(new ExitCriterionSatisfied
-                {
-                    SourceId = @event.SourceId,
-                    OnPartOccurred = @event.OnPartOccurred
-                });
+                await Task.WhenAll(
+                    UnsubscribeFromCriteria(x => x.EntryCriteria),
+                    Host.Publish(new PlanItemRepetitionCriteriaMetEvent(
+                        Host.Scope,
+                        Host.InstanceId,
+                        Host.DefinitionId,
+                        Host.State.Repetition)));
+
+                Host.RaiseEvent(new Repeated());
             }
 
             await Host.ConfirmEvents();
+        }
+
+        protected override async Task HandleParentTransitioned(PlanItemTransitionedEvent @event, StreamSequenceToken token = null)
+        {
+            // ignore if not from direct parent
+            if (@event.SourceInstanceId != Host.ParentInstanceId) return;
+
+            PlanItemTransition? transition = null;
+            switch (@event.StandardEvent)
+            {
+                case PlanItemTransition.Suspend:
+                case PlanItemTransition.ParentSuspend:
+                {
+                    Host.RaiseEvent(new ParentSuspended());
+                    transition = PlanItemTransition.Suspend;
+                    break;
+                }
+                case PlanItemTransition.Resume:
+                case PlanItemTransition.ParentResume:
+                {
+                    Host.RaiseEvent(new ParentResumed());
+                    transition = PlanItemTransition.Resume;
+                    break;
+                }
+                case PlanItemTransition.Exit:
+                case PlanItemTransition.Terminate:
+                {
+                    Host.RaiseEvent(new ParentTerminated());
+                    transition = PlanItemTransition.ParentTerminate;
+                    break;
+                }
+            }
+
+            if (transition.HasValue && StateMachine.CanFire(transition.Value))
+            {
+                await StateMachine.FireAsync(transition.Value);
+            }
         }
     }
 }
