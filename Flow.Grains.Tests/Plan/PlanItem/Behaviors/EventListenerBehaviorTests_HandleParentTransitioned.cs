@@ -67,6 +67,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.ParentInstanceId)
                 .Returns(parentInstanceId);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
@@ -108,6 +110,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.ParentInstanceId)
                 .Returns(parentInstanceId);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
@@ -171,6 +175,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(parentInstanceId);
             mockHost.Setup(x => x.Definition)
                 .Returns(pi);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 

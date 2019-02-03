@@ -16,13 +16,17 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             StateMachine.OnTransitionedAsync(HandleTransitioned);
         }
 
-        private Task HandleTransitioned(PlanItemStateMachine.Transition transition)
+        private async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
         {
+            var userCompletable = StateMachine.CanFire(PlanItemTransition.Complete);
+
+            if (Host.State.UserCompletable == userCompletable) return;
+
             Host.RaiseEvent(new UserCompletableCriteriaMet
             {
-                UserCompletable = StateMachine.CanFire(PlanItemTransition.Complete)
+                UserCompletable = userCompletable
             });
-            return Task.CompletedTask;
+            await Host.ConfirmEvents();
         }
 
         protected override async Task HandleParentTransitioned(PlanItemTransitionedEvent @event, StreamSequenceToken token = null)
@@ -62,9 +66,6 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             }
         }
 
-        protected override Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null)
-        {
-            throw new System.NotImplementedException();
-        }
+        protected override Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null) => Task.CompletedTask;
     }
 }
