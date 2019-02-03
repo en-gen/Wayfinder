@@ -79,7 +79,7 @@ namespace Flow.Grains.Plan.PlanItem
         public void Apply(UserCompletableCriteriaMet @event)
         {
             Updated = @event.Updated;
-            UserCompletable = true;
+            UserCompletable = @event.UserCompletable;
         }
 
         public void Apply(Repeated @event)

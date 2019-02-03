@@ -6,10 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Plan\PlanItem\Behaviors\EventListenerBehavior.cs" />
-    <Compile Remove="Plan\PlanItem\Behaviors\HumanTaskBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\IMigrateBehavior.cs" />
-    <Compile Remove="Plan\PlanItem\Behaviors\TaskBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\TimerEventListenerBehavior.cs" />
     <Compile Remove="Plan\PlanItem\Behaviors\UserEventListenerBehavior.cs" />
   </ItemGroup>

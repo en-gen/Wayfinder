@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces;
@@ -15,16 +16,16 @@ using Xunit;
 
 namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 {
-    public partial class StageBehaviorTests
+    public partial class TaskBehaviorTests
     {
         [Fact]
         public async Task HandleParentTransitioned__When_ParentInstanceIdEventSource__Then_Disregard()
         {
             var parentInstanceId = ShortGuid.NewGuid();
 
-            var stage = new Stage();
+            var task = new HumanTask();
 
-            var testStore = new TestPlanItemStore(piDef: stage);
+            var testStore = new TestPlanItemStore(piDef: task);
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.ParentInstanceId)
@@ -32,9 +33,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
-            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+            var subject = new TaskBehavior<HumanTask>(mockHost.Object, task, mockMachine.Object);
 
-            await (Task)typeof(StageBehavior)
+            await (Task)typeof(TaskBehavior<HumanTask>)
                 .GetMethod("HandleParentTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
@@ -62,9 +63,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         {
             var parentInstanceId = ShortGuid.NewGuid();
 
-            var stage = new Stage();
+            var task = new HumanTask();
 
-            var testStore = new TestPlanItemStore(piDef: stage);
+            var testStore = new TestPlanItemStore(piDef: task);
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.ParentInstanceId)
@@ -72,9 +73,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
-            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+            var subject = new TaskBehavior<HumanTask>(mockHost.Object, task, mockMachine.Object);
 
-            await (Task)typeof(StageBehavior)
+            await (Task)typeof(TaskBehavior<HumanTask>)
                 .GetMethod("HandleParentTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
@@ -103,9 +104,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         {
             var parentInstanceId = ShortGuid.NewGuid();
 
-            var stage = new Stage();
+            var task = new HumanTask();
 
-            var testStore = new TestPlanItemStore(piDef: stage);
+            var testStore = new TestPlanItemStore(piDef: task);
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.ParentInstanceId)
@@ -113,10 +114,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
-            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+            var subject = new TaskBehavior<HumanTask>(mockHost.Object, task, mockMachine.Object);
 
             // we must ParentSuspend before we can ParentResume
-            await (Task)typeof(StageBehavior)
+            await (Task)typeof(TaskBehavior<HumanTask>)
                 .GetMethod("HandleParentTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
@@ -133,7 +134,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockMachine.Object.State.Should().Be(PlanItemState.Suspended);
             mockMachine.Object.ParentSuspendState.Should().Be(PlanItemState.Available);
 
-            await (Task)typeof(StageBehavior)
+            await (Task)typeof(TaskBehavior<HumanTask>)
                 .GetMethod("HandleParentTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
@@ -164,9 +165,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var pi = new Interfaces.Model.PlanItem();
 
-            var stage = new Stage();
+            var task = new HumanTask();
 
-            var testStore = new TestPlanItemStore(piDef: stage, def: pi);
+            var testStore = new TestPlanItemStore(piDef: task, def: pi);
 
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.ParentInstanceId)
@@ -176,9 +177,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
-            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+            var subject = new TaskBehavior<HumanTask>(mockHost.Object, task, mockMachine.Object);
 
-            await (Task)typeof(StageBehavior)
+            await (Task)typeof(TaskBehavior<HumanTask>)
                 .GetMethod("HandleParentTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
