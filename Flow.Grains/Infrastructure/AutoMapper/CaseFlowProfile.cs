@@ -10,7 +10,7 @@ namespace Flow.Grains.Infrastructure.AutoMapper
     {
         public CaseFlowProfile()
         {
-            CreateMap<CriterionStore, CriterionSnapshot>();
+            CreateMap<PlanItemStore.CriterionStore, PlanItemSnapshot.CriterionSnapshot>();
             CreateMap<PlanItemStore, PlanItemSnapshot>()
                 .ForMember(dest => dest.Definition, opts => opts.Ignore())
                 .ForMember(dest => dest.Children, opts => opts.PreCondition(src => src.Children.Any()));

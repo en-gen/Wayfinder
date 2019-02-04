@@ -23,5 +23,12 @@ namespace Flow.Grains.Interfaces.Plan.PlanItem
         public CriterionSnapshot ExitCriterionStore { get; set; }
 
         public IDictionary<string, IDictionary<string, int>> Children { get; set; }
+
+        [Serializable]
+        public class CriterionSnapshot
+        {
+            public string SatisfiedByAddress { get; set; }
+            public CriterionState State { get; set; }
+        }
     }
 }

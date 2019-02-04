@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.CmmnElement.Events;
 using Flow.Grains.Plan.PlanItem.Events;
@@ -99,6 +100,22 @@ namespace Flow.Grains.Plan.PlanItem
             }
 
             instances[@event.PlanItemInstanceId] = @event.Repetition;
+        }
+
+        public class CriterionStore
+        {
+            public string SatisfiedByAddress { get; private set; }
+            public CriterionState State { get; private set; }
+
+            public void Apply(CriterionSatisfied @event)
+            {
+                SatisfiedByAddress = $"{@event.SourceScope}.{@event.SourceId}";
+                State = CriterionState.Satisfied;
+                if (@event.OnPartOccurred)
+                {
+                    State |= CriterionState.OnPartOccurred;
+                }
+            }
         }
     }
 }
