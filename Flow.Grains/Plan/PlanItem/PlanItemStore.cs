@@ -1,9 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.CmmnElement.Events;
+using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
 
 namespace Flow.Grains.Plan.PlanItem
@@ -25,9 +25,7 @@ namespace Flow.Grains.Plan.PlanItem
         public CriterionStore EntryCriterionStore { get; } = new CriterionStore();
         public CriterionStore ExitCriterionStore { get; } = new CriterionStore();
 
-        // only applicable to PlanItems defined by a Stage
-        // PlanItemDefinitionId => PlanItemInstanceId => Repetition
-        public IDictionary<string, IDictionary<string, int>> Children { get; } = new Dictionary<string, IDictionary<string, int>>();
+        public BehaviorStore BehaviorExtension { get; private set; }
 
         public void Apply(BaseUpdate @event)
         {
@@ -39,6 +37,20 @@ namespace Flow.Grains.Plan.PlanItem
             base.Apply(@event);
             PlanItemDefinition = @event.PlanItemDefinition;
             Repetition = @event.Repetition;
+
+            switch (PlanItemDefinition)
+            {
+                case Stage s:
+                {
+                    BehaviorExtension = new StageBehaviorStore();
+                    break;
+                }
+                case TimerEventListener tel:
+                {
+                    BehaviorExtension = new TimerEventListenerBehaviorStore();
+                    break;
+                }
+            }
         }
 
         public void Apply(Transitioned @event)
@@ -92,14 +104,11 @@ namespace Flow.Grains.Plan.PlanItem
         public void Apply(ChildCreated @event)
         {
             Updated = @event.Updated;
-            
-            if (!Children.TryGetValue(@event.PlanItemDefinitionId, out var instances))
-            {
-                instances = new Dictionary<string, int>();
-                Children[@event.PlanItemDefinitionId] = instances;
-            }
 
-            instances[@event.PlanItemInstanceId] = @event.Repetition;
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
         }
 
         public class CriterionStore

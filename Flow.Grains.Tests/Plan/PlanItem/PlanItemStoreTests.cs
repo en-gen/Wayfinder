@@ -3,6 +3,7 @@ using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
@@ -338,6 +339,15 @@ namespace Flow.Grains.Tests.Plan.PlanItem
         {
             var subject = new PlanItemStore();
 
+            subject.Apply(new Defined
+            {
+                CaseDefinitionId = Guid.NewGuid(),
+                Definition = new Interfaces.Model.PlanItem(),
+                PlanItemDefinition = new Stage(),
+                Repetition = 0
+                
+            });
+
             var @event = new ChildCreated
             {
                 PlanItemInstanceId = instanceId,
@@ -347,11 +357,17 @@ namespace Flow.Grains.Tests.Plan.PlanItem
 
             subject.Apply(@event);
 
-            subject.Children.Should().NotBeEmpty()
+            subject.Updated.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Updated);
+            subject.BehaviorExtension.Should().BeOfType<StageBehaviorStore>();
+
+            var stageStore = subject.BehaviorExtension.As<StageBehaviorStore>();
+
+            stageStore.Children.Should().NotBeEmpty()
                 .And.HaveCount(1)
                 .And.ContainKey(definitionId);
 
-            subject.Children[definitionId].Should().NotBeNull()
+            stageStore.Children[definitionId].Should().NotBeNull()
                 .And.HaveCount(1)
                 .And.ContainKey(instanceId)
                 .And.ContainValue(repetition);

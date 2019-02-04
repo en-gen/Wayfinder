@@ -6,11 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Plan\PlanItem\Behaviors\IMigrateBehavior.cs" />
-    <Compile Remove="Plan\PlanItem\Behaviors\TimerEventListenerBehavior.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="AutoMapper" Version="8.0.0" />
     <PackageReference Include="Jint" Version="2.11.58" />
     <PackageReference Include="Microsoft.Orleans.CodeGenerator.MSBuild" Version="2.2.3">
@@ -25,17 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="xunit.assert">
-      <HintPath>..\..\..\..\Users\engenb.ENGEN\.nuget\packages\xunit.assert\2.4.1\lib\netstandard1.1\xunit.assert.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Executables\" />
-    <Folder Include="Plan\Case\" />
   </ItemGroup>
 
 </Project>

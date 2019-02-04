@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Flow.Grains.Plan.PlanningTable;
@@ -297,7 +298,8 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
             }
 
-            var childSnapshots = await Task.WhenAll(Host.State.Children
+            var childSnapshots = await Task.WhenAll(Host.State
+                .BehaviorExtension.As<StageBehaviorStore>().Children
                 .SelectMany(kvp => kvp.Value.Keys)
                 .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemGrain>(
                         Host.CaseInstanceId,

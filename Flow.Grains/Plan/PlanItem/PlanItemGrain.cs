@@ -72,7 +72,9 @@ namespace Flow.Grains.Plan.PlanItem
 
         public override Task Define(Guid caseDefinitionId, Interfaces.Model.PlanItem definition) =>
             DefineRepetition(caseDefinitionId, definition, 0);
-
+        
+        public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(Mapper.Map<PlanItemSnapshot>(this));
+        
         public async Task DefineRepetition(Guid caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition)
         {
             var planItemDefinition = await GrainFactory.GetGrain<IPlanItemDefinitionGraphGrain>(caseDefinitionId)
@@ -104,7 +106,5 @@ namespace Flow.Grains.Plan.PlanItem
             var ret = await GetSnapshot();
             return ret;
         }
-
-        public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(Mapper.Map<PlanItemSnapshot>(this));
     }
 }
