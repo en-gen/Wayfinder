@@ -16,7 +16,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             StateMachine.OnTransitionedAsync(HandleTransitioned);
         }
 
-        private async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
+        protected virtual async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
         {
             var userCompletable = StateMachine.CanFire(PlanItemTransition.Complete);
 

@@ -209,7 +209,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         }
 
         [Fact]
-        public async Task HandleChildTransitioned__Given_Uninitialized__When_ChildrenNotTerminal__Then_RaiseChildTriggeredActivationAndFireTransitionsToStart()
+        public async Task HandleChildTransitioned__Given_Uninitialized__When_ChildrenNotTerminalManuallyActivated__Then_RaiseChildTriggeredActivationAndFireTransitionsToStart()
         {
             var caseInstanceId = Guid.NewGuid();
             var address = ShortGuid.NewGuid();
@@ -217,6 +217,86 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var planItemInstanceId = ShortGuid.NewGuid();
 
             var pi = new Interfaces.Model.PlanItem();
+
+            var stage = new Stage();
+
+            var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
+            testStore.Apply(new ChildCreated
+            {
+                PlanItemDefinitionId = planItemDefinitionId,
+                PlanItemInstanceId = planItemInstanceId,
+                Repetition = 0
+            });
+
+            var snapshot = new PlanItemSnapshot
+            {
+                Required = true,
+                PlanItemState = PlanItemState.Active
+            };
+
+            var mockPlanItem = new Mock<IPlanItemGrain>();
+            mockPlanItem.Setup(x => x.GetSnapshot())
+                .Returns(Task.FromResult(snapshot));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
+                .Returns(mockPlanItem.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost.Setup(x => x.Address)
+                .Returns(address);
+            mockHost.Setup(x => x.Definition)
+                .Returns(pi);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+            mockHost.Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+
+            await (Task)typeof(StageBehavior)
+                .GetMethod("HandleChildTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[]
+                {
+                    new PlanItemTransitionedEvent(
+                        address,
+                        ShortGuid.NewGuid(),
+                        ShortGuid.NewGuid(),
+                        PlanItemTransition.Create,
+                        PlanItemState.Uninitialized,
+                        PlanItemState.Available),
+                    (StreamSequenceToken)null
+                });
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildTriggeredActivation>()), Times.Once);
+
+            mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Create), Times.Once);
+            mockMachine.Verify(x => x.FireAsync(PlanItemTransition.ManualStart), Times.Once);
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<UserCompletableCriteriaMet>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task HandleChildTransitioned__Given_Uninitialized__When_ChildrenNotTerminalEntryCriteria__Then_RaiseChildTriggeredActivationAndFireTransitionsToStart()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var address = ShortGuid.NewGuid();
+            var planItemDefinitionId = ShortGuid.NewGuid();
+            var planItemInstanceId = ShortGuid.NewGuid();
+
+            var pi = new Interfaces.Model.PlanItem
+            {
+                EntryCriteria =
+                {
+                    new EntryCriterion {SentryRef = ShortGuid.NewGuid()}
+                }
+            };
 
             var stage = new Stage();
 

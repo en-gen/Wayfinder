@@ -154,7 +154,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
                 }
             };
 
-            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
+            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{ShortGuid.NewGuid()}");
 
             await subject.Define(caseDefinitionId, sentry);
 

@@ -58,7 +58,23 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             Task.WhenAll(
                 EvaluateRepetitionRule(),
                 EvaluateRequiredRule(),
-                SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create),
+                // 8.7 - Stage and Task instances states
+                // ~~~~~
+                // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
+                // A missing entry criteria(Sentry) is considered TRUE.
+                Host.Definition.EntryCriteriaSpecified
+                    ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
+                    : Task.Factory.StartNew(async () =>
+                    {
+                        if (await EvaluateManualActivationRule())
+                        {
+                            await StateMachine.FireAsync(PlanItemTransition.Enable);
+                        }
+                        else
+                        {
+                            await StateMachine.FireAsync(PlanItemTransition.Start);
+                        }
+                    }),
                 PlanItemDefinition.IsBlocking
                     ? SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create)
                     : Task.CompletedTask);

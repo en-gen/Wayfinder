@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
+using Flow.Grains.Plan.Role;
+using Orleans;
 using Stateless;
 
 namespace Flow.Grains.Plan.PlanItem.Behaviors
@@ -12,15 +14,13 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         public UserEventListenerBehavior(IBehaviorHost host, UserEventListener planItemDefinition, IPlanItemStateMachine stateMachine) :
             base(host, planItemDefinition, stateMachine)
         {
-            StateMachine.OnTransitionedAsync(HandleTransitioned);
         }
 
-        private async Task HandleTransitioned(StateMachine<PlanItemState, PlanItemTransition>.Transition arg)
+        protected override async Task HandleTransitioned(StateMachine<PlanItemState, PlanItemTransition>.Transition transition)
         {
             var userCompletable = StateMachine.CanFire(PlanItemTransition.Complete) &&
-                                  (PlanItemDefinition.AuthorizedRoleRefs == null ||
-                                   !PlanItemDefinition.AuthorizedRoleRefs.Any() ||
-                                   true); // case auth
+                                  ((PlanItemDefinition.AuthorizedRoleRefs?.Length ?? 0) == 0 ||
+                                   await Authorized());
 
             if (Host.State.UserCompletable == userCompletable) return;
 
@@ -29,6 +29,34 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 UserCompletable = userCompletable
             });
             await Host.ConfirmEvents();
+        }
+
+        // this will check all roles in parallel.  as soon
+        // as a task returns true, the remaining tasks are canceled
+        // and result is returned
+        private async Task<bool> Authorized()
+        {
+            var tcs = new GrainCancellationTokenSource();
+
+            var remainingTasks = PlanItemDefinition.AuthorizedRoleRefs
+                .Select(role => Host.GrainFactory
+                    .GetGrain<IRoleGrain>(Host.CaseInstanceId, role)
+                    .Authorize(tcs.Token))
+                .ToHashSet();
+
+            while (remainingTasks.Any())
+            {
+                var next = await Task.WhenAny(remainingTasks);
+                if (next.Result)
+                {
+                    await tcs.Cancel();
+                    tcs.Dispose();
+                    return true;
+                }
+                remainingTasks.Remove(next);
+            }
+
+            return false;
         }
     }
 }

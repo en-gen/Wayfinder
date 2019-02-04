@@ -23,12 +23,14 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
         private void ConfigureFor(PlanItemDefinition planItemDefinition)
         {
             Logger.LogInformation("Initializing {BehaviorType} state machine", planItemDefinition.GetType().Name);
-
-            Configure(PlanItemState.Uninitialized)
-                .Permit(PlanItemTransition.Create, PlanItemState.Available);
-
+            
             switch (planItemDefinition)
             {
+                case Stage stage when stage.IsCasePlanModel:
+                {
+                    ConfigureForCasePlanModel();
+                    break;
+                }
                 case Stage stage:
                 case BaseTask task:
                 {
@@ -44,8 +46,61 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
             }
         }
 
+        private void ConfigureForCasePlanModel()
+        {
+            Configure(PlanItemState.Uninitialized)
+                .Permit(PlanItemTransition.Create, PlanItemState.Active);
+
+            // 8.5 - Case instance states
+            // ~~~~~
+            // In this state the Case instance is executing; meaning the outermost Stage instance is in the Active state
+            Configure(PlanItemState.Active)
+                .Permit(PlanItemTransition.Complete, PlanItemState.Completed)
+                .Permit(PlanItemTransition.Terminate, PlanItemState.Terminated)
+                .Permit(PlanItemTransition.Fault, PlanItemState.Failed)
+                .Permit(PlanItemTransition.Suspend, PlanItemState.Suspended);
+
+            // 8.5 - Case instance states
+            // ~~~~~
+            // The Case instance is completed, when all the required Milestone, Stage, and Task instances in the
+            // outermost Stage instance are completed(completed or terminated), and there are no executing(Active)
+            // Stage or Task instances.
+            Configure(PlanItemState.Completed)
+                .Permit(PlanItemTransition.Reactivate, PlanItemState.Active)
+                .Permit(PlanItemTransition.Close, PlanItemState.Closed);
+
+            // 8.5 - Case instance states
+            // ~~~~~
+            // Terminal state. This state can be achieved by an exit criteria and also allows a Case worker (human) to
+            // terminate an executing Case instance.This state is reached when the outermost Stage instance reaches it.
+            Configure(PlanItemState.Terminated)
+                .Permit(PlanItemTransition.Reactivate, PlanItemState.Active)
+                .Permit(PlanItemTransition.Close, PlanItemState.Closed);
+
+            // 8.5 - Case instance states
+            // ~~~~~
+            // Semi-terminal state. This state is reached when the outermost Stage instance reaches it. The state
+            // indicates an exception or software failure.
+            Configure(PlanItemState.Failed)
+                .Permit(PlanItemTransition.Reactivate, PlanItemState.Active)
+                .Permit(PlanItemTransition.Close, PlanItemState.Closed);
+
+            // 8.5 - Case instance states
+            // ~~~~~
+            // This state allows a Case worker (human) to temporarily suspend an executing Case instance. A Case
+            // instance MUST propagate this state to its outermost Stage instance. This state MUST then be
+            // propagated down to the outermost Stage instance’s contained EventListener, Milestone, Stage,
+            // and Task instances.
+            Configure(PlanItemState.Suspended)
+                .Permit(PlanItemTransition.Reactivate, PlanItemState.Active)
+                .Permit(PlanItemTransition.Close, PlanItemState.Closed);
+        }
+
         private void ConfigureForStageOrTask()
         {
+            Configure(PlanItemState.Uninitialized)
+                .Permit(PlanItemTransition.Create, PlanItemState.Available);
+
             // 8.7 - Stage and Task instance states
             // ~~~~~
             // A Stage or Task instance becomes available when
@@ -122,6 +177,9 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
 
         private void ConfigureForMilestoneOrEventListener()
         {
+            Configure(PlanItemState.Uninitialized)
+                .Permit(PlanItemTransition.Create, PlanItemState.Available);
+
             // 8.10 - EventListener and Milestone instance states
             // ~~~~~
             // In this state an EventListener instance is waiting for the event to occur. A Milestone instance in this

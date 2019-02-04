@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.EventSourcing;
 using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Flow.Grains.Plan.CmmnElement
@@ -41,11 +42,14 @@ namespace Flow.Grains.Plan.CmmnElement
         {
             _caseInstanceId = this.GetPrimaryKey(out _address);
             
-            _scope = _address.Substring(0, _address.LastIndexOf('.'));
-            var chunks = _address.Split('.').Reverse().ToArray();
-            _instanceId = chunks.First();
-            _parentId = chunks.Skip(1).First();
+            var chunks = _address.Split('.');
+            _scope = string.Join('.', chunks.Take(chunks.Length - 1));
+            _instanceId = chunks.LastOrDefault();
+            _parentId = chunks.Length > 1
+                ? chunks.Skip(chunks.Length - 2).FirstOrDefault()
+                : string.Empty;
 
+            _logContext["CorrelationId"] = RequestContext.ActivityId;
             _logContext["CaseInstanceId"] = _caseInstanceId;
             _logContext["ElementAddress"] = _address;
             _logContext["ElementScope"] = _scope;
@@ -95,7 +99,7 @@ namespace Flow.Grains.Plan.CmmnElement
             if (creating || resuming)
             {
                 LogWithContext(logger => logger.LogInformation(
-                    $"{{Element}} {{ElementScope}}.{{ElementInstanceId}}: {(creating ? "creating" : "resuming")} {{EventType}} subscription to {{EventSourceId}}",
+                    $"{{Element}} {{ElementScope}}.{{ElementInstanceId}}: {(creating ? "creating" : "resuming")} {{EventType}} subscription to {{EventSourceDefinitionId}}",
                     Definition.GetType().Name,
                     _scope,
                     Definition.Id,
@@ -116,7 +120,7 @@ namespace Flow.Grains.Plan.CmmnElement
         protected async Task UnsubscribeFrom<TEvent>(string eventSourceRef)
         {
             LogWithContext(logger => logger.LogInformation(
-                "{Element} {ElementScope}.{ElementInstanceId}: removing {EventType} subscription from {EventSourceRef}",
+                "{Element} {ElementScope}.{ElementInstanceId}: removing {EventType} subscription from {EventSourceDefinitionId}",
                 Definition.GetType().Name,
                 _scope,
                 Definition.Id,

@@ -62,6 +62,8 @@ namespace Flow.Grains.Tests.SiloFixture
 
             SiloHost.StartAsync().GetAwaiter().GetResult();
             ClusterClient.Connect().GetAwaiter().GetResult();
+
+            RequestContext.PropagateActivityId = true;
         }
 
         private static void ConfigureServices(HostBuilderContext ctx, IServiceCollection services)
