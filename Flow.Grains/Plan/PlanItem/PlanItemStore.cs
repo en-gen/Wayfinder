@@ -1,6 +1,5 @@
 ﻿using System;
 using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.CmmnElement.Events;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
@@ -14,10 +13,17 @@ namespace Flow.Grains.Plan.PlanItem
         public PlanItemDefinition PlanItemDefinition { get; private set; }
 
         public bool UserCompletable { get; private set; }
-        public bool Required { get; private set; }
-        public bool Repeated { get; private set; }
 
+        public bool Required { get; private set; }
+        public string RequiredEvaluationError { get; private set; }
+
+        public bool Repeatable { get; private set; }
+        public string RepeatableEvaluationError { get; private set; }
+        public bool Repeated { get; private set; }
         public int Repetition { get; private set; }
+
+        public bool ManuallyActivatable { get; private set; }
+        public string ManuallyActivatableEvaluationError { get; private set; }
 
         public PlanItemState PlanItemState { get; private set; }
         public PlanItemState? ParentSuspendState { get; private set; }
@@ -25,7 +31,7 @@ namespace Flow.Grains.Plan.PlanItem
         public CriterionStore EntryCriterionStore { get; } = new CriterionStore();
         public CriterionStore ExitCriterionStore { get; } = new CriterionStore();
 
-        public BehaviorStore BehaviorExtension { get; private set; }
+        public object BehaviorExtension { get; private set; }
 
         public void Apply(BaseUpdate @event)
         {
@@ -73,8 +79,26 @@ namespace Flow.Grains.Plan.PlanItem
 
         public void Apply(RequiredRuleEvaluated @event)
         {
-            Required = @event.Result;
             Updated = @event.Updated;
+
+            Required = @event.Result;
+            RequiredEvaluationError = @event.Error;
+        }
+
+        public void Apply(RepetitionRuleEvaluated @event)
+        {
+            Updated = @event.Updated;
+
+            Repeatable = @event.Result;
+            RepeatableEvaluationError = @event.Error;
+        }
+
+        public void Apply(ManualActivationRuleEvaluated @event)
+        {
+            Updated = @event.Updated;
+
+            ManuallyActivatable = @event.Result;
+            ManuallyActivatableEvaluationError = @event.Error;
         }
 
         public void Apply(ParentSuspended @event)
@@ -111,19 +135,23 @@ namespace Flow.Grains.Plan.PlanItem
             }
         }
 
-        public class CriterionStore
+        public void Apply(TimerStartTriggerOccurred @event)
         {
-            public string SatisfiedByAddress { get; private set; }
-            public CriterionState State { get; private set; }
+            Updated = @event.Updated;
 
-            public void Apply(CriterionSatisfied @event)
+            if (BehaviorExtension is TimerEventListenerBehaviorStore timerStore)
             {
-                SatisfiedByAddress = $"{@event.SourceScope}.{@event.SourceId}";
-                State = CriterionState.Satisfied;
-                if (@event.OnPartOccurred)
-                {
-                    State |= CriterionState.OnPartOccurred;
-                }
+                timerStore.Apply(@event);
+            }
+        }
+
+        public void Apply(TimerExpressionEvaluated @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is TimerEventListenerBehaviorStore timerStore)
+            {
+                timerStore.Apply(@event);
             }
         }
     }

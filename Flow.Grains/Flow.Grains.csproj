@@ -15,6 +15,7 @@
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="2.2.0" />
     <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="2.2.0" />
     <PackageReference Include="NodaTime" Version="2.4.4" />
+    <PackageReference Include="Quartz" Version="3.0.7" />
     <PackageReference Include="Stateless" Version="4.2.1" />
   </ItemGroup>
 

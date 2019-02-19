@@ -60,7 +60,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         private async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
         {
             Host.LogWithContext(logger => logger.LogInformation(
-                "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} processed transition {PreviousState} × {StandardEvent} = {CurrentState}",
+                "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | processed transition {PreviousState} × {StandardEvent} = {CurrentState}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
@@ -89,7 +89,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         private Task HandleUnhandledTrigger(PlanItemState state, PlanItemTransition trigger)
         {
             Host.LogWithContext(logger => logger.LogInformation(
-                "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} attempted invalid transition {CurrentState} × {StandardEvent} = [INVALID]",
+                "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | attempted invalid transition {CurrentState} × {StandardEvent} = [INVALID]",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
@@ -107,7 +107,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 .Select(criterion =>
                 {
                     Host.LogWithContext(logger => logger.LogInformation(
-                        "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} creating {CriterionType} {CriterionId} subscription to sentry {SentryId}",
+                        "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | creating {CriterionType} {CriterionId} subscription to sentry {SentryId}",
                         Host.Definition.GetType().Name,
                         PlanItemDefinition.GetType().Name,
                         Host.Scope,
@@ -204,7 +204,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         }
 
         private async Task<bool> EvaluateRule<TEvent>(IExecutableRule rule, bool defaultResult)
-            where TEvent : RuleEvaluated
+            where TEvent : RuleEvaluated<bool>
         {
             ExecutableResult<bool> ruleResult = null;
             if (rule?.Condition != null)
@@ -223,7 +223,6 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if ((ruleResult?.IsError ?? false) &&
                 StateMachine.CanFire(PlanItemTransition.Fault))
             {
-                // TODO: set fault error msg from result in state?
                 await StateMachine.FireAsync(PlanItemTransition.Fault);
             }
 

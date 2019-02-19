@@ -8,13 +8,13 @@ namespace Flow.Grains.Plan.PlanItem.Definitions
 {
     public class PlanItemDefinitionGrain : Grain<PlanItemDefinitionStore>, IPlanItemDefinitionGrain
     {
-        private Guid _flowDefinition;
+        private Guid _tenantId;
         private string _scope;
         private string _id;
 
         public override Task OnActivateAsync()
         {
-            _flowDefinition = this.GetPrimaryKey(out var address);
+            _tenantId = this.GetPrimaryKey(out var address);
             _scope = address.Substring(0, address.LastIndexOf('.'));
             _id = address.Split('.').Last();
             return base.OnActivateAsync();
@@ -22,7 +22,7 @@ namespace Flow.Grains.Plan.PlanItem.Definitions
 
         public Task Define(PlanItemDefinition planItemDefinition)
         {
-            if (State.Created != null) throw new InvalidOperationException($"PlanItemDefinition {_id} already defined for flow {_flowDefinition}");
+            if (State.Created != null) throw new InvalidOperationException($"PlanItemDefinition {_id} already defined for tenant {_tenantId}");
             if(planItemDefinition.Id != _id) throw new ArgumentException($"PlanItemDefinition id {planItemDefinition.Id} must match grain id {_id}");
 
             State.PlanItemDefinition = planItemDefinition;

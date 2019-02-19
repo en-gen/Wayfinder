@@ -5,7 +5,7 @@ namespace Flow.Grains.Events
     [Serializable]
     public abstract class BaseEvent
     {
-        public DateTime Ocurred { get; } = DateTime.UtcNow;
+        public DateTime Occurred { get; } = DateTime.UtcNow;
 
         public string SourceScope { get; }
         public string SourceDefinitionId { get; }

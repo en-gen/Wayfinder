@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces;
@@ -18,6 +19,8 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
     public class StageBehavior : BaseBehavior<Stage>
     {
+        private StageBehaviorStore StageStore => Host.State.BehaviorExtension as StageBehaviorStore ?? throw new InvalidOperationException();
+
         public StageBehavior(IBehaviorHost host, Stage planItemDefinition, IPlanItemStateMachine stateMachine) :
             base(host, planItemDefinition, stateMachine)
         {
@@ -61,7 +64,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                         if (await sentryGrain.Defined()) return;
 
                         Host.LogWithContext(logger => logger.LogInformation(
-                            "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: creating sentry {SentryId}",
+                            "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | creating sentry {SentryId}",
                             Host.Definition.GetType().Name,
                             PlanItemDefinition.GetType().Name,
                             Host.Scope,
@@ -139,7 +142,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if (criterion == null) return;
 
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
@@ -258,7 +261,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if (@event.SourceScope != Host.Address) return;
 
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: processing instance {ChildElementInstanceId} of child {ChildElementDefinitionId} transition {PreviousState} × {StandardEvent} = {CurrentState}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | processing instance {ChildElementInstanceId} of child {ChildElementDefinitionId} transition {PreviousState} × {StandardEvent} = {CurrentState}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
@@ -298,8 +301,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
             }
 
-            var childSnapshots = await Task.WhenAll(Host.State
-                .BehaviorExtension.As<StageBehaviorStore>().Children
+            var childSnapshots = await Task.WhenAll(StageStore.Children
                 .SelectMany(kvp => kvp.Value.Keys)
                 .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemGrain>(
                         Host.CaseInstanceId,
@@ -368,7 +370,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if (child == null)
             {
                 Host.LogWithContext(logger => logger.LogCritical(
-                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: received child repeat from unknown child {ChildElementDefinitionId}",
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | received child repeat from unknown child {ChildElementDefinitionId}",
                     Host.Definition.GetType().Name,
                     PlanItemDefinition.GetType().Name,
                     Host.Scope,
@@ -378,7 +380,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             }
 
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: instantiating repetition {ChildElementInstanceId} of {ChildElementDefinitionId}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | instantiating repetition {ChildElementInstanceId} of {ChildElementDefinitionId}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
@@ -395,7 +397,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             var childInstanceId = ShortGuid.NewGuid();
 
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: creating instance {ChildElementInstanceId} of child {ChildElementDefinitionId}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | creating instance {ChildElementInstanceId} of child {ChildElementDefinitionId}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,

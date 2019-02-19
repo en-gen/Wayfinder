@@ -5,7 +5,7 @@ using Flow.Grains.Plan.PlanItem.Events;
 namespace Flow.Grains.Plan.PlanItem.Behaviors.Stores
 {
     [Serializable]
-    public class StageBehaviorStore : BehaviorStore
+    public class StageBehaviorStore
     {
         // only applicable to PlanItems defined by a Stage
         // PlanItemDefinitionId => PlanItemInstanceId => Repetition

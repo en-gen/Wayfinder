@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanningTable;
-using Flow.Grains.Tests.Helpers;
+using Flow.Grains.Tests.Utils.Helpers;
 using Moq;
 using Orleans;
 using Xunit;
@@ -50,7 +48,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var parentInstanceId = ShortGuid.NewGuid();
             var instanceId = ShortGuid.NewGuid();
 
-            var planningTable = new PlanningTable();
+            var planningTable = new Interfaces.Model.PlanningTable();
 
             var task = new HumanTask
             {
@@ -96,7 +94,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var parentInstanceId = ShortGuid.NewGuid();
             var instanceId = ShortGuid.NewGuid();
 
-            var planningTable = new PlanningTable();
+            var planningTable = new Interfaces.Model.PlanningTable();
 
             var task = new HumanTask
             {

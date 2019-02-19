@@ -3,7 +3,7 @@
 namespace Flow.Grains.Plan.PlanItem.Events
 {
     [Serializable]
-    public class ManualActivationRuleEvaluated : RuleEvaluated
+    public class ManualActivationRuleEvaluated : RuleEvaluated<bool>
     {
     }
 }

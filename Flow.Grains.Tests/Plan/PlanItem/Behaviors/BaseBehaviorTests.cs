@@ -10,7 +10,7 @@ using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
-using Flow.Grains.Tests.Helpers;
+using Flow.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Moq;
 using Orleans;
@@ -559,12 +559,12 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         }
 
         private PlanItemStore CreateStore(
-            Guid? caseDefId = null,
+            string caseDefId = null,
             PlanItemDefinition piDef = null,
             Interfaces.Model.PlanItem def = null,
             PlanItemState initialState = PlanItemState.Available)
         {
-            caseDefId = caseDefId ?? Guid.NewGuid();
+            caseDefId = caseDefId ?? Guid.NewGuid().ToString();
             piDef = piDef ?? new Milestone { Id = "Milestone" };
             def = def ?? new Interfaces.Model.PlanItem
             {
@@ -575,7 +575,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var store = new PlanItemStore();
             store.Apply(new Defined
             {
-                CaseDefinitionId = caseDefId.Value,
+                CaseDefinitionId = caseDefId,
                 PlanItemDefinition = piDef,
                 Definition = def
             });

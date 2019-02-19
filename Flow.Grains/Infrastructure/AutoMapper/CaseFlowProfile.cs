@@ -1,6 +1,7 @@
-﻿using System.Linq;
-using AutoMapper;
+﻿using AutoMapper;
+using Flow.Grains.Executables;
 using Flow.Grains.Interfaces.Plan.PlanItem;
+using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
@@ -11,10 +12,12 @@ namespace Flow.Grains.Infrastructure.AutoMapper
     {
         public CaseFlowProfile()
         {
-            CreateMap<PlanItemStore.CriterionStore, PlanItemSnapshot.CriterionSnapshot>();
+            CreateMap<Iso8601, Iso8601Snapshot>();
 
-            CreateMap<StageBehaviorStore, PlanItemSnapshot.StageBehaviorSnapshot>();
-            CreateMap<TimerEventListenerBehaviorStore, PlanItemSnapshot.TimerEventListenerBehaviorSnapshot>();
+            CreateMap<CriterionStore, CriterionSnapshot>();
+
+            CreateMap<StageBehaviorStore, StageBehaviorSnapshot>();
+            CreateMap<TimerEventListenerBehaviorStore, TimerEventListenerBehaviorSnapshot>();
 
             CreateMap<PlanItemStore, PlanItemSnapshot>()
                 .ForMember(dest => dest.Definition, opts => opts.Ignore())
@@ -26,21 +29,21 @@ namespace Flow.Grains.Infrastructure.AutoMapper
                 .ForAllOtherMembers(opts => opts.Ignore());
         }
 
-        private static PlanItemSnapshot.BehaviorSnapshot MapBehaviorStore(
+        private static object MapBehaviorStore(
             PlanItemStore src,
             PlanItemSnapshot dest,
-            PlanItemSnapshot.BehaviorSnapshot destProp,
+            object destProp,
             ResolutionContext ctx)
         {
             switch (src.BehaviorExtension)
             {
                 case StageBehaviorStore sbs:
                 {
-                    return ctx.Mapper.Map<PlanItemSnapshot.StageBehaviorSnapshot>(sbs);
+                    return ctx.Mapper.Map<StageBehaviorSnapshot>(sbs);
                 }
                 case TimerEventListenerBehaviorStore telbs:
                 {
-                    return ctx.Mapper.Map<PlanItemSnapshot.TimerEventListenerBehaviorSnapshot>(telbs);
+                    return ctx.Mapper.Map<TimerEventListenerBehaviorSnapshot>(telbs);
                 }
                 default:
                 {

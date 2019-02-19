@@ -11,7 +11,7 @@ using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanningTable;
 using Flow.Grains.Plan.Sentry;
-using Flow.Grains.Tests.Helpers;
+using Flow.Grains.Tests.Utils.Helpers;
 using Moq;
 using Orleans;
 using Orleans.Streams;
@@ -38,7 +38,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         [Fact]
         public async Task Activate__Given_StageWithPlanItems__When_Defined__Then_DefineSentriesResumeSubscriptions()
         {
-            var caseInstanceId = Guid.NewGuid();
+            var caseInstanceId = ShortGuid.NewGuid();
             var parentInstanceId = ShortGuid.NewGuid();
             var instanceId = ShortGuid.NewGuid();
             var entrySentryId = ShortGuid.NewGuid();
@@ -64,7 +64,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     new Interfaces.Model.PlanItem(),
                     new Interfaces.Model.PlanItem()
                 },
-                PlanningTable = new PlanningTable()
+                PlanningTable = new Interfaces.Model.PlanningTable()
             };
 
             var testStore = new TestPlanItemStore();

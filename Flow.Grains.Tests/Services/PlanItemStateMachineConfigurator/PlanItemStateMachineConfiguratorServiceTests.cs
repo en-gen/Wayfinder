@@ -1,8 +1,5 @@
-﻿using System;
-using System.Linq;
-using AutoFixture.Xunit2;
+﻿using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
@@ -19,7 +16,7 @@ namespace Flow.Grains.Tests.Services.PlanItemStateMachineConfigurator
     public class PlanItemStateMachineConfiguratorServiceTests
     {
         [Theory, AutoData]
-        public void Configure__Given_MilestoneStore__Then_MilestoneStateMachine(Guid caseDefinitionId)
+        public void Configure__Given_MilestoneStore__Then_MilestoneStateMachine(string caseDefinitionId)
         {
             var store = new PlanItemStore();
             store.Apply(new Defined

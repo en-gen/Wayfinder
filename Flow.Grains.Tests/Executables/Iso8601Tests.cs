@@ -18,7 +18,7 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Repetitions);
             Assert.False(iso.HasRepetitions);
             Assert.NotNull(iso.Start);
-            Assert.Equal(now, iso.Start.Value.ToDateTimeUtc());
+            Assert.Equal(now, iso.Start.Value);
             Assert.Null(iso.End);
             Assert.Null(iso.Duration);
         }
@@ -42,11 +42,11 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Start);
             Assert.Null(iso.End);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // R#/<duration>
-        public void Ctor__Given_RepeatedPeriod__When_BoundedRepetitions__Then_RepetitionandPeriodSet
+        public void Ctor__Given_RepeatedPeriod__When_BoundedRepetitions__Then_RepetitionAndPeriodSet
             (int repetitions, int days, int hours, int minutes, int seconds)
         {
             var period = new PeriodBuilder
@@ -66,11 +66,11 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Start);
             Assert.Null(iso.End);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // R/<duration>
-        public void Ctor__Given_RepeatedPeriod__When_UnboundedRepetitions__Then_RepetitionandPeriodSet
+        public void Ctor__Given_RepeatedPeriod__When_UnboundedRepetitions__Then_RepetitionAndPeriodSet
             (int days, int hours, int minutes, int seconds)
         {
             var period = new PeriodBuilder
@@ -89,7 +89,7 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Start);
             Assert.Null(iso.End);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // <start>/<duration>
@@ -111,10 +111,10 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Repetitions);
             Assert.False(iso.HasRepetitions);
             Assert.NotNull(iso.Start);
-            Assert.Equal(start, iso.Start.Value.ToDateTimeUtc());
+            Assert.Equal(start, iso.Start.Value);
             Assert.Null(iso.End);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // R#/<start>/<duration>
@@ -137,10 +137,10 @@ namespace Flow.Grains.Tests.Executables
             Assert.Equal(repetitions, iso.Repetitions);
             Assert.True(iso.HasRepetitions);
             Assert.NotNull(iso.Start);
-            Assert.Equal(start, iso.Start.Value.ToDateTimeUtc());
+            Assert.Equal(start, iso.Start.Value);
             Assert.Null(iso.End);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // R/<start>/<duration>
@@ -162,10 +162,10 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Repetitions);
             Assert.True(iso.HasRepetitions);
             Assert.NotNull(iso.Start);
-            Assert.Equal(start, iso.Start.Value.ToDateTimeUtc());
+            Assert.Equal(start, iso.Start.Value);
             Assert.Null(iso.End);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // <duration>/<end>
@@ -188,9 +188,9 @@ namespace Flow.Grains.Tests.Executables
             Assert.False(iso.HasRepetitions);
             Assert.Null(iso.Start);
             Assert.NotNull(iso.End);
-            Assert.Equal(end, iso.End.Value.ToDateTimeUtc());
+            Assert.Equal(end, iso.End.Value);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // R#/<duration>/<end>
@@ -214,9 +214,9 @@ namespace Flow.Grains.Tests.Executables
             Assert.True(iso.HasRepetitions);
             Assert.Null(iso.Start);
             Assert.NotNull(iso.End);
-            Assert.Equal(end, iso.End.Value.ToDateTimeUtc());
+            Assert.Equal(end, iso.End.Value);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Theory, AutoData] // R/<duration>/<end>
@@ -239,9 +239,9 @@ namespace Flow.Grains.Tests.Executables
             Assert.True(iso.HasRepetitions);
             Assert.Null(iso.Start);
             Assert.NotNull(iso.End);
-            Assert.Equal(end, iso.End.Value.ToDateTimeUtc());
+            Assert.Equal(end, iso.End.Value);
             Assert.NotNull(iso.Duration);
-            Assert.Equal(period.ToDuration(), iso.Duration);
+            Assert.Equal(period.ToDuration().ToTimeSpan(), iso.Duration);
         }
 
         [Fact] // <start>/<end>
@@ -256,9 +256,9 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.Repetitions);
             Assert.False(iso.HasRepetitions);
             Assert.NotNull(iso.Start);
-            Assert.Equal(start, iso.Start.Value.ToDateTimeUtc());
+            Assert.Equal(start, iso.Start.Value);
             Assert.NotNull(iso.End);
-            Assert.Equal(end, iso.End.Value.ToDateTimeUtc());
+            Assert.Equal(end, iso.End.Value);
             Assert.Null(iso.Duration);
         }
 

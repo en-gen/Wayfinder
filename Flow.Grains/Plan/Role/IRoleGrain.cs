@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-using Flow.Grains.Plan.CmmnElement;
+using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
 using Orleans;
 
 namespace Flow.Grains.Plan.Role

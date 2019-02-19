@@ -20,6 +20,12 @@ namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
             var stateMachine = PlanItemStateMachineConfigurator.Configure(host.State);
             switch (planItemDefinition)
             {
+                case Stage stage when stage.IsCasePlanModel:
+                {
+                    var cpmb = new CasePlanModelBehavior(host, stage, stateMachine);
+                    await cpmb.Activate();
+                    return cpmb;
+                }
                 case Stage stage:
                 {
                     var sb = new StageBehavior(host, stage, stateMachine);
@@ -49,6 +55,12 @@ namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
                     var uelb = new UserEventListenerBehavior(host, userEventListener, stateMachine);
                     await uelb.Activate();
                     return uelb;
+                }
+                case TimerEventListener timerEventListener:
+                {
+                    var telb = new TimerEventListenerBehavior(host, timerEventListener, stateMachine);
+                    await telb.Activate();
+                    return telb;
                 }
                 case EventListener eventListener:
                 {

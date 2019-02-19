@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoMapper;
+using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.PlanItem;
+using Flow.Grains.Plan.Case;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Definitions;
@@ -39,6 +42,7 @@ namespace Flow.Grains.Plan.PlanItem
 
         void IBehaviorHost.RaiseEvent<TEvent>(TEvent @event) => RaiseEvent(@event);
         Task IBehaviorHost.ConfirmEvents() => ConfirmEvents();
+
         Task IBehaviorHost.SubscribeTo<TEvent>(
             string eventSourceId,
             Func<TEvent, StreamSequenceToken, Task> eventHandler,
@@ -46,6 +50,7 @@ namespace Flow.Grains.Plan.PlanItem
         Task IBehaviorHost.UnsubscribeFrom<TEvent>(string eventSourceId) => UnsubscribeFrom<TEvent>(eventSourceId);
         Task IBehaviorHost.Publish<TEvent>(TEvent @event) => PublishEvent(@event);
 
+        IDictionary<string, object> IBehaviorHost.Context => LogContext;
         void IBehaviorHost.LogWithContext(Action<ILogger> logAction) => LogWithContext(logAction);
 
         #endregion
@@ -66,18 +71,18 @@ namespace Flow.Grains.Plan.PlanItem
 
             if (State.Defined)
             {
-                _behavior = await BehaviorConfigurator.Configure(this, State.PlanItemDefinition);
+                await PostDefine();
             }
         }
 
-        public override Task Define(Guid caseDefinitionId, Interfaces.Model.PlanItem definition) =>
+        public override Task Define(string caseDefinitionId, Interfaces.Model.PlanItem definition) =>
             DefineRepetition(caseDefinitionId, definition, 0);
         
         public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(Mapper.Map<PlanItemSnapshot>(this));
         
-        public async Task DefineRepetition(Guid caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition)
+        public async Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition)
         {
-            var planItemDefinition = await GrainFactory.GetGrain<IPlanItemDefinitionGraphGrain>(caseDefinitionId)
+            var planItemDefinition = await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
                 .Find(_scope, definition.DefinitionRef);
 
             if (planItemDefinition == null) throw new InvalidOperationException($"definition {definition.DefinitionRef} not registered");
@@ -90,10 +95,18 @@ namespace Flow.Grains.Plan.PlanItem
                 PlanItemDefinition = planItemDefinition
             });
 
-            _logContext["CaseDefinitionId"] = caseDefinitionId;
-            _logContext["ElementDefinitionId"] = definition.Id;
-
             await ConfirmEvents();
+
+            await PostDefine();
+        }
+
+        private async Task PostDefine()
+        {
+            LogContext["CaseDefinitionId"] = State.CaseDefinitionId;
+            LogContext["ElementDefinitionId"] = Definition.Id;
+            LogContext["PlanItemDefinition"] = State.PlanItemDefinition.GetType().Name;
+            LogContext["ElementScope"] = _scope;
+            LogContext["ElementInstanceId"] = _instanceId;
 
             _behavior = await BehaviorConfigurator.Configure(this, State.PlanItemDefinition);
         }

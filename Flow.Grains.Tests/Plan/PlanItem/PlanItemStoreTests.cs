@@ -1,5 +1,6 @@
 ﻿using System;
 using AutoFixture.Xunit2;
+using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem;
@@ -21,7 +22,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
             subject.Created.Should().NotHaveValue();
             subject.Updated.Should().NotHaveValue();
 
-            subject.CaseDefinitionId.Should().BeEmpty();
+            subject.CaseDefinitionId.Should().BeNull();
             subject.Definition.Should().BeNull();
 
             subject.PlanItemDefinition.Should().BeNull();
@@ -45,7 +46,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
         [Fact]
         public void Apply__Given_Defined__Then_UpdateState()
         {
-            var caseDefId = Guid.NewGuid();
+            var caseDefId = ShortGuid.NewGuid();
             var planItem = new Interfaces.Model.PlanItem();
             var planItemDefinition = new PlanItemDefinition();
 
@@ -341,7 +342,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
 
             subject.Apply(new Defined
             {
-                CaseDefinitionId = Guid.NewGuid(),
+                CaseDefinitionId = ShortGuid.NewGuid(),
                 Definition = new Interfaces.Model.PlanItem(),
                 PlanItemDefinition = new Stage(),
                 Repetition = 0
@@ -371,6 +372,35 @@ namespace Flow.Grains.Tests.Plan.PlanItem
                 .And.HaveCount(1)
                 .And.ContainKey(instanceId)
                 .And.ContainValue(repetition);
+        }
+
+        [Fact]
+        public void Apply__Given_StartTriggerOccurred__Then_UpdatedAndStartTriggerSet()
+        {
+            var subject = new PlanItemStore();
+
+            subject.Apply(new Defined
+            {
+                CaseDefinitionId = ShortGuid.NewGuid(),
+                Definition = new Interfaces.Model.PlanItem(),
+                PlanItemDefinition = new TimerEventListener(),
+                Repetition = 0
+
+            });
+
+            var @event = new TimerStartTriggerOccurred
+            {
+                Occurred = DateTime.UtcNow
+            };
+
+            subject.Apply(@event);
+
+            subject.Updated.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Updated);
+            subject.BehaviorExtension.Should().BeOfType<TimerEventListenerBehaviorStore>();
+
+            subject.BehaviorExtension.As<TimerEventListenerBehaviorStore>().TimerStart.Should().HaveValue()
+                .And.IsSameOrEqualTo(@event.Occurred);
         }
     }
 }

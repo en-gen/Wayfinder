@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Reflection;
 using System.Threading.Tasks;
-using AutoFixture.Xunit2;
 using Flow.Grains.Events;
 using Flow.Grains.Executables;
 using Flow.Grains.Expressions;
-using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Tests.Helpers;
+using Flow.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Moq;
 using Orleans;

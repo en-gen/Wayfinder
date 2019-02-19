@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Flow.Grains.Infrastructure.Extensions;
+using Flow.Grains.Interfaces;
+using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
 using Flow.Grains.Plan.CmmnElement.Events;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -27,15 +29,15 @@ namespace Flow.Grains.Plan.CmmnElement
         protected string _parentId;
         protected string _instanceId;
 
-        private ILogger Logger { get; }
-
         protected TDefinition Definition => TentativeState.Definition ?? throw new Exception("Definition is not initialized");
-        
-        protected readonly IDictionary<string, object> _logContext = new Dictionary<string, object>();
+
+        private ILogger Logger { get; }
+        protected IDictionary<string, object> LogContext { get; }
 
         protected CmmnElementGrain(ILogger logger)
         {
             Logger = logger;
+            LogContext = new Dictionary<string, object>();
         }
 
         public override async Task OnActivateAsync()
@@ -43,32 +45,37 @@ namespace Flow.Grains.Plan.CmmnElement
             _caseInstanceId = this.GetPrimaryKey(out _address);
             
             var chunks = _address.Split('.');
-            _scope = string.Join('.', chunks.Take(chunks.Length - 1));
+            _scope = chunks.Length > 0
+                ? string.Join('.', chunks.Take(chunks.Length - 1))
+                : string.Empty;
             _instanceId = chunks.LastOrDefault();
             _parentId = chunks.Length > 1
                 ? chunks.Skip(chunks.Length - 2).FirstOrDefault()
                 : string.Empty;
 
-            _logContext["CorrelationId"] = RequestContext.ActivityId;
-            _logContext["CaseInstanceId"] = _caseInstanceId;
-            _logContext["ElementAddress"] = _address;
-            _logContext["ElementScope"] = _scope;
-            _logContext["ElementParentId"] = _parentId;
-            _logContext["ElementInstanceId"] = _instanceId;
-            _logContext["Element"] = typeof(TDefinition).Name;
+            LogContext["TenantId"] = CaseRequestContext.TenantId;
+            LogContext["UserId"] = CaseRequestContext.UserId;
+            LogContext["@UserRoles"] = CaseRequestContext.UserRoles;
+            LogContext["CorrelationId"] = RequestContext.ActivityId;
+            LogContext["CaseInstanceId"] = _caseInstanceId;
+            LogContext["ElementAddress"] = _address;
+            LogContext["ElementScope"] = _scope;
+            LogContext["ElementParentId"] = _parentId;
+            LogContext["ElementInstanceId"] = _instanceId;
+            LogContext["Element"] = typeof(TDefinition).Name;
             
             await base.OnActivateAsync();
 
             if (TentativeState.Defined)
             {
-                _logContext["CaseDefinitionId"] = TentativeState.CaseDefinitionId;
-                _logContext["ElementDefinitionId"] = TentativeState.Definition.Id;
+                LogContext["CaseDefinitionId"] = TentativeState.CaseDefinitionId;
+                LogContext["ElementDefinitionId"] = TentativeState.Definition.Id;
             }
         }
 
         public Task<bool> Defined() => Task.FromResult(State.Defined);
 
-        public virtual Task Define(Guid caseDefinitionId, TDefinition definition)
+        public virtual Task Define(string caseDefinitionId, TDefinition definition)
         {
             RaiseEvent(new CmmnElementDefined<TDefinition>
             {
@@ -76,8 +83,8 @@ namespace Flow.Grains.Plan.CmmnElement
                 Definition = definition
             });
             
-            _logContext["CaseDefinitionId"] = caseDefinitionId;
-            _logContext["ElementDefinitionId"] = definition.Id;
+            LogContext["CaseDefinitionId"] = caseDefinitionId;
+            LogContext["ElementDefinitionId"] = definition.Id;
 
             return ConfirmEvents();
         }
@@ -99,10 +106,10 @@ namespace Flow.Grains.Plan.CmmnElement
             if (creating || resuming)
             {
                 LogWithContext(logger => logger.LogInformation(
-                    $"{{Element}} {{ElementScope}}.{{ElementInstanceId}}: {(creating ? "creating" : "resuming")} {{EventType}} subscription to {{EventSourceDefinitionId}}",
+                    $"{{Element}} {{ElementScope}}.{{ElementInstanceId}} | {(creating ? "creating" : "resuming")} {{EventType}} subscription to {{EventSourceDefinitionId}}",
                     Definition.GetType().Name,
                     _scope,
-                    Definition.Id,
+                    _instanceId,
                     typeof(TEvent).Name,
                     eventSourceId));
             }
@@ -120,10 +127,10 @@ namespace Flow.Grains.Plan.CmmnElement
         protected async Task UnsubscribeFrom<TEvent>(string eventSourceRef)
         {
             LogWithContext(logger => logger.LogInformation(
-                "{Element} {ElementScope}.{ElementInstanceId}: removing {EventType} subscription from {EventSourceDefinitionId}",
+                "{Element} {ElementScope}.{ElementInstanceId} | removing {EventType} subscription from {EventSourceDefinitionId}",
                 Definition.GetType().Name,
                 _scope,
-                Definition.Id,
+                _instanceId,
                 typeof(TEvent).Name,
                 eventSourceRef));
 
@@ -136,7 +143,7 @@ namespace Flow.Grains.Plan.CmmnElement
 
         protected void LogWithContext(Action<ILogger> logAction)
         {
-            using(Logger.BeginScope(_logContext))
+            using(Logger.BeginScope(LogContext))
             {
                 logAction?.Invoke(Logger);
             }

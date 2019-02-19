@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Flow.Grains.Executables;
 using Flow.Grains.Expressions;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.CmmnElement;
+using Flow.Grains.Plan.PlanningTable.Events;
 using Microsoft.Extensions.Logging;
 
 namespace Flow.Grains.Plan.PlanningTable
@@ -17,37 +19,9 @@ namespace Flow.Grains.Plan.PlanningTable
         {
         }
 
-        public Task Define(Interfaces.Model.PlanningTable definition)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<DiscretionaryItem[]> GetPlannableItems()
         {
             return GetPlannableItems(TentativeState.Definition);
-        }
-
-        public Task PlanDiscretionaryItem(string discretionaryItemId)
-        {
-            var item = State.Definition.DiscretionaryItems.SingleOrDefault(x => x.Id.Equals(discretionaryItemId));
-
-            if (item == null)
-            {
-                LogWithContext(logger => logger.LogWarning(
-                    "Attempted to plan DiscretionaryItem {DiscretionaryItemId} that is not in this PlanningTable's hierarchy",
-                    discretionaryItemId));
-                return Task.CompletedTask;
-            }
-
-            // TODO: raise event for planned item
-
-            return Task.CompletedTask;
-        }
-
-        public Task<DiscretionaryItem[]> GetPlannedItems()
-        {
-            // TODO
-            return Task.FromResult(Array.Empty<DiscretionaryItem>());
         }
 
         // Table 5.36 - TableItem attributes
@@ -75,8 +49,8 @@ namespace Flow.Grains.Plan.PlanningTable
                 var applicabilityRules = planningTable.ApplicabilityRules.ToDictionary(x => x.Id);
 
                 var applicabilityRuleResults = await Task.WhenAll(tableItem.ApplicabilityRuleRefs
-                    .Select(async ruleRef => applicabilityRules.TryGetValue(ruleRef, out var rule) &&
-                                             await EvaluateApplicabilityRule(rule)));
+                    .Select(async ruleRef => applicabilityRules.TryGetValue(ruleRef, out var rule)
+                                             && await EvaluateApplicabilityRule(rule)));
 
                 return (tableItem: tableItem, isApplicable: applicabilityRuleResults.All(x => x));
             }));
@@ -101,24 +75,39 @@ namespace Flow.Grains.Plan.PlanningTable
             return itemStatuses.SelectMany(x => x).ToArray();
         }
 
-        public async Task<bool> EvaluateApplicabilityRule(ApplicabilityRule rule)
+        // 5.36 - TableItem attributes
+        // ~~~~~
+        // If the condition of the ApplicabilityRule object evaluates
+        // to TRUE, then the TableItem is applicable for planning,
+        // otherwise it is not. If no ApplicabilityRule is associated
+        // with a TableItem, its applicability is considered TRUE.
+        private async Task<bool> EvaluateApplicabilityRule(ApplicabilityRule rule)
         {
-            // 5.36 - TableItem attributes
-            // ~~~~~
-            // If the condition of the ApplicabilityRule object evaluates
-            // to TRUE, then the TableItem is applicable for planning,
-            // otherwise it is not. If no ApplicabilityRule is associated
-            // with a TableItem, its applicability is considered TRUE.
-            if (rule?.Condition == null) return true;
+            ExecutableResult<bool> ruleResult = null;
+            if (rule?.Condition != null)
+            {
+                ruleResult = await GrainFactory.GetGrain<IExpressionGrain>(_caseInstanceId)
+                    .ExecuteAsBool(rule.ContextRef, rule.Condition);
+            }
+            var result = ruleResult?.Value ?? true;
+            
+            RaiseEvent(new ApplicabilityRuleEvaluated
+            {
+                Result = result,
+                Error = ruleResult?.Message
+            });
 
-            var result = await GrainFactory.GetGrain<IExpressionGrain>(_caseInstanceId)
-                .ExecuteAsBool(rule.ContextRef, rule.Condition);
+            if (ruleResult?.IsError ?? false)
+            {
+                LogWithContext(logger => logger.LogError(
+                    "{Element} {ElementScope}.{ElementInstanceId} | Evaluation of applicability rule resulted in error: {ApplicabilityRuleError}",
+                    Definition.GetType().Name,
+                    _scope,
+                    Definition.Id,
+                    ruleResult.Message));
+            }
 
-            if (result.IsError) return false;
-
-            // TODO: handle fault? - could publish an error event to parent
-
-            return result.Value;
+            return result;
         }
     }
 }

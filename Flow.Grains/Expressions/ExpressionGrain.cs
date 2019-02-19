@@ -42,7 +42,7 @@ namespace Flow.Grains.Expressions
             return executor.ExecuteAsString();
         }
 
-        public async Task<ExecutableResult<Iso8601>> ExecuteAsIso8601(string contextRef, Expression expression)
+        public async Task<ExecutableResult<Iso8601>> ExecuteAsIso8601(/*CaseContext context, */ string contextRef, Expression expression)
         {
             var executor = await BuildExecutable( /*context, */contextRef, expression);
             var result = executor.ExecuteAsString();
@@ -54,7 +54,9 @@ namespace Flow.Grains.Expressions
 
             try
             {
-                return ExecutableResult<Iso8601>.Success(new Iso8601(result.Value));
+                var iso = new Iso8601(result.Value);
+
+                return ExecutableResult<Iso8601>.Success(iso);
             }
             catch (Exception ex)
             {

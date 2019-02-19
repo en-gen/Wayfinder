@@ -8,7 +8,7 @@ using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Tests.Helpers;
+using Flow.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Moq;
 using Orleans;

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using NodaTime;
 using NodaTime.Text;
 
 namespace Flow.Grains.Executables
@@ -13,9 +12,9 @@ namespace Flow.Grains.Executables
         public bool HasRepetitions { get; }
         public int? Repetitions { get; }
         
-        public Instant? Start { get; set; }
-        public Instant? End { get; set; }
-        public Duration? Duration { get; set; }
+        public DateTime? Start { get;  }
+        public DateTime? End { get; }
+        public TimeSpan? Duration { get; }
 
         public Iso8601(string iso8601)
         {
@@ -45,7 +44,7 @@ namespace Flow.Grains.Executables
                     }
                     else
                     {
-                        throw new ArgumentException($"failed to parse ISO8601 repetitons value {isoParts[partsIndex]}");
+                        throw new ArgumentException($"failed to parse ISO8601 repetitions value {isoParts[partsIndex]}");
                     }
                 }
 
@@ -72,12 +71,14 @@ namespace Flow.Grains.Executables
                     Duration = PeriodPattern.NormalizingIso.Parse(firstPart)
                         .GetValueOrThrow()
                         .Normalize()
-                        .ToDuration();
+                        .ToDuration()
+                        .ToTimeSpan();
                 }
                 else
                 {
                     Start = InstantPattern.ExtendedIso.Parse(firstPart)
-                        .GetValueOrThrow();
+                        .GetValueOrThrow()
+                        .ToDateTimeUtc();
                 }
 
                 if (secondPart.StartsWith('P'))
@@ -85,12 +86,14 @@ namespace Flow.Grains.Executables
                     Duration = PeriodPattern.NormalizingIso.Parse(secondPart)
                         .GetValueOrThrow()
                         .Normalize()
-                        .ToDuration();
+                        .ToDuration()
+                        .ToTimeSpan();
                 }
                 else
                 {
                     End = InstantPattern.ExtendedIso.Parse(secondPart)
-                        .GetValueOrThrow();
+                        .GetValueOrThrow()
+                        .ToDateTimeUtc();
                 }
             }
             /*
@@ -105,12 +108,14 @@ namespace Flow.Grains.Executables
                     Duration = PeriodPattern.NormalizingIso.Parse(part)
                         .GetValueOrThrow()
                         .Normalize()
-                        .ToDuration();
+                        .ToDuration()
+                        .ToTimeSpan();
                 }
                 else
                 {
                     Start = InstantPattern.ExtendedIso.Parse(part)
-                        .GetValueOrThrow();
+                        .GetValueOrThrow()
+                        .ToDateTimeUtc();
                 }
             }
             else throw new ArgumentException($"provided ISO8601 string {iso8601} is invalid", nameof(iso8601));

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Tests.Helpers;
+using Flow.Grains.Tests.Utils.Helpers;
 using Moq;
 using Xunit;
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -29,6 +30,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         Task UnsubscribeFrom<TEvent>(string eventSourceId);
         Task Publish<TEvent>(TEvent @event);
 
+        IDictionary<string, object> Context { get; }
         void LogWithContext(Action<ILogger> logAction);
     }
 }

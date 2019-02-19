@@ -2,9 +2,9 @@
 
 namespace Flow.Grains.Plan.PlanItem.Events
 {
-    public abstract class RuleEvaluated : BaseUpdate
+    public abstract class RuleEvaluated<TResult> : BaseUpdate
     {
-        public bool Result { get; set; }
+        public TResult Result { get; set; }
         public string Error { get; set; }
     }
 }

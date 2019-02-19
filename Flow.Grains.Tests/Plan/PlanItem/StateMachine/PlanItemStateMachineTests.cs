@@ -63,12 +63,12 @@ namespace Flow.Grains.Tests.Plan.PlanItem.StateMachine
         }
         
         private PlanItemStore CreateStore(
-            Guid? caseDefId = null,
+            string caseDefId = null,
             PlanItemDefinition piDef = null,
             Interfaces.Model.PlanItem def = null,
             PlanItemState initialState = PlanItemState.Available)
         {
-            caseDefId = caseDefId ?? Guid.NewGuid();
+            caseDefId = caseDefId ?? Guid.NewGuid().ToString();
             piDef = piDef ?? new Milestone();
             def = def ?? new Interfaces.Model.PlanItem
             {
@@ -78,7 +78,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.StateMachine
             var store = new PlanItemStore();
             store.Apply(new Defined
             {
-                CaseDefinitionId = caseDefId.Value,
+                CaseDefinitionId = caseDefId,
                 PlanItemDefinition = piDef,
                 Definition = def
             });

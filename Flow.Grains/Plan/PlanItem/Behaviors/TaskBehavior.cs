@@ -98,7 +98,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if (!PlanItemDefinition.IsBlocking)
             {
                 Host.LogWithContext(logger => logger.LogInformation(
-                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: non-blocking task Activated, transitioning directly to Complete",
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | non-blocking task Activated, transitioning directly to Complete",
                     Host.Definition.GetType().Name,
                     PlanItemDefinition.GetType().Name,
                     Host.Scope,
@@ -162,7 +162,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if (criterion == null) return;
 
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,

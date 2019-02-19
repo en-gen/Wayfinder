@@ -4,10 +4,10 @@ using Flow.Grains.Plan.CmmnElement.Events;
 
 namespace Flow.Grains.Plan.CmmnElement
 {
-    public abstract class CmmnElementStore<TDefinition> : BaseState
+    public abstract class CmmnElementStore<TDefinition> : BaseStore
         where TDefinition : Interfaces.Model.CmmnElement
     {
-        public Guid CaseDefinitionId { get; private set; }
+        public string CaseDefinitionId { get; private set; }
         public TDefinition Definition { get; private set; }
 
         [IgnoreDataMember]
@@ -15,10 +15,9 @@ namespace Flow.Grains.Plan.CmmnElement
 
         public void Apply(CmmnElementDefined<TDefinition> @event)
         {
+            Created = @event.Created;
             CaseDefinitionId = @event.CaseDefinitionId ?? throw new ArgumentNullException(nameof(@event.CaseDefinitionId));
             Definition = @event.Definition;
-
-            Created = @event.Created;
         }
     }
 }

@@ -65,7 +65,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             if (criterion == null) return;
             
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId}: {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,

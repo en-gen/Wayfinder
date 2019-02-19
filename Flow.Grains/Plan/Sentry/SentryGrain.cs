@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Expressions;
-using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.Sentry.Events;
@@ -54,7 +53,7 @@ namespace Flow.Grains.Plan.Sentry
             }
         }
 
-        public override async Task Define(Guid caseDefinitionId, Interfaces.Model.Sentry definition)
+        public override async Task Define(string caseDefinitionId, Interfaces.Model.Sentry definition)
         {
             await base.Define(caseDefinitionId, definition);
             await SubscribeToOnPartTransitions(StreamFlags.Create);
@@ -120,7 +119,7 @@ namespace Flow.Grains.Plan.Sentry
         private async Task HandleOnPartOccurred(OnPart onPart, string sourceScope, string sourceId, object standardEvent)
         {
             LogWithContext(logger => logger.LogInformation(
-                "{ElementType} {ElementScope}.{ElementId}: {OnPartType} {OnPartId} occurred via {EventSourceScope}.{EventSourceId} transition {StandardEvent}",
+                "{ElementType} {ElementScope}.{ElementId} | {OnPartType} {OnPartId} occurred via {EventSourceScope}.{EventSourceId} transition {StandardEvent}",
                 Definition.GetType().Name,
                 _scope,
                 _instanceId,
@@ -145,7 +144,7 @@ namespace Flow.Grains.Plan.Sentry
             if (!State.Satisfied) return;
 
             LogWithContext(logger => logger.LogInformation(
-                "{ElementType} {ElementScope}.{ElementId}: sentry satisfied, notifying subscribers",
+                "{ElementType} {ElementScope}.{ElementId} | sentry satisfied, notifying subscribers",
                 Definition.GetType().Name,
                 _scope,
                 _instanceId));

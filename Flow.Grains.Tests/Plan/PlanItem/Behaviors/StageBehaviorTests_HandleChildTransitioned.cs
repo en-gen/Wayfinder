@@ -2,8 +2,6 @@
 using System.Reflection;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
-using Flow.Grains.Executables;
-using Flow.Grains.Expressions;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.PlanItem;
@@ -11,10 +9,7 @@ using Flow.Grains.Plan;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Plan.PlanningTable;
-using Flow.Grains.Plan.Sentry;
-using Flow.Grains.Tests.Helpers;
-using FluentAssertions;
+using Flow.Grains.Tests.Utils.Helpers;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Orleans;
@@ -818,7 +813,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var stage = new Stage
             {
-                PlanningTable = new PlanningTable
+                PlanningTable = new Interfaces.Model.PlanningTable
                 {
                     TableItems =
                     {
@@ -943,7 +938,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var stage = new Stage
             {
-                PlanningTable = new PlanningTable
+                PlanningTable = new Interfaces.Model.PlanningTable
                 {
                     TableItems =
                     {

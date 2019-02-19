@@ -3,7 +3,7 @@
 namespace Flow.Grains.Plan.PlanItem.Events
 {
     [Serializable]
-    public class RepetitionRuleEvaluated : RuleEvaluated
+    public class RepetitionRuleEvaluated : RuleEvaluated<bool>
     {
     }
 }
