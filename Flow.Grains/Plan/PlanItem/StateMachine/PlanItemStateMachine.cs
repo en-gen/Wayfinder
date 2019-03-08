@@ -10,7 +10,7 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
 
         private ILogger Logger { get; }
 
-        public PlanItemStateMachine(PlanItemStore planItemStore, ILogger<PlanItemStateMachine> logger) :
+        public PlanItemStateMachine(IBehaviorStore planItemStore, ILogger<PlanItemStateMachine> logger) :
             base(planItemStore.PlanItemState)
         {
             Logger = logger;

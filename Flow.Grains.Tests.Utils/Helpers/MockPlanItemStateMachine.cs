@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Plan;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ namespace Flow.Grains.Tests.Utils.Helpers
     {
         private IPlanItemStateMachine StateMachine { get; }
 
-        public MockPlanItemStateMachine(PlanItemStore store)
+        public MockPlanItemStateMachine(IBehaviorStore store)
         {
             StateMachine = new PlanItemStateMachine(store, Mock.Of<ILogger<PlanItemStateMachine>>());
             

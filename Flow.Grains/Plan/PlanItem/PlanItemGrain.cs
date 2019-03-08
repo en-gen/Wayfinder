@@ -8,7 +8,6 @@ using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.Case;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.PlanItem.Definitions;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Microsoft.Extensions.Logging;
@@ -36,8 +35,8 @@ namespace Flow.Grains.Plan.PlanItem
         string IBehaviorHost.InstanceId => _instanceId;
         string IBehaviorHost.DefinitionId => Definition?.Id;
 
-        Interfaces.Model.PlanItem IBehaviorHost.Definition => Definition;
-        PlanItemStore IBehaviorHost.State => TentativeState;
+        IBehaviorDefinition IBehaviorHost.Definition => Definition;
+        IBehaviorStore IBehaviorHost.State => TentativeState;
         IGrainFactory IBehaviorHost.GrainFactory => GrainFactory;
 
         void IBehaviorHost.RaiseEvent<TEvent>(TEvent @event) => RaiseEvent(@event);
@@ -78,12 +77,10 @@ namespace Flow.Grains.Plan.PlanItem
         public override Task Define(string caseDefinitionId, Interfaces.Model.PlanItem definition) =>
             DefineRepetition(caseDefinitionId, definition, 0);
         
-        public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(Mapper.Map<PlanItemSnapshot>(this));
-        
         public async Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition)
         {
             var planItemDefinition = await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
-                .Find(_scope, definition.DefinitionRef);
+                .GetPlanItemDefinition(_scope, definition.DefinitionRef);
 
             if (planItemDefinition == null) throw new InvalidOperationException($"definition {definition.DefinitionRef} not registered");
 
@@ -111,13 +108,14 @@ namespace Flow.Grains.Plan.PlanItem
             _behavior = await BehaviorConfigurator.Configure(this, State.PlanItemDefinition);
         }
 
+        public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(Mapper.Map<PlanItemSnapshot>(State));
+
         public async Task<PlanItemSnapshot> Trigger(PlanItemTransition transition)
         {
-            if(_behavior == null) throw new InvalidOperationException("attempted Trigger on Uninitialized PlanItem");
+            if (_behavior == null) throw new InvalidOperationException("attempted Trigger on Uninitialized PlanItem");
 
             await _behavior.Trigger(transition);
-            var ret = await GetSnapshot();
-            return ret;
+            return await GetSnapshot();
         }
     }
 }

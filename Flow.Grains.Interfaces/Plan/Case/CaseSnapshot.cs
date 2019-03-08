@@ -1,13 +1,15 @@
 ﻿using System;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Interfaces.Plan.PlanItem;
+using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
 
-namespace Flow.Grains.Interfaces.Plan.PlanItem
+namespace Flow.Grains.Interfaces.Plan.Case
 {
     [Serializable]
-    public class PlanItemSnapshot
+    public class CaseSnapshot
     {
-        public Model.PlanItem Definition { get; set; }
-        public PlanItemDefinition PlanItemDefinition { get; set; }
+        public Model.Case Definition { get; set; }
+        public Stage CasePlanModel { get; set; }
 
         public bool UserCompletable { get; set; }
         public bool Required { get; set; }
@@ -27,6 +29,6 @@ namespace Flow.Grains.Interfaces.Plan.PlanItem
         public CriterionSnapshot EntryCriterionStore { get; set; }
         public CriterionSnapshot ExitCriterionStore { get; set; }
 
-        public object BehaviorExtension { get; set; }
+        public StageBehaviorSnapshot BehaviorExtension { get; set; }
     }
 }

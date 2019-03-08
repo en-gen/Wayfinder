@@ -60,7 +60,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         private async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
         {
             Host.LogWithContext(logger => logger.LogInformation(
-                "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | processed transition {PreviousState} × {StandardEvent} = {CurrentState}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | processed transition {PreviousState} × {StandardEvent} = {CurrentState}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
@@ -90,7 +90,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         {
             Host.LogWithContext(logger => logger.LogInformation(
                 "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | attempted invalid transition {CurrentState} × {StandardEvent} = [INVALID]",
-                Host.Definition.GetType().Name,
+                "PlanItem",
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
                 Host.InstanceId,
@@ -101,7 +101,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         }
 
         protected Task SubscribeToCriteria(
-            Expression<Func<Interfaces.Model.PlanItem, IEnumerable<Criterion>>> criteria,
+            Expression<Func<IBehaviorDefinition, IEnumerable<Criterion>>> criteria,
             StreamFlags flags) =>
             Task.WhenAll(criteria.Compile().Invoke(Host.Definition)
                 .Select(criterion =>
@@ -123,7 +123,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }));
 
         protected Task UnsubscribeFromCriteria(
-            Expression<Func<Interfaces.Model.PlanItem, IEnumerable<Criterion>>> criteria) =>
+            Expression<Func<IBehaviorDefinition, IEnumerable<Criterion>>> criteria) =>
             Task.WhenAll(criteria.Compile().Invoke(Host.Definition)
                 .Select(criterion => Host.UnsubscribeFrom<SentrySatisfiedEvent>(criterion.SentryRef)));
 

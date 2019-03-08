@@ -36,9 +36,9 @@ namespace Flow.Grains.Plan.Case
 
             await base.OnActivateAsync();
 
-            if (TentativeState.Defined)
+            if (State.Defined)
             {
-                LogContext["ElementDefinitionId"] = TentativeState.Definition.Id;
+                LogContext["ElementDefinitionId"] = State.Definition.Id;
             }
         }
 
@@ -65,7 +65,9 @@ namespace Flow.Grains.Plan.Case
             await ConfirmEvents();
         }
 
-        public async Task<PlanItemDefinition> Find(string scope, string definitionId)
+        public Task<Interfaces.Model.Case> GetDefinition() => Task.FromResult(State.Definition);
+
+        public async Task<PlanItemDefinition> GetPlanItemDefinition(string scope, string definitionId)
         {
             if (!State.Defined) throw new InvalidOperationException("case has not yet been defined");
 

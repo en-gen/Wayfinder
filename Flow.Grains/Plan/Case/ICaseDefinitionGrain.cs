@@ -5,6 +5,6 @@ namespace Flow.Grains.Plan.Case
 {
     public interface ICaseDefinitionGrain : Interfaces.Plan.Case.ICaseDefinitionGrain
     {
-        Task<PlanItemDefinition> Find(string scope, string definitionId);
+        Task<PlanItemDefinition> GetPlanItemDefinition(string scope, string definitionId);
     }
 }

@@ -15,7 +15,7 @@ namespace Flow.Grains.Plan.CmmnElement
 
         public void Apply(CmmnElementDefined<TDefinition> @event)
         {
-            Created = @event.Created;
+            base.Apply(@event);
             CaseDefinitionId = @event.CaseDefinitionId ?? throw new ArgumentNullException(nameof(@event.CaseDefinitionId));
             Definition = @event.Definition;
         }

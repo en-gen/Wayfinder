@@ -105,7 +105,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // ~~~~~
                 // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
                 // A missing entry criteria(Sentry) is considered TRUE.
-                Host.Definition.EntryCriteriaSpecified
+                Host.Definition.EntryCriteria.Any()
                     ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
                     : Task.Factory.StartNew(async () =>
                     {
@@ -124,7 +124,6 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             Task.WhenAll(PlanItemDefinition.PlanItems
                 .Select(x => CreateChild(x)));
 
-        // TODO - should be raising EntryCriterionSatisfied and ExitCriterionSatisfied
         protected override async Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null)
         {
             // 5.4.5.1 - Criterion, Table 5.25 - Criterion attributes

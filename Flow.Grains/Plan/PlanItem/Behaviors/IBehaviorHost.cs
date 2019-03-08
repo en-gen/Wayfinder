@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Flow.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Streams;
@@ -16,8 +17,8 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         string InstanceId { get; }
         string DefinitionId { get; }
         
-        Interfaces.Model.PlanItem Definition { get; }
-        PlanItemStore State { get; }
+        IBehaviorDefinition Definition { get; }
+        IBehaviorStore State { get; }
 
         IGrainFactory GrainFactory { get; }
 

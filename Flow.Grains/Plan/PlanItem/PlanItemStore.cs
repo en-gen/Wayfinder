@@ -8,7 +8,7 @@ using Flow.Grains.Plan.PlanItem.Events;
 namespace Flow.Grains.Plan.PlanItem
 {
     [Serializable]
-    public class PlanItemStore : CmmnElementStore<Interfaces.Model.PlanItem>
+    public class PlanItemStore : CmmnElementStore<Interfaces.Model.PlanItem>, IBehaviorStore
     {
         public PlanItemDefinition PlanItemDefinition { get; private set; }
 
@@ -32,12 +32,7 @@ namespace Flow.Grains.Plan.PlanItem
         public CriterionStore ExitCriterionStore { get; } = new CriterionStore();
 
         public object BehaviorExtension { get; private set; }
-
-        public void Apply(BaseUpdate @event)
-        {
-            Updated = @event.Updated;
-        }
-
+        
         public void Apply(Defined @event)
         {
             base.Apply(@event);

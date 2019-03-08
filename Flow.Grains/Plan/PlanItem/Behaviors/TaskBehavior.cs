@@ -62,7 +62,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // ~~~~~
                 // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
                 // A missing entry criteria(Sentry) is considered TRUE.
-                Host.Definition.EntryCriteriaSpecified
+                Host.Definition.EntryCriteria.Any()
                     ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
                     : Task.Factory.StartNew(async () =>
                     {

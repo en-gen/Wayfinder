@@ -1,7 +1,11 @@
 ﻿using AutoMapper;
 using Flow.Grains.Executables;
+using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Interfaces.Plan.Case;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
+using Flow.Grains.Plan;
+using Flow.Grains.Plan.Case;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
@@ -20,13 +24,10 @@ namespace Flow.Grains.Infrastructure.AutoMapper
             CreateMap<TimerEventListenerBehaviorStore, TimerEventListenerBehaviorSnapshot>();
 
             CreateMap<PlanItemStore, PlanItemSnapshot>()
-                .ForMember(dest => dest.Definition, opts => opts.Ignore())
                 .ForMember(dest => dest.BehaviorExtension, opts => opts.MapFrom(MapBehaviorStore));
 
-            CreateMap<IBehaviorHost, PlanItemSnapshot>()
-                .AfterMap((src, dest, ctx) => ctx.Mapper.Map(src.State, dest))
-                .ForMember(dest => dest.Definition, opts => opts.MapFrom(src => src.State.Definition))
-                .ForAllOtherMembers(opts => opts.Ignore());
+            CreateMap<CaseStore, CaseSnapshot>()
+                .ForMember(dest => dest.CasePlanModel, opts => opts.MapFrom(src => src.PlanItemDefinition));
         }
 
         private static object MapBehaviorStore(

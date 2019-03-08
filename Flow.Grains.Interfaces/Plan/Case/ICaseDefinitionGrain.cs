@@ -1,5 +1,4 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Orleans;
 
 namespace Flow.Grains.Interfaces.Plan.Case
@@ -8,5 +7,7 @@ namespace Flow.Grains.Interfaces.Plan.Case
     {
         Task<bool> Defined();
         Task Define(Model.Case definition);
+
+        Task<Model.Case> GetDefinition();
     }
 }

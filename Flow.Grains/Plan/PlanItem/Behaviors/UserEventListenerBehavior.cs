@@ -18,7 +18,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
         protected override async Task HandleTransitioned(StateMachine<PlanItemState, PlanItemTransition>.Transition transition)
         {
-            var userCompletable = StateMachine.CanFire(PlanItemTransition.Complete) &&
+            var userCompletable = Host.State.PlanItemState == PlanItemState.Available &&
                                   ((PlanItemDefinition.AuthorizedRoleRefs?.Length ?? 0) == 0 ||
                                    await Authorized());
 
@@ -39,8 +39,8 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             var tcs = new GrainCancellationTokenSource();
 
             var remainingTasks = PlanItemDefinition.AuthorizedRoleRefs
-                .Select(role => Host.GrainFactory
-                    .GetGrain<IRoleGrain>(Host.CaseInstanceId, role)
+                .Select(roleId => Host.GrainFactory
+                    .GetGrain<IRoleGrain>(Host.CaseInstanceId, roleId)
                     .Authorize(tcs.Token))
                 .ToHashSet();
 
