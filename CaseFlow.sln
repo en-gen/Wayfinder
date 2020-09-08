@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.136
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30225.117
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "~Tests", "~Tests", "{D0DB18E2-B342-4CEC-9EBE-6F5C5141824F}"
 EndProject
@@ -15,9 +15,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests.Integrati
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests.Utils", "Flow.Grains.Tests.Utils\Flow.Grains.Tests.Utils.csproj", "{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Api", "Flow.Api\Flow.Api.csproj", "{E883D3F7-D8DD-47FD-AC69-5A1BE79EFFBA}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flow.Silo", "Flow.Silo\Flow.Silo.csproj", "{4A7FDB07-E352-4686-941F-C91362833155}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Silo", "Flow.Silo\Flow.Silo.csproj", "{4A7FDB07-E352-4686-941F-C91362833155}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,10 +43,6 @@ Global
 		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E883D3F7-D8DD-47FD-AC69-5A1BE79EFFBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E883D3F7-D8DD-47FD-AC69-5A1BE79EFFBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E883D3F7-D8DD-47FD-AC69-5A1BE79EFFBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E883D3F7-D8DD-47FD-AC69-5A1BE79EFFBA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4A7FDB07-E352-4686-941F-C91362833155}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{4A7FDB07-E352-4686-941F-C91362833155}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4A7FDB07-E352-4686-941F-C91362833155}.Release|Any CPU.ActiveCfg = Release|Any CPU

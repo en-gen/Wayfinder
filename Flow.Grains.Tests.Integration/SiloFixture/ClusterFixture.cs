@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
 using System.Reflection;
+using System.Threading.Tasks;
 using AutoMapper;
 using Flow.Grains.Infrastructure.AutoMapper;
 using Flow.Grains.Infrastructure.Extensions;
@@ -15,24 +17,36 @@ using Microsoft.Extensions.Logging;
 using NodaTime;
 using NodaTime.Extensions;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using Xunit;
 
 namespace Flow.Grains.Tests.Integration.SiloFixture
 {
-    public class ClusterFixture : IDisposable
+    public class ClusterFixture : IDisposable, IAsyncLifetime
     {
-        public ISiloHost SiloHost { get; }
-        public IClusterClient ClusterClient { get; }
+        public ISiloHost SiloHost { get; private set; }
+        public IClusterClient ClusterClient { get; private set; }
 
-        public ClusterFixture()
+        private bool _disposed = false;
+
+        public async Task InitializeAsync()
         {
             SiloHost = new SiloHostBuilder()
                 .UseLocalhostClustering()
+                
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "integration";
+                    options.ServiceId = "Case.Flow";
+                })
+
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 
                 .ConfigureServices(ConfigureServices)
                 .ConfigureLogging(ConfigureLogging)
@@ -51,25 +65,22 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 
                 .Build();
 
-            SiloHost.StartAsync().GetAwaiter().GetResult();
+            await SiloHost.StartAsync();
 
             ClusterClient = SiloHost.Services.GetRequiredService<IClusterClient>();
-            ClusterClient.Connect().GetAwaiter().GetResult();
+
+            await ClusterClient.Connect();
+        }
+
+        public async Task DisposeAsync()
+        {
+            await ClusterClient.Close();
+            await SiloHost.StopAsync();
         }
 
         private static void ConfigureServices(HostBuilderContext ctx, IServiceCollection services)
         {
             services
-                .AddSingleton(sp => new ClientBuilder()
-                    .UseLocalhostClustering()
-
-                    .AddSimpleMessageStreamProvider("Default")
-
-                    .ConfigureApplicationParts(parts => parts
-                        .AddApplicationPart(typeof(IPlanItemGrain).Assembly)
-                        .AddApplicationPart(typeof(ICaseGrain).Assembly))
-
-                    .Build())
                 .AddSingleton<IClock>(SystemClock.Instance.InUtc())
                 .AddRuleExecutor()
                 .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
@@ -78,7 +89,7 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 .AddQuartz(QuartzSchedulerConfig.Volatile);
         }
 
-        private void ConfigureLogging(HostBuilderContext ctx, ILoggingBuilder logging)
+        private static void ConfigureLogging(HostBuilderContext ctx, ILoggingBuilder logging)
         {
             var levelSwitch = new LoggingLevelSwitch
             {
@@ -98,8 +109,20 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
 
         public void Dispose()
         {
-            Log.CloseAndFlush();
-            SiloHost.StopAsync().GetAwaiter().GetResult();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                Log.CloseAndFlush();
+            }
+
+            _disposed = true;
         }
     }
 }

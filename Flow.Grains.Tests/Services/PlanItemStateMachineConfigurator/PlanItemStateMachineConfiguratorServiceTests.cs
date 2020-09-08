@@ -5,9 +5,9 @@ using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
 using Flow.Grains.Tests.Infrastructure.Extensions;
+using Flow.Grains.Tests.Infrastructure.Logging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions.Internal;
 using Moq;
 using Xunit;
 
@@ -15,6 +15,8 @@ namespace Flow.Grains.Tests.Services.PlanItemStateMachineConfigurator
 {
     public class PlanItemStateMachineConfiguratorServiceTests
     {
+        private static readonly string PlanItemStateMachineTypeName = TypeNameHelper.GetTypeDisplayName(typeof(PlanItemStateMachine));
+
         [Theory, AutoData]
         public void Configure__Given_MilestoneStore__Then_MilestoneStateMachine(string caseDefinitionId)
         {
@@ -38,7 +40,7 @@ namespace Flow.Grains.Tests.Services.PlanItemStateMachineConfigurator
         {
             var logFactory = new Mock<ILoggerFactory>();
             logFactory
-                .Setup(x => x.CreateLogger(TypeNameHelper.GetTypeDisplayName(typeof(PlanItemStateMachine))))
+                .Setup(x => x.CreateLogger(PlanItemStateMachineTypeName))
                 .Returns(Mock.Of<ILogger<PlanItemStateMachine>>());
             
             return new PlanItemStateMachineConfiguratorService(logFactory.Object);
