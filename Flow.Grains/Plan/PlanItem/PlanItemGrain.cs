@@ -18,7 +18,7 @@ namespace Flow.Grains.Plan.PlanItem
 {
     public class PlanItemGrain :
         CmmnElementGrain<PlanItemStore, Interfaces.Model.PlanItem>,
-        IPlanItemGrain,
+        IPlanItemInternalGrain,
         IBehaviorHost
     {
         private IPlanItemBehaviorConfigurator BehaviorConfigurator { get; }

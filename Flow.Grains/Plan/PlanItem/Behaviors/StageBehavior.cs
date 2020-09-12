@@ -302,7 +302,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
             var childSnapshots = await Task.WhenAll(StageStore.Children
                 .SelectMany(kvp => kvp.Value.Keys)
-                .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemGrain>(
+                .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemInternalGrain>(
                         Host.CaseInstanceId,
                         $"{Host.Address}.{piInstanceId}")
                     .GetSnapshot()));
@@ -404,7 +404,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 childInstanceId,
                 child.Id));
 
-            var childGrain = Host.GrainFactory.GetGrain<IPlanItemGrain>(
+            var childGrain = Host.GrainFactory.GetGrain<IPlanItemInternalGrain>(
                 Host.CaseInstanceId,
                 $"{Host.Address}.{childInstanceId}");
 

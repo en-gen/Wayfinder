@@ -67,7 +67,7 @@ namespace Flow.Grains.Scheduler
                 .UsingJobData(new JobDataMap(context))
                 .Build();
 
-        private ITrigger ConfigureTrigger(Iso8601 schedule, DateTime? timerStart)
+        private static ITrigger ConfigureTrigger(Iso8601 schedule, DateTime? timerStart)
         {
             var triggerBuilder = TriggerBuilder.Create();
 

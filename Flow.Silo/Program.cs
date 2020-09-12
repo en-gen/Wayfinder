@@ -1,21 +1,27 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using AutoMapper;
 using Flow.Grains.Infrastructure.AutoMapper;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
-using Flow.Grains.Plan.Case;
+using Flow.Grains.Interfaces.Plan.Case;
+using Flow.Grains.Interfaces.Plan.PlanItem;
+using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Flow.Silo.Infrastructure.Options;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -26,70 +32,86 @@ namespace Flow.Silo
 {
     public class Program
     {
-        private static ISiloHost SiloHost { get; set; }
-
-        public static async Task<int> Main(string[] args)
+        public static async Task Main(string[] args)
         {
+            await CreateHostBuilder(args).Build().RunAsync();
+        }
+
+        private static IHostBuilder CreateHostBuilder(string[] args) =>
+            Host.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
+                {
+                    webBuilder.UseStartup<Startup>();
+                })
+                .ConfigureLogging(ConfigureLogging)
+                .UseOrleans(ConfigureOrleans)
+                .ConfigureServices(ConfigureServices)
+                .UseConsoleLifetime();
+        
+        private static void ConfigureLogging(HostBuilderContext context, ILoggingBuilder logging)
+        {
+            var seqOptions = context.Configuration.GetSection(SeqOptions.ConfigKey).Get<SeqOptions>();
+
             var levelSwitch = new LoggingLevelSwitch
             {
                 MinimumLevel = LogEventLevel.Debug
             };
-            Log.Logger = new LoggerConfiguration()
+
+            logging.AddSerilog(new LoggerConfiguration()
                 .MinimumLevel.ControlledBy(levelSwitch)
                 .Enrich.FromLogContext()
                 .Enrich.WithExceptionDetails()
                 .WriteTo.Seq(
-                    "http://localhost:5341",
-                    apiKey: null,
+                    serverUrl: seqOptions.ServerUrl,
+                    apiKey: seqOptions.ApiKey,
                     controlLevelSwitch: levelSwitch
                 )
-                .CreateLogger();
-            
-            Log.Logger.Debug("initializing silo");
-
-            try
-            {
-                var host = new HostBuilder()
-                    .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(builder => builder.AddSerilog(Log.Logger))
-                    .UseOrleans((context, siloBuilder) =>
-                    {
-                        siloBuilder
-                            .UseAzureStorageClustering(options => options.ConnectionString = "UseDevelopmentStorage=true")
-
-                            .Configure<ClusterOptions>(options =>
-                            {
-                                options.ClusterId = "development";
-                                options.ServiceId = "Case.Flow";
-                            })
-                            .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = Dns.GetHostAddresses(Dns.GetHostName())
-                                .Single(x => x.AddressFamily == AddressFamily.InterNetwork && x.ToString().StartsWith("192.168."))) // TODO: even if this is a config point, I don't like it
-
-                            .AddAzureTableGrainStorageAsDefault(options => options.ConnectionString = "UseDevelopmentStorage=true") // grain state
-                            .AddLogStorageBasedLogConsistencyProvider() // journaled grain
-
-                            .AddSimpleMessageStreamProvider("Default", options => options.FireAndForgetDelivery = true) // cluster stream provider
-                            .AddAzureTableGrainStorage("PubSubStore", options => options.ConnectionString = "UseDevelopmentStorage=true") // stream state
-                            .UseAzureTableReminderService("UseDevelopmentStorage=true")
-                            
-                            .ConfigureApplicationParts(parts => parts
-                                .AddApplicationPart(typeof(CaseGrain).Assembly) // Flow.Grains
-                                .WithReferences()); //Flow.Grains.Interfaces
-                    })
-                    .Build();
-
-                await host.RunAsync();
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                Log.Logger.Error(ex, "failure during cluster startup");
-                Log.CloseAndFlush();
-                return 1;
-            }
+                .CreateLogger());
         }
 
-        private static void ConfigureServices(HostBuilderContext ctx, IServiceCollection services)
+        private static void ConfigureOrleans(HostBuilderContext context, ISiloBuilder silo)
+        {
+            if (context.HostingEnvironment.IsDevelopment())
+            {
+                ConfigureDevelopmentOrleans(silo);
+            }
+            else
+            {
+                ConfigureDeployedOrleans(context, silo);
+            }
+
+            silo
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = context.HostingEnvironment.EnvironmentName;
+                    options.ServiceId = context.HostingEnvironment.ApplicationName;
+                })
+                .ConfigureApplicationParts(parts => parts
+                    .AddApplicationPart(typeof(IPlanItemInternalGrain).Assembly)
+                    .WithReferences())
+                .UseSiloUnobservedExceptionsHandler();
+        }
+
+        private static void ConfigureDevelopmentOrleans(ISiloBuilder silo)
+        {
+            silo
+                .UseLocalhostClustering()
+
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+
+                .AddMemoryGrainStorageAsDefault() // grain state
+                .AddLogStorageBasedLogConsistencyProvider() // journaled grain
+                .AddMemoryGrainStorage("PubSubStore") // stream storage
+                .AddSimpleMessageStreamProvider("Default", options => options.FireAndForgetDelivery = true) // cluster stream provider
+                .UseInMemoryReminderService();
+        }
+
+        private static void ConfigureDeployedOrleans(HostBuilderContext context, ISiloBuilder silo)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
             services
                 .AddRuleExecutor()

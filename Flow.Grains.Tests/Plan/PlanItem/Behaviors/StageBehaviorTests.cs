@@ -183,10 +183,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage);
 
-            var mockPlanItemGrain = new Mock<IPlanItemGrain>();
+            var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, It.IsAny<string>(), null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
                 .Returns(mockPlanItemGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();

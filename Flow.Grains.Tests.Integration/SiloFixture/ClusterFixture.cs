@@ -7,8 +7,8 @@ using AutoMapper;
 using Flow.Grains.Infrastructure.AutoMapper;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
-using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Plan.Case;
+using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
@@ -58,8 +58,8 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 .UseInMemoryReminderService()
 
                 .ConfigureApplicationParts(parts => parts
-                    .AddApplicationPart(typeof(IPlanItemGrain).Assembly)
-                    .AddApplicationPart(typeof(ICaseGrain).Assembly))
+                    .AddApplicationPart(typeof(IPlanItemInternalGrain).Assembly)
+                    .WithReferences())
 
                 .UseSiloUnobservedExceptionsHandler()
                 

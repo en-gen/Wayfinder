@@ -106,10 +106,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
             
-            var mockPlanItemGrain = new Mock<IPlanItemGrain>();
+            var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, It.IsAny<string>(), null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
                 .Returns(mockPlanItemGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -229,12 +229,12 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Active
             };
 
-            var mockPlanItem = new Mock<IPlanItemGrain>();
+            var mockPlanItem = new Mock<IPlanItemInternalGrain>();
             mockPlanItem.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshot));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
                 .Returns(mockPlanItem.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -309,12 +309,12 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Active
             };
 
-            var mockPlanItem = new Mock<IPlanItemGrain>();
+            var mockPlanItem = new Mock<IPlanItemInternalGrain>();
             mockPlanItem.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshot));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
                 .Returns(mockPlanItem.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -383,12 +383,12 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Active
             };
 
-            var mockPlanItem = new Mock<IPlanItemGrain>();
+            var mockPlanItem = new Mock<IPlanItemInternalGrain>();
             mockPlanItem.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshot));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemInstanceId}", null))
                 .Returns(mockPlanItem.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -470,17 +470,17 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Active
             };
 
-            var mockPlanItemA = new Mock<IPlanItemGrain>();
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
             mockPlanItemA.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotA));
-            var mockPlanItemB = new Mock<IPlanItemGrain>();
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
             mockPlanItemB.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotB));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
                 .Returns(mockPlanItemA.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
                 .Returns(mockPlanItemB.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -561,17 +561,17 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Active
             };
 
-            var mockPlanItemA = new Mock<IPlanItemGrain>();
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
             mockPlanItemA.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotA));
-            var mockPlanItemB = new Mock<IPlanItemGrain>();
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
             mockPlanItemB.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotB));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
                 .Returns(mockPlanItemA.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
                 .Returns(mockPlanItemB.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -652,17 +652,17 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Completed
             };
 
-            var mockPlanItemA = new Mock<IPlanItemGrain>();
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
             mockPlanItemA.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotA));
-            var mockPlanItemB = new Mock<IPlanItemGrain>();
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
             mockPlanItemB.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotB));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
                 .Returns(mockPlanItemA.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
                 .Returns(mockPlanItemB.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -741,17 +741,17 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Completed
             };
 
-            var mockPlanItemA = new Mock<IPlanItemGrain>();
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
             mockPlanItemA.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotA));
-            var mockPlanItemB = new Mock<IPlanItemGrain>();
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
             mockPlanItemB.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotB));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
                 .Returns(mockPlanItemA.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
                 .Returns(mockPlanItemB.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -861,22 +861,22 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Completed
             };
 
-            var mockPlanItemA = new Mock<IPlanItemGrain>();
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
             mockPlanItemA.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotA));
-            var mockPlanItemB = new Mock<IPlanItemGrain>();
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
             mockPlanItemB.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotB));
-            var mockPlanItemC = new Mock<IPlanItemGrain>();
+            var mockPlanItemC = new Mock<IPlanItemInternalGrain>();
             mockPlanItemC.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotC));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
                 .Returns(mockPlanItemA.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
                 .Returns(mockPlanItemB.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{discretionaryItemCInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{discretionaryItemCInstanceId}", null))
                 .Returns(mockPlanItemC.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -986,22 +986,22 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 PlanItemState = PlanItemState.Enabled
             };
 
-            var mockPlanItemA = new Mock<IPlanItemGrain>();
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
             mockPlanItemA.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotA));
-            var mockPlanItemB = new Mock<IPlanItemGrain>();
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
             mockPlanItemB.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotB));
-            var mockPlanItemC = new Mock<IPlanItemGrain>();
+            var mockPlanItemC = new Mock<IPlanItemInternalGrain>();
             mockPlanItemC.Setup(x => x.GetSnapshot())
                 .Returns(Task.FromResult(snapshotC));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
                 .Returns(mockPlanItemA.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
                 .Returns(mockPlanItemB.Object);
-            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemGrain>(caseInstanceId, $"{address}.{discretionaryItemCInstanceId}", null))
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{discretionaryItemCInstanceId}", null))
                 .Returns(mockPlanItemC.Object);
 
             var mockHost = new Mock<IBehaviorHost>();

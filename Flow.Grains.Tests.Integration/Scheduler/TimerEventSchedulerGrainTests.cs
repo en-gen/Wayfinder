@@ -50,7 +50,7 @@ namespace Flow.Grains.Tests.Integration.Scheduler
 
                     return Task.CompletedTask;
                 });
-            var period = Period.FromSeconds(2).Normalize();
+            var period = Period.FromSeconds(1).Normalize();
             var isoPeriod = PeriodPattern.NormalizingIso.Format(period);
 
             await schedulerGrain.ScheduleTimer(
@@ -66,7 +66,7 @@ namespace Flow.Grains.Tests.Integration.Scheduler
                     ["ElementInstanceId"] = planItemInstanceId
                 });
 
-            await Task.Factory.StartNew(() => Thread.Sleep(TimeSpan.FromSeconds(10)));
+            await Task.Factory.StartNew(() => Thread.Sleep(TimeSpan.FromSeconds(4)));
 
             ticks.Should().HaveCount(expectedTicks);
         }
