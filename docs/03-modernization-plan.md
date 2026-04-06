@@ -655,6 +655,6 @@ Crunchafi advantages that compress this timeline:
 
 Crunchafi-specific additions beyond the base plan:
 - **Carina connector** — register the CMMN platform as a product in Carina (orgs, users, entitlements)
-- **Crunchafi Lease Accounting ProcessTask** — built-in ProcessTask implementation that invokes Crunchafi Lease Accounting APIs
-- **Crunchafi Data Extraction ProcessTask** — built-in ProcessTask implementation that invokes Crunchafi Data Extraction data extraction
+- **Lease Accounting ProcessTask** — built-in ProcessTask implementation that invokes Lease Accounting APIs
+- **Data Extraction ProcessTask** — built-in ProcessTask implementation that invokes Data Extraction APIs
 - **Audit case templates** — pre-built engagement models aligned with Thomson Reuters Guided Assurance workflow

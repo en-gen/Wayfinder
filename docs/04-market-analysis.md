@@ -75,7 +75,7 @@ A financial audit engagement is textbook CMMN territory:
 | Case | Audit engagement |
 | Stage | Audit phases (Planning, Fieldwork, Reporting, Completion) |
 | HumanTask | Control test, substantive procedure, client interview |
-| ProcessTask | Crunchafi Lease Accounting analysis, Strongbox ERP extraction |
+| ProcessTask | Lease Accounting analysis, Data Extraction ERP extraction |
 | Milestone | "Risk Assessment Complete", "Draft Report Approved" |
 | Entry criterion | "Start fieldwork once planning is signed off" |
 | Exit criterion | "Close fieldwork stage once all required procedures are complete" |
@@ -93,7 +93,7 @@ A financial audit engagement is textbook CMMN territory:
   ├─ [Stage: Planning]
   │    ├─ [Task: Assess materiality]              (required)
   │    ├─ [Task: Identify risk areas]             (required)
-  │    ├─ [ProcessTask: Strongbox — ERP extract]  (required)
+  │    ├─ [ProcessTask: Data Extraction — ERP extract]  (required)
   │    ├─ [Task: Prepare audit plan]              (required)
   │    └─ [Milestone: Planning Complete]
   │
@@ -103,7 +103,7 @@ A financial audit engagement is textbook CMMN territory:
   │    │    ├─ [Task: Substantive testing]        (required)
   │    │    └─ [Task: Extended sampling]          (discretionary — if control failure)
   │    ├─ [Stage: Lease Review]
-  │    │    └─ [ProcessTask: Crunchafi Lease Accounting]         (required if leases exist)
+  │    │    └─ [ProcessTask: Lease Accounting]         (required if leases exist)
   │    ├─ [Stage: Cash Flow Review]
   │    └─ [Stage: IT Controls]                   (discretionary — if significant IT risk)
   │
@@ -137,17 +137,17 @@ A financial audit engagement is textbook CMMN territory:
 ### Current Position
 
 Crunchafi operates three products targeting the same buyer (CPA firms and lenders):
-- **Crunchafi Lease Accounting** — lease accounting compliance (ASC 842, IFRS 16, GASB)
-- **Crunchafi Data Extraction** — financial data extraction from ERPs
+- **Lease Accounting** — lease accounting compliance (ASC 842, IFRS 16, GASB)
+- **Data Extraction** — financial data extraction from ERPs
 - **Cash Flow** — cash flow forecasting and analysis
 
 These products are currently **silos** — a firm uses each independently, with no thread connecting them into a coherent engagement workflow.
 
 ### The Thomson Reuters Partnership
 
-In December 2025, Crunchafi integrated Crunchafi Lease Accounting into Thomson Reuters' **Guided Assurance** (Cloud Audit Suite) as a ProcessTask within their PPC-based audit workflow. The partnership deepened in February 2026 with joint education initiatives.
+In December 2025, Crunchafi integrated Lease Accounting into Thomson Reuters' **Guided Assurance** (Cloud Audit Suite) as a ProcessTask within their PPC-based audit workflow. The partnership deepened in February 2026 with joint education initiatives.
 
-**Key observation:** Thomson Reuters chose **Validis** (not Crunchafi Data Extraction) as their data extraction partner for Audit Intelligence. The two are direct competitors in the ERP-to-audit-data pipeline.
+**Key observation:** Thomson Reuters chose **Validis** (not Data Extraction) as their data extraction partner for Audit Intelligence. The two are direct competitors in the ERP-to-audit-data pipeline.
 
 ### The CMMN Opportunity Within Crunchafi
 
@@ -156,8 +156,8 @@ A CMMN engine could serve as the **orchestration layer** that stitches Crunchafi
 ```
 [Audit Engagement Case — powered by Case-Flow]
         │
-        ├─ ProcessTask: Strongbox      → client ERP extraction
-        ├─ ProcessTask: Crunchafi Lease Accounting    → lease accounting analysis
+        ├─ ProcessTask: Data Extraction      → client ERP extraction
+        ├─ ProcessTask: Lease Accounting    → lease accounting analysis
         ├─ ProcessTask: Cash Flow      → cash flow review
         └─ ProcessTask: [Future]       → next acquisition plugs in here
 ```
@@ -165,19 +165,19 @@ A CMMN engine could serve as the **orchestration layer** that stitches Crunchafi
 **Strategic value:**
 1. **Acquisition glue** — every product Crunchafi acquires becomes a ProcessTask
 2. **Stickiness** — once a firm's audit workflow lives in CMMN, switching individual products becomes very costly
-3. **Competitive pressure on Validis** — an integrated Crunchafi Data Extraction ProcessTask within the engagement platform competes more effectively with Validis than the product does standalone
+3. **Competitive pressure on Validis** — an integrated Data Extraction ProcessTask within the engagement platform competes more effectively with Validis than the product does standalone
 4. **Platform positioning** — shifts Crunchafi from component vendor to platform owner
 
 ### Two Strategic Paths
 
 **Path A — Deepen the TR Partnership**
-Stay a component vendor within Thomson Reuters' Guided Assurance. Get Crunchafi Data Extraction into the TR ecosystem alongside Validis. Let TR own the orchestration layer.
+Stay a component vendor within Thomson Reuters' Guided Assurance. Get Data Extraction into the TR ecosystem alongside Validis. Let TR own the orchestration layer.
 - Lower sales friction (TR's 750+ firm relationships)
 - Permanently capped upside — always a line item, never the platform
 - Vulnerable to TR acquiring a competitor or deprioritizing the partnership
 
 **Path B — Build the Orchestration Layer**
-Use Case-Flow to build the audit engagement platform that sits above TR's tools. CPA firms run their engagements in Crunchafi; TR products, Strongbox, Crunchafi Lease Accounting, and future acquisitions are all ProcessTasks.
+Use Case-Flow to build the audit engagement platform that sits above TR's tools. CPA firms run their engagements in Crunchafi; TR products, Data Extraction, Lease Accounting, and future acquisitions are all ProcessTasks.
 - Platform stickiness and upsell surface
 - Directly challenges Thomson Reuters' Guided Assurance
 - Risks the existing partnership

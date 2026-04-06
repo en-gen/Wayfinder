@@ -149,8 +149,8 @@ A financial audit engagement is a strong fit for CMMN modeling. Key mapping:
 | Audit engagement | Case |
 | Planning, fieldwork, reporting phases | Stages |
 | Control test, substantive procedure | HumanTask |
-| Lease accounting analysis (Crunchafi Lease Accounting) | ProcessTask |
-| ERP data extraction (Crunchafi Data Extraction) | ProcessTask |
+| Lease accounting analysis (Lease Accounting) | ProcessTask |
+| ERP data extraction (Data Extraction) | ProcessTask |
 | "Risk assessment complete" | Milestone |
 | Extended procedures triggered by a finding | Discretionary task (entry criterion = finding recorded) |
 | Mandatory ISA/GAAS procedures | Required tasks |

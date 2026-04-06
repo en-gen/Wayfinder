@@ -14,8 +14,8 @@ Crunchafi's strategy is to acquire products that serve the financial audit proce
 
 Today a CPA firm using Crunchafi's products works like this:
 
-- They log into **Crunchafi Data Extraction** to extract client financials
-- They log into **Crunchafi Lease Accounting** to handle lease accounting
+- They log into **Data Extraction** to extract client financials
+- They log into **Lease Accounting** to handle lease accounting
 - They manually coordinate between the two
 - They use **Thomson Reuters Guided Assurance** (or a spreadsheet) to track where they are in the engagement
 - Every new product Crunchafi acquires adds another tool to manage
@@ -48,14 +48,14 @@ The engine works. What it needs is modernisation (Orleans 8, .NET 8), a REST API
 
 ### Crunchafi's stated direction is acquisition
 
-The rebrand from Crunchafi Lease Accounting to Crunchafi explicitly signals a multi-product platform ambition. Every product acquired to serve the audit process faces the same integration problem: how does it connect to the others? How does a CPA firm run a coordinated engagement across multiple tools?
+The rebrand from LeaseCrunch to Crunchafi explicitly signals a multi-product platform ambition. Every product acquired to serve the audit process faces the same integration problem: how does it connect to the others? How does a CPA firm run a coordinated engagement across multiple tools?
 
 Case-Flow is the answer to that question. Each acquired product becomes a **ProcessTask** within a CMMN case — invoked at the right point in the engagement, with results flowing into the case file and triggering downstream work.
 
 ```
 [Audit Engagement Case]
-    ├─ ProcessTask: Crunchafi Data Extraction      ← ERP data extraction
-    ├─ ProcessTask: Crunchafi Lease Accounting     ← Lease accounting
+    ├─ ProcessTask: Data Extraction      ← ERP data extraction
+    ├─ ProcessTask: Lease Accounting     ← Lease accounting
     ├─ ProcessTask: Cash Flow                      ← Cash flow analysis
     └─ ProcessTask: [Next acquisition]             ← plugs in on day one
 ```
@@ -64,15 +64,15 @@ Without Case-Flow, each acquisition compounds the coordination problem. With it,
 
 ### The Thomson Reuters Dependency Risk
 
-The TR partnership has been a meaningful growth driver — Crunchafi Lease Accounting is embedded in Guided Assurance and TR's sales force carries it. But the partnership reveals a structural risk that compounds over time:
+The TR partnership has been a meaningful growth driver — Lease Accounting is embedded in Guided Assurance and TR's sales force carries it. But the partnership reveals a structural risk that compounds over time:
 
-**We do not control the relationship.** TR chose Validis — not Crunchafi Data Extraction — as their data extraction partner for Audit Intelligence. Both products compete in the same space. TR made a choice that excluded us from a major workflow integration. They can make that choice again, for any product, at any time.
+**We do not control the relationship.** TR chose Validis — not Data Extraction — as their data extraction partner for Audit Intelligence. Both products compete in the same space. TR made a choice that excluded us from a major workflow integration. They can make that choice again, for any product, at any time.
 
-**TR controls the engagement workflow.** When a CPA firm runs an audit in Guided Assurance, the engagement lives in TR's platform. Crunchafi Lease Accounting is a line item in that workflow — useful, but substitutable if TR builds the capability internally or partners with a competitor. The firm's loyalty is to TR's platform, not to Crunchafi.
+**TR controls the engagement workflow.** When a CPA firm runs an audit in Guided Assurance, the engagement lives in TR's platform. Lease Accounting is a line item in that workflow — useful, but substitutable if TR builds the capability internally or partners with a competitor. The firm's loyalty is to TR's platform, not to Crunchafi.
 
 **The incentive structure is asymmetric.** TR benefits from Crunchafi's products making their platform more complete. Crunchafi benefits from TR's distribution. But TR can replace Crunchafi's products; Crunchafi cannot replace TR's distribution without building something of its own.
 
-Case-Flow is that something. It does not require ending the TR partnership — in the near term, Crunchafi Lease Accounting continues as a TR partner regardless of whether Case-Flow exists. But it means Crunchafi is building towards a position where TR's decisions about partnerships are no longer existential.
+Case-Flow is that something. It does not require ending the TR partnership — in the near term, Lease Accounting continues as a TR partner regardless of whether Case-Flow exists. But it means Crunchafi is building towards a position where TR's decisions about partnerships are no longer existential.
 
 ### Firms Should Own Their Workflow — Not Thomson Reuters
 
@@ -176,7 +176,7 @@ When Crunchafi acquires a new product, integrating it into Case-Flow is a matter
 
 ### Product-Agnostic Adapter Architecture
 
-The ProcessTask adapter interface is not Crunchafi-specific. Any product — whether Crunchafi-owned or third-party — can implement it. Crunchafi ships first-party adapters for Crunchafi Lease Accounting and Crunchafi Data Extraction on day one. Third-party vendors who want to be part of a firm's workflow implement the same interface and list on the marketplace.
+The ProcessTask adapter interface is not Crunchafi-specific. Any product — whether Crunchafi-owned or third-party — can implement it. Crunchafi ships first-party adapters for Lease Accounting and Data Extraction on day one. Third-party vendors who want to be part of a firm's workflow implement the same interface and list on the marketplace.
 
 This positions Crunchafi as a **platform operator**, not a walled garden. Firms are not restricted to Crunchafi tools within their workflows. That openness is a selling point — it removes adoption friction — while Crunchafi's bundled products retain the preferred position through pricing and deep integration. The architecture enables an ecosystem. Crunchafi decides how open or closed to make the marketplace, and can adjust that policy as the platform matures.
 
@@ -190,7 +190,7 @@ This positions Crunchafi as a **platform operator**, not a walled garden. Firms 
 
 **Medium-term target:** Large regional and specialist firms who have proprietary methodologies and resent being forced into PPC. These firms have the budget and the pain.
 
-**Long-term:** Any firm using Crunchafi products today is a warm lead — they are already in the ecosystem, already using Crunchafi Lease Accounting or Crunchafi Data Extraction, and Case-Flow adds value on top of what they already have.
+**Long-term:** Any firm using Crunchafi products today is a warm lead — they are already in the ecosystem, already using Lease Accounting or Data Extraction, and Case-Flow adds value on top of what they already have.
 
 ### Competitive Landscape
 
@@ -216,7 +216,7 @@ No incumbent can offer this without rebuilding on open standards and giving up t
 
 ### Pricing Unit: Per Engagement
 
-The natural pricing unit is the **audit engagement** — consistent with Crunchafi Lease Accounting's per-lease model and aligned with how CPA firms think about their work. The cost scales with the firm's revenue, is directly billable to each client engagement, and is easy to budget and justify.
+The natural pricing unit is the **audit engagement** — consistent with Lease Accounting's per-lease model and aligned with how CPA firms think about their work. The cost scales with the firm's revenue, is directly billable to each client engagement, and is easy to budget and justify.
 
 CPA firms price their audit engagements at $10,000–$500,000+ depending on entity size. Software that enables and documents that work should cost 1–3% of the value it enables. The pricing below is conservative by that measure.
 
@@ -224,7 +224,7 @@ CPA firms price their audit engagements at $10,000–$500,000+ depending on enti
 
 **Standard — $300–400/engagement/year**
 - Core engagement workflow
-- Crunchafi Lease Accounting + Crunchafi Data Extraction ProcessTasks included
+- Lease Accounting + Data Extraction ProcessTasks included
 - Standard audit trail and reporting
 - Shared infrastructure
 - Email support
@@ -258,7 +258,7 @@ Overage at $35–50 per engagement above the bucket limit.
 
 ### Bundle Strategy
 
-Firms using Crunchafi Lease Accounting + Crunchafi Data Extraction + Case-Flow receive a 20% discount across all three products. This creates a meaningful retention mechanism — switching workflow platforms becomes the switching cost for all Crunchafi products simultaneously. It also gives the sales team a reason to lead with the platform story rather than selling products individually.
+Firms using Lease Accounting + Data Extraction + Case-Flow receive a 20% discount across all three products. This creates a meaningful retention mechanism — switching workflow platforms becomes the switching cost for all Crunchafi products simultaneously. It also gives the sales team a reason to lead with the platform story rather than selling products individually.
 
 ### Revenue Projections
 
@@ -325,7 +325,7 @@ Getting firms productive quickly is a product design problem as much as a techni
 
 **The template library is the on-ramp for self-service.** A firm does not need to build a workflow from scratch. They browse the marketplace, select a template built by a design partner or aligned with published ISA/GAAS standards, and load it into the modeller. From there they customise: add their firm's specific procedures, adjust required vs. discretionary designations, encode their sign-off rules. The result is their methodology, built in hours, not a project.
 
-**Products as first-class adapters.** Every product that participates in a Case-Flow engagement implements a ProcessTask adapter — a defined interface that accepts inputs, invokes the product's API, and returns results to the case. Crunchafi ships first-party adapters for Crunchafi Lease Accounting and Crunchafi Data Extraction on day one. Third-party products implement the same interface. A firm's workflow is not limited to Crunchafi products — it can invoke any tool that exposes the adapter interface.
+**Products as first-class adapters.** Every product that participates in a Case-Flow engagement implements a ProcessTask adapter — a defined interface that accepts inputs, invokes the product's API, and returns results to the case. Crunchafi ships first-party adapters for Lease Accounting and Data Extraction on day one. Third-party products implement the same interface. A firm's workflow is not limited to Crunchafi products — it can invoke any tool that exposes the adapter interface.
 
 This means the platform is **product-agnostic by design**. Crunchafi's own products get preferential placement (bundled, pre-configured, deeply integrated), but the architecture does not require it. A firm using a different data extraction tool can still use Case-Flow. That removes the "we only work with Crunchafi products" objection and broadens the addressable market substantially.
 
@@ -367,8 +367,8 @@ The engine exists. The infrastructure patterns exist. The customer relationships
 
 | Risk | Mitigation |
 |---|---|
-| TR partnership tension | Crunchafi Lease Accounting continues as a TR partner regardless. Case-Flow serves firms who want to own their workflow — a different buyer motion than TR's PPC-embedded approach. Near-term complementary; strategic hedge long-term. |
-| Over-reliance on TR if we do nothing | This is the risk of *not* building Case-Flow. TR already chose Validis over Crunchafi Data Extraction. Remaining a component vendor without platform ownership compounds this exposure. |
+| TR partnership tension | Lease Accounting continues as a TR partner regardless. Case-Flow serves firms who want to own their workflow — a different buyer motion than TR's PPC-embedded approach. Near-term complementary; strategic hedge long-term. |
+| Over-reliance on TR if we do nothing | This is the risk of *not* building Case-Flow. TR already chose Validis over Data Extraction. Remaining a component vendor without platform ownership compounds this exposure. |
 | Domain knowledge — we are not audit experts | By design. The platform is methodology-agnostic. Design partner firms encode their own methodology. Crunchafi ships the engine and the tools; firms bring the knowledge. |
 | Engine modernisation is harder than expected | Orleans 3→8 serialisation migration is the main technical risk; isolated, testable, does not block API or UI work in parallel. |
 | Adoption is slow without content | Design partner approach — first template built *with* a firm, not *for* them. Their investment in the methodology sells it to the next 50 customers. |
