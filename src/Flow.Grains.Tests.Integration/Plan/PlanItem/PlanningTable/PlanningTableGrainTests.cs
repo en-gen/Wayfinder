@@ -1,0 +1,166 @@
+﻿using System;
+using System.Threading.Tasks;
+using AutoFixture.Xunit2;
+using Flow.Grains.Interfaces;
+using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Plan.PlanningTable;
+using Flow.Grains.Tests.Integration.SiloFixture;
+using Flow.Grains.Tests.Utils.Helpers;
+using FluentAssertions;
+using Orleans;
+using Orleans.Hosting;
+using Xunit;
+
+namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
+{
+    [Collection(ClusterCollection.Name)]
+    public class PlanningTableGrainTests
+    {
+        private ISiloHost SiloHost { get; }
+        private IClusterClient ClusterClient { get; }
+
+        public PlanningTableGrainTests(ClusterFixture fixture)
+        {
+            SiloHost = fixture.SiloHost;
+            ClusterClient = fixture.ClusterClient;
+
+            CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        }
+
+        [Theory, AutoData]
+        public async Task GetPlannableItems__Given_Defined__When_NoApplicabilityRule__Then_GetItem
+            (string caseDefinitionId, Guid caseInstanceId)
+        {
+            var expectedResult = new DiscretionaryItem();
+            var definition = new Interfaces.Model.PlanningTable
+            {
+                TableItems =
+                {
+                    expectedResult
+                }
+            };
+
+            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+
+            await subject.Define(caseDefinitionId, definition);
+
+            var result = await subject.GetPlannableItems();
+
+            result.Should()
+                .ContainSingle()
+                .And.Contain(expectedResult);
+        }
+
+        [Theory, AutoData]
+        public async Task GetPlannableItems__Given_Defined__When_ApplicabilityRuleTrue__Then_ReturnItem
+            (string caseDefinitionId, Guid caseInstanceId)
+        {
+            var expectedResult = new DiscretionaryItem
+            {
+                ApplicabilityRuleRefs = new[]
+                {
+                    Rules.IsApplicable.Id
+                }
+            };
+
+            var definition = new Interfaces.Model.PlanningTable
+            {
+                ApplicabilityRules =
+                {
+                    Rules.IsApplicable
+                },
+                TableItems =
+                {
+                    expectedResult
+                }
+            };
+
+            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+
+            await subject.Define(caseDefinitionId, definition);
+
+            var result = await subject.GetPlannableItems();
+
+            result.Should()
+                .ContainSingle()
+                .And.Contain(expectedResult);
+        }
+
+        [Theory, AutoData]
+        public async Task GetPlannableItems__Given_Defined__When_ApplicabilityRuleFalse__Then_ReturnNone
+            (string caseDefinitionId, Guid caseInstanceId)
+        {
+            var definition = new Interfaces.Model.PlanningTable
+            {
+                ApplicabilityRules =
+                {
+                    Rules.NotApplicable
+                },
+                TableItems =
+                {
+                    new DiscretionaryItem
+                    {
+                        ApplicabilityRuleRefs = new[]
+                        {
+                            Rules.NotApplicable.Id
+                        }
+                    }
+                }
+            };
+
+            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+
+            await subject.Define(caseDefinitionId, definition);
+
+            var result = await subject.GetPlannableItems();
+
+            result.Should()
+                .BeEmpty();
+        }
+
+        [Theory, AutoData]
+        public async Task GetPlannableItems__Given_Defined__When_NestedPlanningTable__Then_ReturnItem
+            (string caseDefinitionId, Guid caseInstanceId)
+        {
+            var expectedResult = new DiscretionaryItem
+            {
+                ApplicabilityRuleRefs = new []
+                {
+                    Rules.IsApplicable.Id
+                }
+            };
+            var definition = new Interfaces.Model.PlanningTable
+            {
+                ApplicabilityRules =
+                {
+                    Rules.NotApplicable
+                },
+                TableItems =
+                {
+                    new Interfaces.Model.PlanningTable
+                    {
+                        ApplicabilityRules =
+                        {
+                            Rules.IsApplicable
+                        },
+                        TableItems =
+                        {
+                            expectedResult
+                        }
+                    }
+                }
+            };
+
+            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+
+            await subject.Define(caseDefinitionId, definition);
+
+            var result = await subject.GetPlannableItems();
+
+            result.Should()
+                .ContainSingle()
+                .And.Contain(expectedResult);
+        }
+    }
+}
