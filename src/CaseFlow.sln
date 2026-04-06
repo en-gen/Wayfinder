@@ -1,0 +1,62 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30225.117
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "~Tests", "~Tests", "{D0DB18E2-B342-4CEC-9EBE-6F5C5141824F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains", "Flow.Grains\Flow.Grains.csproj", "{165311F8-8097-41B4-A9D2-15D3E1885D3F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests", "Flow.Grains.Tests\Flow.Grains.Tests.csproj", "{3AF96888-D575-4825-B914-37F2F67BE4FB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Interfaces", "Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj", "{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests.Integration", "Flow.Grains.Tests.Integration\Flow.Grains.Tests.Integration.csproj", "{C2B9B169-8901-4958-93A6-410CF388B4AF}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests.Utils", "Flow.Grains.Tests.Utils\Flow.Grains.Tests.Utils.csproj", "{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flow.Silo", "Flow.Silo\Flow.Silo.csproj", "{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{165311F8-8097-41B4-A9D2-15D3E1885D3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{165311F8-8097-41B4-A9D2-15D3E1885D3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{165311F8-8097-41B4-A9D2-15D3E1885D3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{165311F8-8097-41B4-A9D2-15D3E1885D3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AF96888-D575-4825-B914-37F2F67BE4FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AF96888-D575-4825-B914-37F2F67BE4FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AF96888-D575-4825-B914-37F2F67BE4FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AF96888-D575-4825-B914-37F2F67BE4FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2B9B169-8901-4958-93A6-410CF388B4AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2B9B169-8901-4958-93A6-410CF388B4AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2B9B169-8901-4958-93A6-410CF388B4AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2B9B169-8901-4958-93A6-410CF388B4AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3AF96888-D575-4825-B914-37F2F67BE4FB} = {D0DB18E2-B342-4CEC-9EBE-6F5C5141824F}
+		{C2B9B169-8901-4958-93A6-410CF388B4AF} = {D0DB18E2-B342-4CEC-9EBE-6F5C5141824F}
+		{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0} = {D0DB18E2-B342-4CEC-9EBE-6F5C5141824F}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CCA50106-0CEF-4F09-A620-744F2628029C}
+	EndGlobalSection
+EndGlobal
