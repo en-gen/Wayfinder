@@ -1,0 +1,89 @@
+# GitVersion configuration for Case.Flow (GitVersion 6.x).
+#
+# Baseline: 1.0.0. No release tags exist yet, so `next-version` floors every
+# computation at 1.0.0 — all pre-GA builds are previews of 1.0.0:
+#   develop            1.0.0-develop.<n>
+#   release/1.0.0      1.0.0-rc.<n>
+#   feature/<wi>_<d>   1.0.0-<wi>-<d>.<n>
+#   PR validation      1.0.0-PullRequest<id>.<n>
+#
+# GitVersion 6.x quirk (verified empirically): when a custom tag-prefix is
+# configured, `next-version` MUST include the prefix or GitVersion fails with
+# "Failed to parse 1.0.0 into a Semantic Version". Hence `Case.Flow-1.0.0`.
+#
+# At GA: merge to main and tag it —  git tag Case.Flow-1.0.0 <sha> && git push origin Case.Flow-1.0.0
+# Release tags take precedence over next-version (it is a floor, never a
+# ceiling): main then emits clean 1.0.0, develop automatically advances to
+# 1.1.0-develop.<n>, and hotfixes from main emit 1.0.1-<wi>-<desc>.<n>.
+
+mode: ContinuousDelivery
+
+tag-prefix: 'Case.Flow-'
+
+next-version: Case.Flow-1.0.0
+
+# How to extract a version from a branch name; required for release/X.Y.Z to
+# pin version X.Y.Z. Matches X, X.Y, X.Y.Z with optional v/V prefix.
+version-in-branch-pattern: '(?<version>[vV]?\d+(\.\d+)?(\.\d+)?).*'
+
+branches:
+  develop:
+    regex: ^develop$
+    mode: ContinuousDelivery
+    label: develop
+    increment: Inherit
+    tracks-release-branches: true
+    is-source-branch-for:
+      - feature
+
+  main:
+    regex: ^main$|^master$
+    mode: ContinuousDelivery
+    label: ''
+    increment: Minor
+    is-main-branch: true
+
+  release:
+    # `increment: Inherit` makes release inherit develop's already-bumped
+    # version: with main at 2.6.0, develop computes 2.7.0 and release inherits
+    # it, yielding 2.7.0-rc.N. Convention: cut release branches named after
+    # develop's current next-version (release/2.7.0).
+    regex: ^releases?[/-]
+    mode: ContinuousDelivery
+    label: rc
+    increment: Inherit
+    source-branches:
+      - develop
+    is-release-branch: true
+    pre-release-weight: 30000
+
+  hotfix:
+    # Hotfix branches from main (the deployed version), patch-bumps. The
+    # branch name is captured so the prerelease label carries the work item.
+    # Note: {BranchName} substitution requires the named regex capture.
+    regex: ^hotfix[/-](?<BranchName>.+)
+    mode: ContinuousDelivery
+    label: '{BranchName}'
+    increment: Patch
+    source-branches:
+      - main
+
+  pull-request:
+    regex: ^(pull|pull\-requests|pr)[/-]
+    mode: ContinuousDelivery
+    label: PullRequest
+    increment: Inherit
+    source-branches:
+      - develop
+      - main
+      - release
+      - hotfix
+
+  feature:
+    regex: ^features?[/-](?<BranchName>.+)
+    mode: ContinuousDelivery
+    label: '{BranchName}'
+    increment: Inherit
+    source-branches:
+      - develop
+      - main

@@ -1,0 +1,75 @@
+{
+  "tag": "roadmap-v1",
+  "epics": [
+    {
+      "title": "M0 Solid Ground — foundation & modernization",
+      "description": "Modernize the platform and make truth continuously visible. Exit gate: green pipeline on .NET 8, CVE-clean, docs truthful.",
+      "features": [
+        { "title": "CI/CD pipeline live with merged coverage", "description": "Commit azure-pipelines.yml (repo root); branch policy on develop requires green build+tests; publish merged unit+integration coverage. AC: PR cannot merge red; coverage visible per build." },
+        { "title": "GitVersion semantic versioning (Case.Flow-* tags)", "description": "GitVersion.yml at repo root (GitFlow increments, tag-prefix Case.Flow-, baseline 1.0.0 via next-version) + Version job in Case.Flow.CI republishing outputs and naming runs <X.Y.Z>-<label>.<counter>. AC: develop builds emit 1.0.0-develop.<n> as previews of 1.0.0; Case.Flow-1.0.0 tag pushed at GA flips main to clean 1.0.0 and develop to 1.1.0-develop.<n>; assemblies stamped with AssemblySemVer/InformationalVersion." },
+        { "title": ".NET 8 + Orleans 8.x migration", "description": "Per docs/03: [GenerateSerializer] sweep (~45 [Serializable] types), Host/TestCluster builders, Jint 3.x, System.Text.Json, remove OrleansAzureUtils 2.4.5. AC: 209 tests green natively without DOTNET_ROLL_FORWARD." },
+        { "title": "Dependency & CVE remediation", "description": "Newtonsoft.Json >=13.0.1, AutoMapper patch, transitive criticals (System.Text.Encodings.Web, System.Drawing.Common). AC: dotnet list package --vulnerable clean, gated in CI." },
+        { "title": "Systemic bug fixes with pinning tests", "description": "Fix Task.Factory.StartNew(async) Task<Task> at 4 sites; BaseEvent.Occurred replay timestamps; HashSet<OnPart> identity equality; sentry double-satisfy guard. AC: regression test per fix (see docs/06 section 3.2)." },
+        { "title": "Documentation corrections", "description": "Apply docs/06 section 5 correction list: README claims match runtime reality (no 'full CMMN 1.1' overclaim), doc 02 metric fixes, doc 03 Phase-3 contradiction, add the three omitted material facts." }
+      ]
+    },
+    {
+      "title": "M1 True Engine — spec data plane",
+      "description": "Close the gap between state-machine demo and licensable engine. Exit gate: data-driven demo case (risk score triggers discretionary procedures) runs end-to-end; conformance scenario suite green.",
+      "features": [
+        { "title": "CaseFile / CaseFileItem grains (spec 8.3)", "description": "Full CaseFileItem lifecycle + operations publishing CaseFileItemTransitionedEvent; unblocks case-file sentries and timer start triggers (deviation D2)." },
+        { "title": "Expression context binder (fixes D1)", "description": "Typed dot-path case-file access injected into every evaluation; shared across expression engines. Today all expressions run in an empty JS context (ExpressionGrain.cs:68-95)." },
+        { "title": "Sentry completion: D3, D5, D6, D10", "description": "ifPart-only sentry evaluation; per-repetition sentry reset; stage exit-criteria subscription on create path; PlanItemOnPart.sentryRef mode; fault event on ifPart error." },
+        { "title": "Rules completion: D4, D7, D8", "description": "Stage autoComplete=false per Table 8.12 OR-structure; repetition first-eval discard + repeat-on-complete for no-entry-criteria items; CasePlanModelBehavior close/lockdown semantics." },
+        { "title": "Structural .cmmn import/export + capability lint", "description": "XmlSerializer path over the XSD-generated model (docs/06 section 2.4); golden-file round-trips vs Trisotech/Flowable samples; lint warns/rejects constructs the runtime cannot honor." },
+        { "title": "Conformance scenario suite (internal TCK)", "description": "Generate state-transition tests from spec Tables 8.5-8.11. No official OMG TCK exists — this suite becomes a marketable asset and the coverage backbone." },
+        { "title": "DECISION GATE: licensing model", "description": "Source-available + commercial embedded (Camunda-8-style) vs OSS-core + enterprise (Flowable-style) vs closed commercial. Must decide before M2 API surface freezes." }
+      ]
+    },
+    {
+      "title": "M-EXPR Expression languages (FEEL first)",
+      "description": "Pluggable expression architecture; FEEL as flagship authored language; XPath compat gated; JUEL as import-shim only. See docs/07 section 5.",
+      "features": [
+        { "title": "Pluggable IExpressionEngine + sandbox budgets", "description": "Registry keyed by Expression.Language URI; per-engine timeout/statement/memory budgets (fixes B4 for Jint); compilation cache." },
+        { "title": "FEEL spike: feelin-on-Jint vs native .NET port", "description": "Evaluate bpmn-io's feelin (JS FEEL engine) hosted on the existing Jint sandbox vs porting/adopting a .NET FEEL implementation. Output: decision memo + benchmark." },
+        { "title": "FEEL GA as flagship authored language", "description": "Full ifPart/rule/timer expression support in FEEL; docs; modeler autocomplete lands with M3. DMN synergy for future DecisionTask." },
+        { "title": "XPath compatibility mode (gated)", "description": "Spec-default language for imported conformant models; System.Xml.XPath over case-file XML projection. Gate on conformance marketing value (M1 decision)." },
+        { "title": "JUEL import-translation shim (best-effort)", "description": "Translate common ${...} subset at import with per-expression warnings; explicitly NOT a runtime engine (JUEL is Java EL; no credible .NET runtime)." }
+      ]
+    },
+    {
+      "title": "M2 Cloud Native — production runtime, API, tenancy",
+      "description": "Runs somewhere real. Exit gate: chaos test (silo kill mid-case loses no timers/events); authenticated API demo; benchmark report.",
+      "features": [
+        { "title": "Deployed Orleans: clustering, durable state & streams", "description": "Azure clustering + durable grain/journal storage; replace fire-and-forget SMS streams for criticality-1 events; snapshotting; event-schema versioning. Fixes B1." },
+        { "title": "Durable timers + scheduler keying fix", "description": "Orleans Reminders (or clustered AdoJobStore Quartz); fix Guid.Empty singleton scheduler (B2/B3). AC: silo crash loses zero timers." },
+        { "title": "REST API + OpenAPI + Flow.Client SDK", "description": "Definitions CRUD/versioning, case lifecycle, task inbox, planning ops, case-file ops, history queries; NuGet client SDK. Optional gRPC." },
+        { "title": "AuthN/Z + tenant enforcement", "description": "OIDC; per-call tenant enforcement filter replacing ambient-context trust (B5); runtime role-to-user resolution. Multi-tenant isolation tests (zero exist today)." },
+        { "title": "Observability + reference deployment", "description": "OpenTelemetry traces/metrics, health checks, container images, Helm chart / Bicep for AKS or Container Apps." },
+        { "title": "Benchmark report: 10k cases x 50 plan items", "description": "Publishable scale numbers incl. activation-storm mitigation results. Sales asset." }
+      ]
+    },
+    {
+      "title": "M3 Faces — modeler, tasklist, inspector",
+      "description": "Model, deploy, run, inspect — visually. Exit gate: recordable end-to-end demo. UI stack decision is the first story.",
+      "features": [
+        { "title": "SPIKE FIRST: modeler stack diligence (cmmn-js)", "description": "cmmn-js is effectively unmaintained and carries the bpmn.io watermark license. Decide: fork-and-own vs rebuild on diagram-js vs commercial license. Output: decision memo + legal check. Biggest UI risk; 1-2 wks." },
+        { "title": "Web modeler MVP", "description": "Author/validate CMMN diagrams; deploy to engine via API (round-trips section-9 import/export); FEEL-first expression autocomplete." },
+        { "title": "Tasklist app", "description": "Human-task inbox: claim/complete; planning-table discretionary-item selection UX; simple forms (evaluate form-js)." },
+        { "title": "Case inspector (cockpit)", "description": "Live plan-item state overlaid on the diagram; event-sourced timeline replay (differentiator: full audit trail); sentry/criteria status view." },
+        { "title": "Admin console", "description": "Tenants, definition versions, in-flight migration policies." }
+      ]
+    },
+    {
+      "title": "M4 Commercialization — package, prove, sell",
+      "description": "Someone can buy this. Licensing implemented, docs/samples shipped, design partners engaged, sale-readiness data room assembled.",
+      "features": [
+        { "title": "Licensing implementation", "description": "Per M1 gate: repo/licensing split, notices, bpmn.io compliance, license keys if applicable." },
+        { "title": "Docs site + quickstarts + samples gallery", "description": "Model-to-running-case in 15 minutes; samples: insurance claim, employee onboarding, audit engagement showcase (risk-tailored program via planning tables + Crunchafi data-extraction feed)." },
+        { "title": "Conformance + benchmark whitepapers", "description": "Publish internal TCK results and M2 benchmark. Credibility assets for licensing conversations." },
+        { "title": "Design-partner program", "description": "2-3 partners: .NET ISVs needing case semantics; one audit/accounting firm via Crunchafi network. Feedback loop into backlog." },
+        { "title": "Pricing, packaging, sale-readiness data room", "description": "Embedded per-app license / per-core self-host / managed SaaS tiers; IP audit (XmlSchemaClassGenerator MIT, OMG spec usage, bpmn.io posture, no PPC content); architecture dossier (docs 01-07)." }
+      ]
+    }
+  ]
+}
