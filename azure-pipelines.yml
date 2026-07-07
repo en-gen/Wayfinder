@@ -1,0 +1,179 @@
+# Case.Flow.CI — version, build, test, merged coverage
+# (ADO definition id 4 targets this file on refs/heads/develop)
+#
+# Versioning: GitVersion (dotnet tool, 6.x) computes SemVer from GitVersion.yml
+# and `Case.Flow-<X.Y.Z>` tags. The Version job republishes the results as job
+# outputs for downstream jobs and renames the build run to
+#   <MajorMinorPatch>-<PreReleaseLabel>.<per-branch counter>   (prerelease)
+#   <MajorMinorPatch>                                          (main / tagged)
+# so the run list reads as versions, not counters.
+#
+# Baseline 1.0.0 (GitVersion.yml next-version): no tags exist pre-GA, so all
+# builds are previews of 1.0.0 — develop -> 1.0.0-develop.<n>,
+# release/1.0.0 -> 1.0.0-rc.<n>, PR -> 1.0.0-PullRequest<id>.<n>.
+# At GA, tag mainline `Case.Flow-1.0.0`; main then emits clean 1.0.0 and
+# develop advances to 1.1.0-develop.<n> automatically.
+#
+# netcoreapp3.1 is EOL; tests run on a modern runtime via DOTNET_ROLL_FORWARD.
+# Remove the roll-forward once the .NET 8 retarget (roadmap M0) lands.
+
+trigger:
+  branches:
+    include: [develop, main, release/*, hotfix/*]
+
+# PR validation is enforced by branch policy (build validation on develop/main),
+# which is authoritative for Azure Repos — no pr: block needed.
+
+# Per-branch monotonic counter; the Version job folds it into the run name.
+variables:
+  - name: ciCounter
+    value: $[counter(variables['Build.SourceBranchName'], 0)]
+
+name: $(ciCounter)
+
+pool:
+  vmImage: ubuntu-latest
+
+jobs:
+  - job: Version
+    displayName: Compute version (GitVersion)
+
+    steps:
+      # GitVersion walks tags and branch ancestry; needs full history.
+      - checkout: self
+        fetchDepth: 0
+
+      - pwsh: |
+          dotnet tool install --global GitVersion.Tool --version 6.*
+          $toolPath = Join-Path $env:HOME '.dotnet/tools/dotnet-gitversion'
+          $json = & $toolPath /output json
+          if ($LASTEXITCODE -ne 0) { Write-Error "GitVersion failed:`n$json"; exit 1 }
+          Write-Host ($json -join "`n")
+          # Surface every GitVersion value as GITVERSION_<UPPER> for later steps
+          # (uppercase: Linux agents have case-sensitive env vars).
+          $gv = ($json -join "`n") | ConvertFrom-Json
+          foreach ($p in $gv.PSObject.Properties) {
+              $envName = "GITVERSION_$($p.Name.ToUpperInvariant())"
+              Write-Host "##vso[task.setvariable variable=$envName]$($p.Value)"
+          }
+        displayName: Run GitVersion
+
+      # Republish as job-output variables (isOutput=true) so downstream jobs —
+      # here Build; later Case.Flow.CD, pack, docker tagging — can consume via
+      # dependencies.Version.outputs['publish.<name>'].
+      - pwsh: |
+          $names = @(
+              'Major', 'Minor', 'Patch',
+              'MajorMinorPatch',                  # "0.2.0" — clean 3-part version
+              'SemVer',                           # "0.2.0-develop.4" — canonical string
+              'FullSemVer',
+              'AssemblySemVer',                   # "0.2.0.0" — 4-part assembly version
+              'AssemblySemFileVer',
+              'InformationalVersion',             # version + branch + sha
+              'BuildMetaData',                    # commits since version source
+              'PreReleaseLabel',                  # "develop", "rc", ...
+              'PreReleaseNumber',
+              'BranchName',
+              'Sha', 'ShortSha'
+          )
+          foreach ($n in $names) {
+              $envName = "GITVERSION_$($n.ToUpperInvariant())"
+              $value = [Environment]::GetEnvironmentVariable($envName)
+              if ($null -eq $value) { $value = '' }
+              Write-Host "##vso[task.setvariable variable=$n;isOutput=true]$value"
+              Write-Host "GitVersion.$n = $value"
+          }
+
+          # Compose the run name: MajorMinorPatch + PreReleaseLabel + the ADO
+          # per-branch counter (this pipeline's `name:`). Counters are
+          # per-branch, not per-version, so re-runs stay unique.
+          $major = [Environment]::GetEnvironmentVariable('GITVERSION_MAJORMINORPATCH')
+          $label = [Environment]::GetEnvironmentVariable('GITVERSION_PRERELEASELABEL')
+          $counter = [Environment]::GetEnvironmentVariable('BUILD_BUILDNUMBER')
+
+          # SemVer 2.0 prerelease identifiers only allow [0-9A-Za-z-]; sanitize
+          # so a branch label never produces a version dotnet would reject.
+          if (-not [string]::IsNullOrEmpty($label)) {
+              $sanitized = $label -replace '[^0-9A-Za-z-]', '-'
+              if ($sanitized -ne $label) {
+                  Write-Host "Sanitized prerelease label: '$label' -> '$sanitized'"
+                  $label = $sanitized
+              }
+          }
+
+          if ([string]::IsNullOrEmpty($major)) {
+              Write-Warning "MajorMinorPatch was empty; build number not updated."
+              $packageVersion = ''
+          }
+          elseif ([string]::IsNullOrEmpty($label)) {
+              $packageVersion = $major
+          }
+          else {
+              $packageVersion = "$major-$label.$counter"
+          }
+
+          if (-not [string]::IsNullOrEmpty($packageVersion)) {
+              Write-Host "##vso[build.updatebuildnumber]$packageVersion"
+          }
+          Write-Host "##vso[task.setvariable variable=PackageVersion;isOutput=true]$packageVersion"
+          Write-Host "PackageVersion = $packageVersion"
+        name: publish
+        displayName: Publish version outputs and update build number
+
+  - job: Build
+    displayName: Build, test, coverage
+    dependsOn: Version
+
+    variables:
+      version: $[dependencies.Version.outputs['publish.PackageVersion']]
+      assemblySemVer: $[dependencies.Version.outputs['publish.AssemblySemVer']]
+      assemblySemFileVer: $[dependencies.Version.outputs['publish.AssemblySemFileVer']]
+      informationalVersion: $[dependencies.Version.outputs['publish.InformationalVersion']]
+      DOTNET_ROLL_FORWARD: LatestMajor
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+    steps:
+      - task: UseDotNet@2
+        displayName: Install .NET SDK 8.x
+        inputs:
+          packageType: sdk
+          version: 8.x
+
+      - script: >
+          dotnet build src/CaseFlow.sln -c Release -v minimal
+          /p:Version=$(version)
+          /p:AssemblyVersion=$(assemblySemVer)
+          /p:FileVersion=$(assemblySemFileVer)
+          /p:InformationalVersion="$(informationalVersion)"
+        displayName: Build ($(version))
+
+      - script: >
+          dotnet test src/Flow.Grains.Tests/Flow.Grains.Tests.csproj
+          -c Release --no-build --logger trx
+          /p:CollectCoverage=true
+          /p:CoverletOutput=$(Build.SourcesDirectory)/coverage/
+          /p:CoverletOutputFormat=json
+          /p:Exclude="[*.Tests*]*"
+        displayName: Unit tests (+coverage)
+
+      - script: >
+          dotnet test src/Flow.Grains.Tests.Integration/Flow.Grains.Tests.Integration.csproj
+          -c Release --no-build --logger trx
+          /p:CollectCoverage=true
+          /p:MergeWith=$(Build.SourcesDirectory)/coverage/coverage.json
+          /p:CoverletOutput=$(Build.SourcesDirectory)/coverage/merged
+          /p:CoverletOutputFormat=cobertura
+          /p:Exclude="[*.Tests*]*"
+        displayName: Integration tests (+merged coverage)
+
+      - task: PublishTestResults@2
+        displayName: Publish test results
+        condition: always()
+        inputs:
+          testResultsFormat: VSTest
+          testResultsFiles: '**/*.trx'
+
+      - task: PublishCodeCoverageResults@2
+        displayName: Publish coverage
+        inputs:
+          summaryFileLocation: $(Build.SourcesDirectory)/coverage/merged.cobertura.xml
