@@ -1,5 +1,11 @@
 {
     "workbench.editorAssociations": {
         "*.md": "vscode.markdown.preview.editor"
+    },
+    "files.associations": {
+        "**/devops/**/*.yml": "azure-pipelines"
+    },
+    "[azure-pipelines]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     }
 }

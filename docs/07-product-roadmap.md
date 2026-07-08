@@ -29,7 +29,7 @@ Sizing assumes 2–3 engineers; ranges are dev-weeks of focused work. Milestones
 Modernize + make truth continuously visible.
 1. **CI/CD live** — commit the provided `azure-pipelines.yml`; branch policy on `develop` requiring green build + tests; publish merged coverage. *(AC: PR cannot merge red; coverage visible per build.)*
    Includes **GitVersion semantic versioning**: `GitVersion.yml` at repo root (GitFlow increments; tag-prefix `Case.Flow-`; **baseline 1.0.0** via `next-version`, so every pre-GA build is a preview of 1.0.0 — `1.0.0-develop.<n>`, `1.0.0-rc.<n>`), a Version job in `Case.Flow.CI` that republishes outputs for downstream jobs and names each run accordingly, assemblies stamped via `/p:Version`/`AssemblySemVer`/`InformationalVersion`. *(Tag `Case.Flow-1.0.0` on mainline at GA; tags become the version source of truth thereafter.)*
-2. **.NET 8 + Orleans 8.x migration** — per doc 03: `[GenerateSerializer]` sweep (~45 `[Serializable]` types), Host/TestCluster builders, Jint 3.x, System.Text.Json, drop `OrleansAzureUtils` 2.4.5. *(AC: 209 tests green natively, no roll-forward.)*
+2. **.NET 10 LTS + latest Orleans migration** — net10.0 across all projects (.NET 8 EOL lands Nov 2026, so 10 is the only sane LTS target); latest stable Orleans: `[GenerateSerializer]` sweep + JSON-fallback serializer for the XSD-generated model, Host/TestCluster builders, memory streams, Jint 4.x with sandbox budgets, license-safe dependency refresh (AutoMapper pinned to last MIT 12.0.1; FluentAssertions kept on 7.x), drop `OrleansAzureUtils` 2.4.5. *(AC: 209 tests green natively, no roll-forward, vulnerable-package scan clean.)*
 3. **Dependency & CVE remediation** — Newtonsoft ≥13.0.1, AutoMapper patch, transitive criticals; `dotnet list package --vulnerable` clean gate in CI.
 4. **Systemic bug fixes** — `Task.Factory.StartNew(async…)` ×4, `BaseEvent.Occurred` replay timestamps, `HashSet<OnPart>` identity, sentry double-satisfy guard. *(AC: regression test per fix.)*
 5. **Docs corrections** — apply doc 06 §5 list; README claims match reality.
@@ -56,7 +56,8 @@ See §5 for the full analysis. Deliverables:
 2. **Durable timers** — Orleans Reminders (or clustered AdoJobStore Quartz); fix singleton scheduler keying (B3). *(AC: chaos test — silo kill mid-case loses no timers/events.)*
 3. **API layer** — REST (+ optional gRPC) with OpenAPI: definitions CRUD/versioning, case lifecycle, task inbox ops, planning ops, case-file ops, event/history queries; `Flow.Client` SDK on NuGet.
 4. **AuthN/Z + tenancy** — OIDC, per-call tenant enforcement filter (kills ambient-context trust, B5), role→user resolution.
-5. **Observability & packaging** — OpenTelemetry traces/metrics, health checks; container images + Helm chart/Bicep reference deployment (AKS/Container Apps). Delivery pipeline lands here as **`Case.Flow.CD`** (name reserved; companion to `Case.Flow.CI`).
+5. **Docker support** — silo container image (SDK-native `PublishContainer` vs multi-stage Dockerfile decided in-item; non-root, health checks, net10.0 base) + a `docker compose` evaluation stack (silo + Seq, storage emulators as they land) that doubles as the licensee trial experience; images tagged from GitVersion (`case.flow/silo:<version>`) and built/pushed by **`Case.Flow.CD`** (name reserved; companion to `Case.Flow.CI`). Starts right after the .NET 10 migration merges.
+6. **Observability & reference deployment** — OpenTelemetry traces/metrics, health checks; Helm chart/Bicep reference deployment (AKS/Container Apps) consuming those images.
 6. **Benchmark report** — 10k concurrent cases × 50 plan items; publishable numbers (sales asset).
 
 ### M3 — Faces (10–14 wks) · *"model → deploy → run → inspect, visually"*
