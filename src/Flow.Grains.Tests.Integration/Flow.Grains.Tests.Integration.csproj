@@ -10,8 +10,6 @@
 
   <ItemGroup>
     <PackageReference Include="AutoFixture.Xunit2" Version="4.18.1" />
-    <!-- pinned: last MIT license version (15.0+ moved to RPL-1.5/commercial dual license) -->
-    <PackageReference Include="AutoMapper" Version="14.0.0" />
     <PackageReference Include="coverlet.msbuild" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
