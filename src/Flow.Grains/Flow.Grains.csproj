@@ -6,8 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- pinned: last MIT license version (15.0+ moved to RPL-1.5/commercial dual license) -->
-    <PackageReference Include="AutoMapper" Version="14.0.0" />
     <PackageReference Include="Jint" Version="4.11.0" />
     <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="10.2.1" />

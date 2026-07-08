@@ -1,10 +1,6 @@
 using System;
-using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Threading.Tasks;
-using AutoMapper;
-using Flow.Grains.Infrastructure.AutoMapper;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
@@ -132,7 +128,6 @@ namespace Flow.Silo
                 .AddRuleExecutor()
                 .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
                 .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
-                .AddAutoMapper(cfg => cfg.AddProfile<CaseFlowProfile>(), Enumerable.Empty<Assembly>())
                 .AddQuartz(QuartzSchedulerConfig.Volatile);
         }
     }

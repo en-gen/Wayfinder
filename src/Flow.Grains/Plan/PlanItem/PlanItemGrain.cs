@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using AutoMapper;
+using Flow.Grains.Infrastructure.Mapping;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.PlanItem;
@@ -23,7 +23,6 @@ namespace Flow.Grains.Plan.PlanItem
         IBehaviorHost
     {
         private IPlanItemBehaviorConfigurator BehaviorConfigurator { get; }
-        private IMapper Mapper { get; }
 
         private IPlanItemBehavior _behavior;
         
@@ -57,12 +56,10 @@ namespace Flow.Grains.Plan.PlanItem
 
         public PlanItemGrain(
             IPlanItemBehaviorConfigurator behaviorConfigurator,
-            IMapper mapper,
             ILogger<PlanItemGrain> logger) :
             base(logger)
         {
             BehaviorConfigurator = behaviorConfigurator;
-            Mapper = mapper;
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -109,7 +106,7 @@ namespace Flow.Grains.Plan.PlanItem
             _behavior = await BehaviorConfigurator.Configure(this, State.PlanItemDefinition);
         }
 
-        public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(Mapper.Map<PlanItemSnapshot>(State));
+        public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(State.ToSnapshot());
 
         public async Task<PlanItemSnapshot> Trigger(PlanItemTransition transition)
         {
