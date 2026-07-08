@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using Flow.Grains.Executables;
+using Flow.Grains.Interfaces.Model;
 using Jint;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -58,9 +60,133 @@ namespace Flow.Grains.Tests.Executables
             Assert.Equal(expected, result.Value);
         }
 
+        // WithArgument/WithContext bridge arbitrary CLR objects into Jint script scope via the
+        // System.Text.Json.Nodes-based JsonObjectInstance (see Executables/JsonObjectInstance.cs,
+        // JsonNodePropertyDescriptor.cs, Infrastructure/Extensions/JsonNodeExtensions.cs). Neither
+        // method has a live production call site as of this migration (ExpressionGrain.BuildExecutable
+        // has both commented out) and had no prior test coverage, so these pin the rewrite's behavior
+        // directly rather than relying on incidental coverage elsewhere.
+
+        [Fact]
+        public void WithArgument__Given_ObjectWithScalarProperties__Then_PropertiesAccessibleCamelCased()
+        {
+            var result = CreateSubject("argName.count + ' ' + argName.label + ' ' + argName.isActive")
+                .WithArgument(new TestArgument("argName", new { Count = 3, Label = "widgets", IsActive = true }))
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("3 widgets true", result.Value);
+        }
+
+        [Fact]
+        public void WithArgument__Given_ObjectWithNestedObject__Then_NestedPropertiesAccessible()
+        {
+            var result = CreateSubject("argName.parent.child.value")
+                .WithArgument(new TestArgument("argName", new { Parent = new { Child = new { Value = "deep" } } }))
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("deep", result.Value);
+        }
+
+        [Fact]
+        public void WithArgument__Given_ObjectWithArrayProperty__Then_ArrayIndexableAndLengthCorrect()
+        {
+            var result = CreateSubject("argName.items.length + ':' + argName.items[0] + ',' + argName.items[1]")
+                .WithArgument(new TestArgument("argName", new { Items = new[] { "a", "b" } }))
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("2:a,b", result.Value);
+        }
+
+        [Fact]
+        public void WithArgument__Given_ObjectWithNullProperty__Then_PropertyIsNull()
+        {
+            var result = CreateSubject("argName.maybe === null")
+                .WithArgument(new TestArgument("argName", new { Maybe = (string)null }))
+                .ExecuteAsBool();
+
+            Assert.False(result.IsError);
+            Assert.True(result.Value);
+        }
+
+        [Fact]
+        public void WithArgument__Given_ObjectWithEnumProperty__Then_EnumSerializedAsPascalCaseMemberName()
+        {
+            // Matches the original Newtonsoft StringEnumConverter() default (no NamingStrategy):
+            // enum members serialize using their raw C# name, independent of the camelCase property
+            // naming policy that applies to property names.
+            var result = CreateSubject("argName.state")
+                .WithArgument(new TestArgument("argName", new { State = PlanItemState.Active }))
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("Active", result.Value);
+        }
+
+        [Fact]
+        public void WithArgument__Given_ScriptMutatesProperty__Then_DoesNotThrow()
+        {
+            // JsonNodePropertyDescriptor.SetValue writes back through the parent JsonObject's
+            // indexer - this exercises that write path (Newtonsoft's equivalent mutated the
+            // JProperty.Value in place).
+            var result = CreateSubject("argName.count = argName.count + 1; '' + argName.count")
+                .WithArgument(new TestArgument("argName", new { Count = 1 }))
+                .ExecuteAsString();
+
+            Assert.False(result.IsError, result.Message);
+            Assert.Equal("2", result.Value);
+        }
+
+        [Fact]
+        public void WithContext__Given_FlatObject__Then_EachPropertyBoundAsTopLevelVariable()
+        {
+            var result = CreateSubject("firstName + ' is ' + age")
+                .WithContext(new { FirstName = "Ada", Age = 36 })
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("Ada is 36", result.Value);
+        }
+
+        [Fact]
+        public void WithContext__Given_ObjectWithNestedObjectProperty__Then_NestedPropertiesAccessible()
+        {
+            var result = CreateSubject("owner.name")
+                .WithContext(new { Owner = new { Name = "case-owner" } })
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("case-owner", result.Value);
+        }
+
+        [Fact]
+        public void WithContext__Given_Null__Then_NoVariablesBoundAndExpressionStillEvaluates()
+        {
+            var result = CreateSubject("'unaffected'")
+                .WithContext(null)
+                .ExecuteAsString();
+
+            Assert.False(result.IsError);
+            Assert.Equal("unaffected", result.Value);
+        }
+
         private static Executable CreateSubject(string expression)
         {
             return new Executable(new Engine(), Mock.Of<ILogger<Executable>>(), expression);
+        }
+
+        private class TestArgument : IExpressionArgument
+        {
+            public TestArgument(string name, object value)
+            {
+                Name = name;
+                Value = value;
+            }
+
+            public string Name { get; }
+            public object Value { get; }
         }
     }
 }

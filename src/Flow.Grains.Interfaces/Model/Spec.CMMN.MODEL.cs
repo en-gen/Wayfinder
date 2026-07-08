@@ -26,7 +26,7 @@ namespace Flow.Grains.Interfaces.Model
 
         /// <summary>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlAnyElementAttribute()]
         public System.Collections.Generic.ICollection<System.Xml.XmlElement> Any
         {
@@ -40,7 +40,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Any-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Any collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool AnySpecified
         {
@@ -194,7 +194,7 @@ namespace Flow.Grains.Interfaces.Model
 
         /// <summary>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlElementAttribute("documentation", Namespace = "http://www.omg.org/spec/CMMN/20151109/MODEL")]
         public System.Collections.Generic.ICollection<Documentation> Documentation
         {
@@ -208,7 +208,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Documentation-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Documentation collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool DocumentationSpecified
         {
@@ -244,7 +244,7 @@ namespace Flow.Grains.Interfaces.Model
 
         /// <summary>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlAnyAttributeAttribute()]
         public System.Collections.Generic.ICollection<System.Xml.XmlAttribute> AnyAttributes
         {
@@ -862,7 +862,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die PlanItemDefinition-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the PlanItemDefinition collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool PlanItemDefinitionSpecified
         {
@@ -900,7 +900,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die ExitCriterion-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the ExitCriterion collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool ExitCriterionSpecified
         {
@@ -966,7 +966,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die PlanItem-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the PlanItem collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool PlanItemSpecified
         {
@@ -1004,7 +1004,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Sentry-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Sentry collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool SentrySpecified
         {
@@ -1241,7 +1241,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die EntryCriterion-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the EntryCriterion collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool EntryCriteriaSpecified
         {
@@ -1279,7 +1279,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die ExitCriterion-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the ExitCriterion collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool ExitCriterionSpecified
         {
@@ -1386,7 +1386,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die OnPart-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the OnPart collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool OnPartSpecified
         {
@@ -1487,7 +1487,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die TableItem-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the TableItem collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool TableItemsSpecified
         {
@@ -1525,7 +1525,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die ApplicabilityRule-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the ApplicabilityRule collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool ApplicabilityRuleSpecified
         {
@@ -1624,7 +1624,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Role-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Role collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool RolesSpecified
         {
@@ -1743,7 +1743,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Property-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Property collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool PropertySpecified
         {
@@ -1875,7 +1875,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Input-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Input collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool InputSpecified
         {
@@ -1913,7 +1913,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Output-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Output collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool OutputSpecified
         {
@@ -2059,7 +2059,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die ParameterMapping-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the ParameterMapping collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool ParameterMappingSpecified
         {
@@ -2165,7 +2165,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Input-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Input collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool InputSpecified
         {
@@ -2203,7 +2203,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Output-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Output collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool OutputSpecified
         {
@@ -2278,7 +2278,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die ParameterMapping-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the ParameterMapping collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool ParameterMappingSpecified
         {
@@ -2351,7 +2351,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die ParameterMapping-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the ParameterMapping collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool ParameterMappingSpecified
         {
@@ -2425,7 +2425,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Input-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Input collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool InputSpecified
         {
@@ -2463,7 +2463,7 @@ namespace Flow.Grains.Interfaces.Model
         /// <para xml:lang="de">Ruft einen Wert ab, der angibt, ob die Output-Collection leer ist.</para>
         /// <para xml:lang="en">Gets a value indicating whether the Output collection is empty.</para>
         /// </summary>
-        [Newtonsoft.Json.JsonIgnoreAttribute]
+        [System.Text.Json.Serialization.JsonIgnoreAttribute]
         [System.Xml.Serialization.XmlIgnoreAttribute()]
         public bool OutputSpecified
         {

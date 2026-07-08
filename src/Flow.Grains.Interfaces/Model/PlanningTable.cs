@@ -1,11 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.Serialization;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Flow.Grains.Interfaces.Model
 {
     public partial class PlanningTable
     {
+        // [IgnoreDataMember] alone is not sufficient for System.Text.Json (it only honors its own
+        // [JsonIgnore]); DiscretionaryItems is a recursive get-only projection over TableItems, so
+        // without this the fallback JSON serializer would attempt to walk it as data.
         [JsonIgnore]
         [IgnoreDataMember]
         public IEnumerable<DiscretionaryItem> DiscretionaryItems => GetDiscretionaryItems(this);

@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
+using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
 using Flow.Silo.Infrastructure.Options;
@@ -11,8 +12,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Serialization;
@@ -82,25 +81,13 @@ namespace Flow.Silo
                 });
 
             // Fallback serializer for types Orleans's [GenerateSerializer] codegen can't reasonably
-            // cover: the XSD-generated CMMN model (Flow.Grains.Interfaces.Model) and the Newtonsoft
-            // JToken family used by the Jint expression-evaluation bridge. Everything else in the
-            // solution is swept with [GenerateSerializer] + [Id(n)] and uses the native serializer.
-            //
-            // TypeNameHandling.Auto is required: the CMMN model is a polymorphic hierarchy
-            // (PlanItemDefinition -> Stage/Milestone/HumanTask/...), and without it Newtonsoft
-            // deserializes every value back as its statically-declared type, silently losing the
-            // concrete subtype identity that Flow.Grains.Services.PlanItemBehaviorConfigurator's
-            // type-switch depends on. .Auto (rather than .All) only embeds the $type discriminator
-            // when the runtime type actually differs from the declared/property type, which keeps
-            // the payload smaller and limits the surface to genuine polymorphism.
-            silo.Services.AddSerializer(s => s.AddNewtonsoftJsonSerializer(
-                isSupported: type =>
-                    (type.Namespace?.StartsWith("Flow.Grains.Interfaces.Model") ?? false) ||
-                    typeof(JToken).IsAssignableFrom(type),
-                jsonSerializerSettings: new JsonSerializerSettings
-                {
-                    TypeNameHandling = TypeNameHandling.Auto
-                }));
+            // cover: the XSD-generated CMMN model (Flow.Grains.Interfaces.Model). Everything else in
+            // the solution is swept with [GenerateSerializer] + [Id(n)] and uses the native serializer.
+            // See OrleansFallbackJsonSerializer for the shared isSupported predicate/options - the
+            // TestCluster silo and client configurators in ClusterFixture must register identically.
+            silo.Services.AddSerializer(s => s.AddJsonSerializer(
+                isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
+                jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
         }
 
         private static void ConfigureDevelopmentOrleans(ISiloBuilder silo)
