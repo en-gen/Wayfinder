@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Events;
 using Flow.Grains.Executables;
+using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Scheduler;
@@ -13,7 +13,6 @@ using FluentAssertions;
 using NodaTime;
 using NodaTime.Text;
 using Orleans;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
 
@@ -39,9 +38,15 @@ namespace Flow.Grains.Tests.Integration.Scheduler
 
             var schedulerGrain = ClusterClient.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId);
 
-            var streamId = StreamId.Create((string)planItemInstanceId, caseInstanceId);
+            // Must match the stream identity StreamProviderExtensions.GetCaseEventStream builds -
+            // the same helper TimerEventListenerBehavior's subscription (and, after the fix,
+            // TimerTickJob's publish) goes through. Previously this subscribed on a raw
+            // StreamId.Create((string)planItemInstanceId, caseInstanceId) - the same wrong
+            // namespace TimerTickJob published to - so the test only ever passed because both sides
+            // agreed on the same incorrect stream, not because ticks were actually reaching a real
+            // subscriber the way production behaviors subscribe.
             await ClusterClient.GetStreamProvider("Default")
-                .GetStream<TimerTickedEvent>(streamId)
+                .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, (string)planItemInstanceId)
                 .SubscribeAsync((@event, token) =>
                 {
                     ticks.Add(@event.FireTime);
@@ -61,10 +66,14 @@ namespace Flow.Grains.Tests.Integration.Scheduler
                     ["ElementType"] = typeof(PlanItem).Name,
                     ["PlanItemDefinition"] = typeof(TimerEventListener).Name,
                     ["ElementScope"] = "CPM.ParentStage",
-                    ["ElementInstanceId"] = planItemInstanceId
+                    // stored as string, matching what real production code passes via
+                    // Host.Context["ElementInstanceId"] = IBehaviorHost.InstanceId (a plain string) -
+                    // TimerTickJob.Execute reads this key back with a direct (string) cast, which only
+                    // succeeds if the boxed runtime type is actually string.
+                    ["ElementInstanceId"] = (string)planItemInstanceId
                 });
 
-            await Task.Factory.StartNew(() => Thread.Sleep(TimeSpan.FromSeconds(4)));
+            await Task.Delay(TimeSpan.FromSeconds(4));
 
             ticks.Should().HaveCount(expectedTicks);
         }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Events;
@@ -185,6 +186,72 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
             var handlerInvoked = tcs.Task.Wait(TimeSpan.FromMilliseconds(500));
 
             handlerInvoked.Should().BeFalse();
+        }
+
+        // Pinning test for the double-satisfy guard in SentryGrain.HandleOnPartOccurred: at-least
+        // -once stream delivery can redeliver the same PlanItemTransitionedEvent. Without a guard,
+        // the redelivery would re-raise OnPartOccurred, re-run the satisfaction check and IfPart
+        // evaluation, and publish a second SentrySatisfiedEvent even though the sentry was already
+        // satisfied by the first delivery.
+        [Theory, AutoData]
+        public async Task HandlePlanItemTransitioned__Given_SameEventDeliveredTwice__Then_PublishSentrySatisfiedEventExactlyOnce
+            (string caseDefinitionId, Guid caseInstanceId, string sourceScope, string sourcePlanItemId)
+        {
+            var sentry = new Interfaces.Model.Sentry
+            {
+                OnParts =
+                {
+                    new PlanItemOnPart
+                    {
+                        SourceRef = sourcePlanItemId,
+                        StandardEvent = PlanItemTransition.Occur
+                    }
+                },
+                IfPart = new IfPart
+                {
+                    Condition = Rules.TruthyExpression
+                }
+            };
+
+            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
+
+            await subject.Define(caseDefinitionId, sentry);
+
+            var receivedCount = 0;
+            var firstReceived = new TaskCompletionSource<bool>();
+
+            await ClusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<SentrySatisfiedEvent>(caseInstanceId, sentry.Id)
+                .SubscribeAsync((e, t) =>
+                {
+                    Interlocked.Increment(ref receivedCount);
+                    firstReceived.TrySetResult(true);
+
+                    return Task.CompletedTask;
+                });
+
+            var transitionEvent = new PlanItemTransitionedEvent(
+                sourceScope,
+                ShortGuid.NewGuid(),
+                sourcePlanItemId,
+                PlanItemTransition.Occur,
+                PlanItemState.Available,
+                PlanItemState.Completed);
+
+            var transitionedStream = ClusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId);
+
+            // simulate at-least-once redelivery of the exact same logical transition
+            await transitionedStream.OnNextAsync(transitionEvent);
+            await transitionedStream.OnNextAsync(transitionEvent);
+
+            var firstArrived = firstReceived.Task.Wait(TimeSpan.FromMilliseconds(500));
+            firstArrived.Should().BeTrue("the sentry should still be satisfied by the first delivery");
+
+            // give any (incorrect) second publish a chance to arrive before asserting the count
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+            receivedCount.Should().Be(1, "redelivery of the same transition must not cause a second SentrySatisfiedEvent publish");
         }
     }
 }

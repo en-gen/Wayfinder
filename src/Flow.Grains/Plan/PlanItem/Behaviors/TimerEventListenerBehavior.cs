@@ -31,30 +31,32 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             Task.WhenAll(
                 base.Activate(),
                 Host.SubscribeTo<TimerTickedEvent>(Host.InstanceId, HandleTimerTickedEvent, StreamFlags.Resume),
-                Task.Factory.StartNew(() =>
+                ResumeStartTriggerSubscription());
+
+        private Task ResumeStartTriggerSubscription()
+        {
+            switch (PlanItemDefinition.TimerStart)
+            {
+                case PlanItemStartTrigger piStartTrigger:
                 {
-                    switch (PlanItemDefinition.TimerStart)
-                    {
-                        case PlanItemStartTrigger piStartTrigger:
-                        {
-                            return Host.SubscribeTo<PlanItemTransitionedEvent>(
-                                piStartTrigger.SourceRef,
-                                HandleStartTriggerSourceTransitioned,
-                                StreamFlags.Resume);
-                        }
-                        case CaseFileItemStartTrigger cfiStartTrigger:
-                        {
-                            return Host.SubscribeTo<CaseFileItemTransitionedEvent>(
-                                cfiStartTrigger.SourceRef,
-                                HandleStartTriggerSourceTransitioned,
-                                StreamFlags.Resume);
-                        }
-                        default:
-                        {
-                            return Task.CompletedTask;
-                        }
-                    }
-                }));
+                    return Host.SubscribeTo<PlanItemTransitionedEvent>(
+                        piStartTrigger.SourceRef,
+                        HandleStartTriggerSourceTransitioned,
+                        StreamFlags.Resume);
+                }
+                case CaseFileItemStartTrigger cfiStartTrigger:
+                {
+                    return Host.SubscribeTo<CaseFileItemTransitionedEvent>(
+                        cfiStartTrigger.SourceRef,
+                        HandleStartTriggerSourceTransitioned,
+                        StreamFlags.Resume);
+                }
+                default:
+                {
+                    return Task.CompletedTask;
+                }
+            }
+        }
         
         // if we have a start trigger, subscribe
         // if we have a start date (from expression) schedule start

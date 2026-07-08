@@ -119,6 +119,20 @@ namespace Flow.Grains.Plan.Sentry
 
         private async Task HandleOnPartOccurred(OnPart onPart, string sourceScope, string sourceId, object standardEvent)
         {
+            // Idempotency guard against at-least-once redelivery of the same transition event:
+            //   - a sentry that has already been satisfied has nothing further to do; re-running the
+            //     satisfaction check and re-publishing SentrySatisfiedEvent would let a duplicate
+            //     delivery drive a second (spurious) satisfaction downstream.
+            //   - an OnPart that was already recorded as occurred (dovetails with the Id-based
+            //     tracking in SentryStore) should not be re-raised/re-journaled; without this, a
+            //     redelivered event that arrives after satisfaction was already reached elsewhere
+            //     would still be a no-op count-wise, but would still perform a redundant raise and
+            //     re-evaluate the IfPart unnecessarily.
+            if (TentativeState.Satisfied || TentativeState.OccurredOnPartIds.Contains(onPart.Id))
+            {
+                return;
+            }
+
             LogWithContext(logger => logger.LogInformation(
                 "{ElementType} {ElementScope}.{ElementId} | {OnPartType} {OnPartId} occurred via {EventSourceScope}.{EventSourceId} transition {StandardEvent}",
                 Definition.GetType().Name,
@@ -135,7 +149,7 @@ namespace Flow.Grains.Plan.Sentry
                 OnPart = onPart
             });
 
-            if (TentativeState.OccurredOnParts.Count() == Definition.OnParts.Count && await EvaluateIfPart())
+            if (TentativeState.OccurredOnPartIds.Count() == Definition.OnParts.Count && await EvaluateIfPart())
             {
                 RaiseEvent(new Satisfied());
             }
