@@ -1,12 +1,14 @@
 # Codebase Evaluation
 
-*Assessment conducted April 2026. Engine originally authored ~2015-2016.*
+> **Historical snapshot.** This assessment describes the pre-modernization codebase (.NET Core 3.1 / Orleans 3.3 era). Milestone M0 (July 2026) executed the modernization plan; the project wiki carries the as-built current state.
+
+*Assessment conducted April 2026. Engine first committed January 2019.*
 
 ---
 
 ## Summary
 
-Case-Flow is a substantially complete CMMN 1.1 engine with solid architectural instincts. The core design decisions — Orleans virtual actors, JournaledGrain event sourcing, behavior pattern for testability — were correct and hold up well. The weaknesses are typical of code written at a different point in one's career: over-abstraction in some places, duplication in others, and implicit coupling that wasn't visible at the time.
+Case.Flow is a substantially complete CMMN 1.1 engine with solid architectural instincts. The core design decisions — Orleans virtual actors, JournaledGrain event sourcing, behavior pattern for testability — were correct and hold up well. The weaknesses are typical of code written at a different point in one's career: over-abstraction in some places, duplication in others, and implicit coupling that wasn't visible at the time.
 
 The engine is worth modernizing rather than rewriting. The domain logic and event model are the hardest parts and they are sound.
 
@@ -36,11 +38,11 @@ The virtual actor model maps naturally to CMMN. Each case instance is isolated s
 
 ### Behavior Pattern Enables Testability
 
-The `IBehaviorHost` adapter that decouples grain behavior from Orleans infrastructure is genuinely good design. Behaviors can be unit-tested without spinning up an Orleans cluster. The 42-file unit test suite is a direct consequence of this decision. Most Orleans codebases don't do this.
+The `IBehaviorHost` adapter that decouples grain behavior from Orleans infrastructure is genuinely good design. Behaviors can be unit-tested without spinning up an Orleans cluster. The 25-file unit test suite is a direct consequence of this decision. Most Orleans codebases don't do this.
 
 ### CMMN Spec Fidelity
 
-The code contains extensive `// SPEC:` comments mapping implementation to the OMG specification. The criterion/sentry/onPart structure faithfully reflects CMMN 1.1. The state machine transitions match the spec's lifecycle diagrams.
+The code contains extensive spec-section comments (`// 8.4.2 - ...` style) mapping implementation to the OMG specification. The criterion/sentry/onPart structure faithfully reflects CMMN 1.1. The state machine transitions match the spec's lifecycle diagrams.
 
 ### JavaScript Expressions via Jint
 
@@ -73,7 +75,7 @@ public static class CaseRequestContext
 }
 ```
 
-22 references across the codebase. Threading tenant/user through a static ambient context is an anti-pattern:
+38 references across the codebase. (The implementation wraps Orleans `RequestContext` rather than raw static setters, which mitigates cross-activation bleed — but the coupling and security concerns below stand.) Threading tenant/user through a static ambient context is an anti-pattern:
 - Invisible coupling — dependencies aren't declared, they're assumed
 - In async grain execution, execution context can bleed between activations
 - Makes testing require global setup/teardown
@@ -97,7 +99,7 @@ public interface IBehaviorHost {
 }
 ```
 
-14 members mixing grain plumbing (`GrainFactory`, `Scope`, `Address`) with domain concerns (`Definition`, `State`, `RaiseEvent`). This violates Interface Segregation — `TaskBehavior` is forced to depend on `GrainFactory` it never uses. The interface grows over time because it's always "easier to add one more thing."
+17 members mixing grain plumbing (`GrainFactory`, `Scope`, `Address`) with domain concerns (`Definition`, `State`, `RaiseEvent`). This violates Interface Segregation — `TaskBehavior` is forced to depend on `GrainFactory` it never uses. The interface grows over time because it's always "easier to add one more thing."
 
 **Fix:** Split into `IDomainBehaviorHost` (domain concerns) and `IChildManagementBehaviorHost : IDomainBehaviorHost` (grain factory + addressing, for stages only).
 
@@ -107,7 +109,7 @@ The sentry-satisfaction handling and parent-transition handling are nearly ident
 
 ```csharp
 // StageBehavior.HandleSentrySatisfied lines 127-205
-// TaskBehavior.HandleSentrySatisfied lines 182-207 — nearly identical
+// TaskBehavior.HandleSentrySatisfied — nearly identical
 ```
 
 **Fix:** Extract common sentry-satisfaction logic into composable policies (`CriterionSatisfactionPolicy`, `ManualActivationPolicy`) used by both behaviors.
@@ -154,7 +156,7 @@ The production deployment path was never implemented. This engine was only ever 
 | Compound grain keys for multi-tenancy | Correct. Baked in at the right level. |
 | `[Serializable]` for event/state classes | Outdated. Orleans 8 requires `[GenerateSerializer]`. |
 | Static `CaseRequestContext` | Wrong. Should be explicit DI or `AsyncLocal<T>`. |
-| `IBehaviorHost` with 14 members | Too wide. Should be split by concern. |
+| `IBehaviorHost` with 17 members | Too wide. Should be split by concern. |
 | Generic `BaseBehavior<T>` | Over-engineered. Type parameter doesn't add value. |
 
 ---

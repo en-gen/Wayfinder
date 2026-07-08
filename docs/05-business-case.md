@@ -1,4 +1,4 @@
-# Business Case: Case-Flow as a Crunchafi Product
+# Business Case: Case.Flow as a Crunchafi Product
 
 *April 2026. Prepared for internal review.*
 
@@ -6,7 +6,7 @@
 
 ## The Opportunity in One Sentence
 
-Crunchafi's strategy is to acquire products that serve the financial audit process — Case-Flow is the orchestration layer that turns those acquisitions into a platform rather than a collection of silos.
+Crunchafi's strategy is to acquire products that serve the financial audit process — Case.Flow is the orchestration layer that turns those acquisitions into a platform rather than a collection of silos.
 
 ---
 
@@ -22,7 +22,7 @@ Today a CPA firm using Crunchafi's products works like this:
 
 There is no single place where the audit engagement *lives*. There is no system of record for what has been done, by whom, when, and in what order. There is no way to enforce that required procedures were completed before an opinion was signed.
 
-That's the gap Case-Flow fills.
+That's the gap Case.Flow fills.
 
 ---
 
@@ -50,7 +50,7 @@ The engine works. What it needs is modernisation (Orleans 8, .NET 8), a REST API
 
 The rebrand from LeaseCrunch to Crunchafi explicitly signals a multi-product platform ambition. Every product acquired to serve the audit process faces the same integration problem: how does it connect to the others? How does a CPA firm run a coordinated engagement across multiple tools?
 
-Case-Flow is the answer to that question. Each acquired product becomes a **ProcessTask** within a CMMN case — invoked at the right point in the engagement, with results flowing into the case file and triggering downstream work.
+Case.Flow is the answer to that question. Each acquired product becomes a **ProcessTask** within a CMMN case — invoked at the right point in the engagement, with results flowing into the case file and triggering downstream work.
 
 ```
 [Audit Engagement Case]
@@ -60,7 +60,7 @@ Case-Flow is the answer to that question. Each acquired product becomes a **Proc
     └─ ProcessTask: [Next acquisition]             ← plugs in on day one
 ```
 
-Without Case-Flow, each acquisition compounds the coordination problem. With it, each acquisition compounds the platform's value.
+Without Case.Flow, each acquisition compounds the coordination problem. With it, each acquisition compounds the platform's value.
 
 ### The Thomson Reuters Dependency Risk
 
@@ -72,7 +72,7 @@ The TR partnership has been a meaningful growth driver — Lease Accounting is e
 
 **The incentive structure is asymmetric.** TR benefits from Crunchafi's products making their platform more complete. Crunchafi benefits from TR's distribution. But TR can replace Crunchafi's products; Crunchafi cannot replace TR's distribution without building something of its own.
 
-Case-Flow is that something. It does not require ending the TR partnership — in the near term, Lease Accounting continues as a TR partner regardless of whether Case-Flow exists. But it means Crunchafi is building towards a position where TR's decisions about partnerships are no longer existential.
+Case.Flow is that something. It does not require ending the TR partnership — in the near term, Lease Accounting continues as a TR partner regardless of whether Case.Flow exists. But it means Crunchafi is building towards a position where TR's decisions about partnerships are no longer existential.
 
 ### Firms Should Own Their Workflow — Not Thomson Reuters
 
@@ -84,17 +84,17 @@ Thomson Reuters' Guided Assurance embeds PPC methodology. Firms using it run TR'
 - **International firms** operate under different standards where PPC is not relevant.
 - **Any firm that has been through a quality review** knows that their methodology needs to be theirs to defend.
 
-Case-Flow's answer is straightforward: **the firm defines the workflow.** Using the CMMN modeller, a firm encodes their own audit program — their required procedures, their risk thresholds, their evidence standards, their sign-off requirements. That program runs consistently across every engagement. It is stored as portable, version-controlled CMMN XML that the firm owns.
+Case.Flow's answer is straightforward: **the firm defines the workflow.** Using the CMMN modeller, a firm encodes their own audit program — their required procedures, their risk thresholds, their evidence standards, their sign-off requirements. That program runs consistently across every engagement. It is stored as portable, version-controlled CMMN XML that the firm owns.
 
-Crunchafi does not need to be an audit methodology expert to build this. The platform is methodology-agnostic by design. The firm brings the knowledge; Case-Flow provides the engine and the tools to encode it.
+Crunchafi does not need to be an audit methodology expert to build this. The platform is methodology-agnostic by design. The firm brings the knowledge; Case.Flow provides the engine and the tools to encode it.
 
-Every firm sits somewhere on a spectrum, and Case-Flow serves all of them:
+Every firm sits somewhere on a spectrum, and Case.Flow serves all of them:
 
 - **Use a standard template** — firms that want a proven starting point select a pre-built engagement template from the marketplace, aligned with ISA/GAAS or contributed by a design partner, and run it as-is
 - **Customise an existing template** — firms that mostly follow a standard methodology but have specific adaptations load a template into the modeller and adjust it: adding required procedures, changing sign-off rules, encoding their specific risk thresholds
 - **Build from scratch** — firms with deeply proprietary methodologies developed over decades model their process entirely in the CMMN modeller; the platform imposes no structure, only the standard they choose to follow
 
-Critically, **firms switching from a proprietary platform do not have to abandon their existing methodology.** A firm currently running engagements in Thomson Reuters' Guided Assurance using PPC can encode that same workflow in Case-Flow and migrate without starting over. Their process is already defined — Case-Flow gives them a place to own it rather than rent it. Over time they can adapt and extend it. The methodology travels with the firm, not with the vendor.
+Critically, **firms switching from a proprietary platform do not have to abandon their existing methodology.** A firm currently running engagements in Thomson Reuters' Guided Assurance using PPC can encode that same workflow in Case.Flow and migrate without starting over. Their process is already defined — Case.Flow gives them a place to own it rather than rent it. Over time they can adapt and extend it. The methodology travels with the firm, not with the vendor.
 
 For firms that *do* want a starting point, Crunchafi can offer standard templates — either built with design partners or aligned with published audit standards. But the key word is *starting point*. Firms customise, extend, and own the result. That is the opposite of being locked into PPC.
 
@@ -164,7 +164,7 @@ This directly addresses ISA 230 (Audit Documentation) and PCAOB AS 1215 requirem
 
 Thomson Reuters embeds PPC methodology — firms use TR's audit programs, TR's structure, TR's sequence. Large regionals, specialist firms, and international practices have their own proprietary methodologies developed over decades. They do not use PPC and do not want to.
 
-Case-Flow lets a firm build their engagement workflow once in the CMMN modeller and run it consistently across every engagement. The firm owns the methodology. It is stored as portable CMMN XML, not locked in a vendor's proprietary format.
+Case.Flow lets a firm build their engagement workflow once in the CMMN modeller and run it consistently across every engagement. The firm owns the methodology. It is stored as portable CMMN XML, not locked in a vendor's proprietary format.
 
 ### Scales to Thousands of Concurrent Engagements
 
@@ -172,7 +172,7 @@ The Orleans virtual actor model means each case instance, each plan item, and ea
 
 ### Acquisition Integration Is Structural, Not Bespoke
 
-When Crunchafi acquires a new product, integrating it into Case-Flow is a matter of implementing a `ProcessTask` — a defined interface that invokes an external API, waits for a result, and feeds it back into the case. This is not a custom integration project for each acquisition. It is the same pattern every time.
+When Crunchafi acquires a new product, integrating it into Case.Flow is a matter of implementing a `ProcessTask` — a defined interface that invokes an external API, waits for a result, and feeds it back into the case. This is not a custom integration project for each acquisition. It is the same pattern every time.
 
 ### Product-Agnostic Adapter Architecture
 
@@ -190,7 +190,7 @@ This positions Crunchafi as a **platform operator**, not a walled garden. Firms 
 
 **Medium-term target:** Large regional and specialist firms who have proprietary methodologies and resent being forced into PPC. These firms have the budget and the pain.
 
-**Long-term:** Any firm using Crunchafi products today is a warm lead — they are already in the ecosystem, already using Lease Accounting or Data Extraction, and Case-Flow adds value on top of what they already have.
+**Long-term:** Any firm using Crunchafi products today is a warm lead — they are already in the ecosystem, already using Lease Accounting or Data Extraction, and Case.Flow adds value on top of what they already have.
 
 ### Competitive Landscape
 
@@ -258,7 +258,7 @@ Overage at $35–50 per engagement above the bucket limit.
 
 ### Bundle Strategy
 
-Firms using Lease Accounting + Data Extraction + Case-Flow receive a 20% discount across all three products. This creates a meaningful retention mechanism — switching workflow platforms becomes the switching cost for all Crunchafi products simultaneously. It also gives the sales team a reason to lead with the platform story rather than selling products individually.
+Firms using Lease Accounting + Data Extraction + Case.Flow receive a 20% discount across all three products. This creates a meaningful retention mechanism — switching workflow platforms becomes the switching cost for all Crunchafi products simultaneously. It also gives the sales team a reason to lead with the platform story rather than selling products individually.
 
 ### Revenue Projections
 
@@ -321,13 +321,13 @@ Getting firms productive quickly is a product design problem as much as a techni
 
 **Phase one: concierge onboarding for design partners.** The self-service modeller is a v2 feature, deliberately. For the first cohort of firms, Crunchafi models the workflow collaboratively — the firm describes their audit methodology, Crunchafi encodes it in CMMN using standard open source tooling, and the resulting XML is loaded directly into the platform via API. The firm never touches a modelling tool; they go straight to running real engagements through the dashboard. This approach generates validated templates from actual firm methodologies before the self-service layer is built, and ensures the modeller is designed around how firms actually work.
 
-**Phase two: self-service via Carina.** Carina is already Crunchafi's identity and access spine and the logical surface for platform-level features that span products. The workflow modeller and template marketplace are natural extensions of what Carina already does — platform tools that CPA firms already access through Carina. Hosting Case-Flow's user-facing layer within Carina minimises onboarding cost for existing customers: they are already authenticated, already credentialed, already oriented to the platform. When a firm is ready to customise beyond a template, they open the modeller in Carina — the same place they manage everything else.
+**Phase two: self-service via Carina.** Carina is already Crunchafi's identity and access spine and the logical surface for platform-level features that span products. The workflow modeller and template marketplace are natural extensions of what Carina already does — platform tools that CPA firms already access through Carina. Hosting Case.Flow's user-facing layer within Carina minimises onboarding cost for existing customers: they are already authenticated, already credentialed, already oriented to the platform. When a firm is ready to customise beyond a template, they open the modeller in Carina — the same place they manage everything else.
 
 **The template library is the on-ramp for self-service.** A firm does not need to build a workflow from scratch. They browse the marketplace, select a template built by a design partner or aligned with published ISA/GAAS standards, and load it into the modeller. From there they customise: add their firm's specific procedures, adjust required vs. discretionary designations, encode their sign-off rules. The result is their methodology, built in hours, not a project.
 
-**Products as first-class adapters.** Every product that participates in a Case-Flow engagement implements a ProcessTask adapter — a defined interface that accepts inputs, invokes the product's API, and returns results to the case. Crunchafi ships first-party adapters for Lease Accounting and Data Extraction on day one. Third-party products implement the same interface. A firm's workflow is not limited to Crunchafi products — it can invoke any tool that exposes the adapter interface.
+**Products as first-class adapters.** Every product that participates in a Case.Flow engagement implements a ProcessTask adapter — a defined interface that accepts inputs, invokes the product's API, and returns results to the case. Crunchafi ships first-party adapters for Lease Accounting and Data Extraction on day one. Third-party products implement the same interface. A firm's workflow is not limited to Crunchafi products — it can invoke any tool that exposes the adapter interface.
 
-This means the platform is **product-agnostic by design**. Crunchafi's own products get preferential placement (bundled, pre-configured, deeply integrated), but the architecture does not require it. A firm using a different data extraction tool can still use Case-Flow. That removes the "we only work with Crunchafi products" objection and broadens the addressable market substantially.
+This means the platform is **product-agnostic by design**. Crunchafi's own products get preferential placement (bundled, pre-configured, deeply integrated), but the architecture does not require it. A firm using a different data extraction tool can still use Case.Flow. That removes the "we only work with Crunchafi products" objection and broadens the addressable market substantially.
 
 ---
 
@@ -339,7 +339,7 @@ The asset exists. The question is whether Crunchafi moves first.
 
 **Option A — Acquire the engine and build the product**
 
-1. **Formalise the acquisition** — define terms for acquiring the Case-Flow CMMN engine as a Crunchafi IP asset; assign it a product name and executive sponsorship
+1. **Formalise the acquisition** — define terms for acquiring the Case.Flow CMMN engine as a Crunchafi IP asset; assign it a product name and executive sponsorship
 2. **Allocate a small team for 3 months** — 2–3 developers led by the original author as architect and technical lead, leveraging existing Crunchafi infrastructure (Azure, Auth0, Bicep, ScrumBot)
 3. **Define the first design partner** — sales and client success identify one firm from the existing early adopter base willing to co-build the first audit engagement template; launch with real, validated content
 
@@ -367,8 +367,8 @@ The engine exists. The infrastructure patterns exist. The customer relationships
 
 | Risk | Mitigation |
 |---|---|
-| TR partnership tension | Lease Accounting continues as a TR partner regardless. Case-Flow serves firms who want to own their workflow — a different buyer motion than TR's PPC-embedded approach. Near-term complementary; strategic hedge long-term. |
-| Over-reliance on TR if we do nothing | This is the risk of *not* building Case-Flow. TR already chose Validis over Data Extraction. Remaining a component vendor without platform ownership compounds this exposure. |
+| TR partnership tension | Lease Accounting continues as a TR partner regardless. Case.Flow serves firms who want to own their workflow — a different buyer motion than TR's PPC-embedded approach. Near-term complementary; strategic hedge long-term. |
+| Over-reliance on TR if we do nothing | This is the risk of *not* building Case.Flow. TR already chose Validis over Data Extraction. Remaining a component vendor without platform ownership compounds this exposure. |
 | Domain knowledge — we are not audit experts | By design. The platform is methodology-agnostic. Design partner firms encode their own methodology. Crunchafi ships the engine and the tools; firms bring the knowledge. |
 | Engine modernisation is harder than expected | Orleans 3→8 serialisation migration is the main technical risk; isolated, testable, does not block API or UI work in parallel. |
 | Adoption is slow without content | Design partner approach — first template built *with* a firm, not *for* them. Their investment in the methodology sells it to the next 50 customers. |
@@ -379,7 +379,7 @@ The engine exists. The infrastructure patterns exist. The customer relationships
 
 ## Summary
 
-Crunchafi has a working CMMN engine, an established Azure infrastructure platform, deep CPA firm relationships, and a strategic direction toward audit process ownership. Case-Flow is the connective layer that turns those assets into a platform.
+Crunchafi has a working CMMN engine, an established Azure infrastructure platform, deep CPA firm relationships, and a strategic direction toward audit process ownership. Case.Flow is the connective layer that turns those assets into a platform.
 
 The technical foundation is built. The market gap is real. The investment is contained.
 

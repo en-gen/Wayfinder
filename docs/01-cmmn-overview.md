@@ -102,7 +102,7 @@ Rules are boolean expressions evaluated at runtime to control plan item behavior
 
 ---
 
-## How Case-Flow Implements CMMN
+## How Case.Flow Implements CMMN
 
 ### Virtual Actor Per Element
 

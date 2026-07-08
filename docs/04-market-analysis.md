@@ -154,7 +154,7 @@ In December 2025, Crunchafi integrated Lease Accounting into Thomson Reuters' **
 A CMMN engine could serve as the **orchestration layer** that stitches Crunchafi's products together into a unified audit engagement platform:
 
 ```
-[Audit Engagement Case — powered by Case-Flow]
+[Audit Engagement Case — powered by Case.Flow]
         │
         ├─ ProcessTask: Data Extraction      → client ERP extraction
         ├─ ProcessTask: Lease Accounting    → lease accounting analysis
@@ -177,7 +177,7 @@ Stay a component vendor within Thomson Reuters' Guided Assurance. Get Data Extra
 - Vulnerable to TR acquiring a competitor or deprioritizing the partnership
 
 **Path B — Build the Orchestration Layer**
-Use Case-Flow to build the audit engagement platform that sits above TR's tools. CPA firms run their engagements in Crunchafi; TR products, Data Extraction, Lease Accounting, and future acquisitions are all ProcessTasks.
+Use Case.Flow to build the audit engagement platform that sits above TR's tools. CPA firms run their engagements in Crunchafi; TR products, Data Extraction, Lease Accounting, and future acquisitions are all ProcessTasks.
 - Platform stickiness and upsell surface
 - Directly challenges Thomson Reuters' Guided Assurance
 - Risks the existing partnership

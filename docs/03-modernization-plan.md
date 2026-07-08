@@ -1,12 +1,14 @@
 # Modernization Plan
 
+> **Historical planning document.** The platform-modernization phases of this plan were executed as roadmap milestone M0 (July 2026) — .NET 10 LTS (rather than the .NET 8 assumed here), Orleans 10.2.1, System.Text.Json. The project wiki carries the as-built state; docs/07 carries the live roadmap.
+
 *Assessed April 2026. Target: shippable multi-tenant Azure SaaS product.*
 
 ---
 
 ## Objective
 
-Modernize Case-Flow from a ~2016 development-only CMMN engine prototype into a production-grade, multi-tenant, cloud-native SaaS product running on Azure. The engine implementation is substantially complete — the work is modernizing the stack, implementing production infrastructure, building the API surface, and filling gaps in the CMMN implementation.
+Modernize Case.Flow from a ~2016 development-only CMMN engine prototype into a production-grade, multi-tenant, cloud-native SaaS product running on Azure. The engine implementation is substantially complete — the work is modernizing the stack, implementing production infrastructure, building the API surface, and filling gaps in the CMMN implementation.
 
 ---
 
@@ -236,10 +238,10 @@ resource siloApp 'Microsoft.App/containerApps@2024-03-01' = {
     template: {
       containers: [
         {
-          image: 'your-acr.azurecr.io/case-flow-silo:latest'
+          image: 'your-acr.azurecr.io/case.flow/silo:latest'
           env: [
-            { name: 'ORLEANS_CLUSTER_ID',      value: 'case-flow-prod' }
-            { name: 'ORLEANS_SERVICE_ID',       value: 'case-flow' }
+            { name: 'ORLEANS_CLUSTER_ID',      value: 'Case.Flow-prod' }
+            { name: 'ORLEANS_SERVICE_ID',       value: 'Case.Flow' }
             { name: 'AZURE_STORAGE_CONNECTION', secretRef: 'storage-connection' }
           ]
           probes: [
@@ -615,7 +617,7 @@ Pre-built CMMN case models that lower time-to-value for specific verticals:
 |---|---|---|---|
 | 1 | Stack modernization | 5–6 weeks | None — start here |
 | 2 | Containerization | 1 week | Can start alongside Phase 1 |
-| 3 | Production infrastructure | 3–4 weeks | After Phase 1 |
+| 3 | Production infrastructure | 5–7 weeks | After Phase 1 |
 | 4 | Multi-tenancy hardening | 2–3 weeks | Can overlap Phase 3 |
 | 5 | REST API | 6–8 weeks | After Phase 1 |
 | 6 | Engine gaps (CaseFileItem, planning table) | 3–5 weeks | Can overlap Phase 5 |
