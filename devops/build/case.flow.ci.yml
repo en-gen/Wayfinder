@@ -1,5 +1,5 @@
 # Case.Flow.CI — version, build, test, merged coverage
-# (ADO definition id 4 targets this file on refs/heads/develop)
+# (ADO definition id 4 targets devops/build/case.flow.ci.yml on refs/heads/develop)
 #
 # Versioning: GitVersion (dotnet tool, 6.x) computes SemVer from GitVersion.yml
 # and `Case.Flow-<X.Y.Z>` tags. The Version job republishes the results as job
@@ -17,9 +17,17 @@
 trigger:
   branches:
     include: [develop, main, release/*, hotfix/*]
+  paths:
+    include:
+      - src
+      - devops
+      - GitVersion.yml
+      - global.json
 
 # PR validation is enforced by branch policy (build validation on develop/main),
-# which is authoritative for Azure Repos — no pr: block needed.
+# which is authoritative for Azure Repos — no pr: block needed. The policy's
+# filenamePatterns mirror the paths.include above, so docs-only PRs skip
+# build validation by design.
 
 # Per-branch monotonic counter; the Version job folds it into the run name.
 variables:
