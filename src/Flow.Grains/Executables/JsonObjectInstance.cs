@@ -12,11 +12,11 @@ namespace Flow.Grains.Executables
 {
     public class JsonObjectInstance : ObjectInstance
     {
-        private JsonObject Value { get; }
+        private readonly JsonObject _value;
 
         public JsonObjectInstance(Jint.Engine engine, JsonObject value) : base(engine)
         {
-            Value = value;
+            _value = value ?? throw new ArgumentNullException(nameof(value));
         }
 
         public override PropertyDescriptor GetOwnProperty(JsValue property)
@@ -28,9 +28,9 @@ namespace Flow.Grains.Executables
                 // TryGetPropertyValue's bool return tracks key presence, not null-ness of the value -
                 // it correctly returns true (with node set to null) for a key whose value is a JSON
                 // null, distinguishing that from the key genuinely not existing.
-                if (Value.TryGetPropertyValue(propertyName, out var node))
+                if (_value.TryGetPropertyValue(propertyName, out var node))
                 {
-                    descriptor = new JsonNodePropertyDescriptor(Engine, Value, propertyName, node);
+                    descriptor = new JsonNodePropertyDescriptor(Engine, _value, propertyName, node);
                     FastSetProperty(propertyName, descriptor);
                 }
             }
@@ -70,7 +70,7 @@ namespace Flow.Grains.Executables
                 case Jint.Runtime.Types.Object:
                     if (value.AsObject() is JsonObjectInstance instance)
                     {
-                        return instance.Value.DeepClone();
+                        return instance._value.DeepClone();
                     }
 
                     var result = new JsonObject();

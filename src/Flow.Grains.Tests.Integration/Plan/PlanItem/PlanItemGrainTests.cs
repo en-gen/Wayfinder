@@ -15,11 +15,11 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
     [Collection(ClusterCollection.Name)]
     public class PlanItemGrainTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public PlanItemGrainTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -29,7 +29,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
         public async Task GetState__When_Undefined__Then_Uninitialized
             (Guid caseInstanceId)
         {
-            var subject = ClusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
+            var subject = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
 
             var result = await subject.GetSnapshot();
 
@@ -42,7 +42,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
         public async Task Trigger__When_Undefined__Then_InvalidOperationEx
             (Guid caseInstanceId)
         {
-            var subject = ClusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
+            var subject = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
 
             await subject
                 .Awaiting(x => x.Trigger(PlanItemTransition.Create))
@@ -54,7 +54,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
         public async Task Define__Given_PlanItem__When_CaseUndefined__Then_ThrowInvalidOperationException
             (string caseDefinitionId, Guid caseInstanceId)
         {
-            var subject = ClusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
+            var subject = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
 
             await subject
                 .Awaiting(x => x.Define(caseDefinitionId, new Interfaces.Model.PlanItem {DefinitionRef = "not_defined"}))
@@ -88,11 +88,11 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
                 }
             };
 
-            await ClusterClient
+            await _clusterClient
                 .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, @case.Id)
                 .Define(@case);
 
-            var subject = ClusterClient
+            var subject = _clusterClient
                 .GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{@case.CasePlanModel.Id}.{planItem.Id}");
 
             await subject
@@ -127,11 +127,11 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
                 }
             };
 
-            await ClusterClient
+            await _clusterClient
                 .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, @case.Id)
                 .Define(@case);
 
-            var subject = ClusterClient
+            var subject = _clusterClient
                 .GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{@case.CasePlanModel.Id}.{planItem.Id}");
 
             await subject

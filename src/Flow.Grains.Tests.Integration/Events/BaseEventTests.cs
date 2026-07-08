@@ -31,11 +31,11 @@ namespace Flow.Grains.Tests.Integration.Events
     [Collection(ClusterCollection.Name)]
     public class BaseEventTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public BaseEventTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
         }
 
         [Theory, AutoData]
@@ -58,7 +58,7 @@ namespace Flow.Grains.Tests.Integration.Events
 
             var tcs = new TaskCompletionSource<PlanItemTransitionedEvent>();
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, definitionId)
                 .SubscribeAsync((received, token) =>
                 {
@@ -66,7 +66,7 @@ namespace Flow.Grains.Tests.Integration.Events
                     return Task.CompletedTask;
                 });
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, definitionId)
                 .OnNextAsync(@event);
 

@@ -32,12 +32,12 @@ namespace Flow.Grains.Plan.CmmnElement
 
         protected TDefinition Definition => TentativeState.Definition ?? throw new Exception("Definition is not initialized");
 
-        private ILogger Logger { get; }
+        private readonly ILogger _logger;
         protected IDictionary<string, object> LogContext { get; }
 
         protected CmmnElementGrain(ILogger logger)
         {
-            Logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             LogContext = new Dictionary<string, object>();
         }
 
@@ -144,9 +144,9 @@ namespace Flow.Grains.Plan.CmmnElement
 
         protected void LogWithContext(Action<ILogger> logAction)
         {
-            using(Logger.BeginScope(LogContext))
+            using(_logger.BeginScope(LogContext))
             {
-                logAction?.Invoke(Logger);
+                logAction?.Invoke(_logger);
             }
         }
     }

@@ -22,7 +22,7 @@ namespace Flow.Grains.Plan.PlanItem
         IPlanItemInternalGrain,
         IBehaviorHost
     {
-        private IPlanItemBehaviorConfigurator BehaviorConfigurator { get; }
+        private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
 
         private IPlanItemBehavior _behavior;
         
@@ -59,7 +59,7 @@ namespace Flow.Grains.Plan.PlanItem
             ILogger<PlanItemGrain> logger) :
             base(logger)
         {
-            BehaviorConfigurator = behaviorConfigurator;
+            _behaviorConfigurator = behaviorConfigurator ?? throw new ArgumentNullException(nameof(behaviorConfigurator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -103,7 +103,7 @@ namespace Flow.Grains.Plan.PlanItem
             LogContext["ElementScope"] = _scope;
             LogContext["ElementInstanceId"] = _instanceId;
 
-            _behavior = await BehaviorConfigurator.Configure(this, State.PlanItemDefinition);
+            _behavior = await _behaviorConfigurator.Configure(this, State.PlanItemDefinition);
         }
 
         public Task<PlanItemSnapshot> GetSnapshot() => Task.FromResult(State.ToSnapshot());

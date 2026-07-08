@@ -1,4 +1,5 @@
-﻿using System.Collections.Specialized;
+﻿using System;
+using System.Collections.Specialized;
 using Quartz;
 using Quartz.Core;
 using Quartz.Impl;
@@ -8,17 +9,17 @@ namespace Flow.Grains.Infrastructure.Quartz
 {
     public class QuartzSchedulerFactory : StdSchedulerFactory
     {
-        private IJobFactory JobFactory { get; }
+        private readonly IJobFactory _jobFactory;
 
         public QuartzSchedulerFactory(IJobFactory jobFactory, NameValueCollection config) :
             base(config)
         {
-            JobFactory = jobFactory;
+            _jobFactory = jobFactory ?? throw new ArgumentNullException(nameof(jobFactory));
         }
-        
+
         protected override IScheduler Instantiate(QuartzSchedulerResources qsr, QuartzScheduler qs)
         {
-            qs.JobFactory = JobFactory;
+            qs.JobFactory = _jobFactory;
             return base.Instantiate(qsr, qs);
         }
     }

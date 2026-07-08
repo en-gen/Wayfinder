@@ -29,12 +29,12 @@ namespace Flow.Grains.Tests.Integration
     [Collection(ClusterCollection.Name)]
     public class StreamSemanticsTests
     {
-        private ClusterFixture Fixture { get; }
-        private IClusterClient ClusterClient => Fixture.ClusterClient;
+        private readonly ClusterFixture _fixture;
+        private IClusterClient ClusterClient => _fixture.ClusterClient;
 
         public StreamSemanticsTests(ClusterFixture fixture)
         {
-            Fixture = fixture;
+            _fixture = fixture;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -89,8 +89,8 @@ namespace Flow.Grains.Tests.Integration
 
             // force the grain out of memory - OnActivateAsync must resume the OnPart subscription
             // (StreamFlags.Resume) the next time it is reactivated to deliver a pending message.
-            await Fixture.Cluster.DeactivateAsync(sentryGrain);
-            await Fixture.Cluster.WaitForDeactivationAsync(sentryGrain);
+            await _fixture.Cluster.DeactivateAsync(sentryGrain);
+            await _fixture.Cluster.WaitForDeactivationAsync(sentryGrain);
 
             var tcs = new TaskCompletionSource<bool>();
 

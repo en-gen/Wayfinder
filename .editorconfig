@@ -1,0 +1,57 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+insert_final_newline = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+charset = utf-8
+insert_final_newline = true
+
+# Prefer marking fields readonly when they are never reassigned outside the constructor.
+dotnet_style_readonly_field = true:warning
+
+##########################################
+# Naming conventions
+#
+# Roslyn evaluates dotnet_naming_rule entries in declaration order and applies the
+# first one whose symbol spec matches, so the more specific const / static readonly
+# rules are declared before the catch-all private-instance-field rule below.
+##########################################
+
+# Constants (any accessibility) -> PascalCase.
+# Codebase precedent: CaseRequestContext.TenantIdKey, ExpressionLanguage.Jint,
+# ClusterCollection.Name, SeqOptions.ConfigKey.
+dotnet_naming_rule.constants_pascal_case.symbols = constant_fields
+dotnet_naming_rule.constants_pascal_case.style = pascal_case
+dotnet_naming_rule.constants_pascal_case.severity = warning
+
+dotnet_naming_symbols.constant_fields.applicable_kinds = field
+dotnet_naming_symbols.constant_fields.required_modifiers = const
+
+# Static readonly fields (any accessibility) -> PascalCase.
+# Codebase precedent: ShortGuid.Empty, PlanItemState.TerminalStates,
+# QuartzSchedulerConfig.Durable, Rules.TruthyExpression.
+dotnet_naming_rule.static_readonly_fields_pascal_case.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_fields_pascal_case.style = pascal_case
+dotnet_naming_rule.static_readonly_fields_pascal_case.severity = warning
+
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static, readonly
+
+# Private instance fields -> _camelCase.
+dotnet_naming_rule.private_instance_fields_underscore_camel_case.symbols = private_instance_fields
+dotnet_naming_rule.private_instance_fields_underscore_camel_case.style = underscore_camel_case
+dotnet_naming_rule.private_instance_fields_underscore_camel_case.severity = warning
+
+dotnet_naming_symbols.private_instance_fields.applicable_kinds = field
+dotnet_naming_symbols.private_instance_fields.applicable_accessibilities = private
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _

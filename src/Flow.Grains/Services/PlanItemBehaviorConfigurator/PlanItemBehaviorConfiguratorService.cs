@@ -8,16 +8,16 @@ namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
 {
     public class PlanItemBehaviorConfiguratorService : IPlanItemBehaviorConfigurator
     {
-        private IPlanItemStateMachineConfigurator PlanItemStateMachineConfigurator { get; }
+        private readonly IPlanItemStateMachineConfigurator _planItemStateMachineConfigurator;
 
         public PlanItemBehaviorConfiguratorService(IPlanItemStateMachineConfigurator planItemStateMachineConfigurator)
         {
-            PlanItemStateMachineConfigurator = planItemStateMachineConfigurator;
+            _planItemStateMachineConfigurator = planItemStateMachineConfigurator ?? throw new ArgumentNullException(nameof(planItemStateMachineConfigurator));
         }
 
         public async Task<IPlanItemBehavior> Configure(IBehaviorHost host, PlanItemDefinition planItemDefinition)
         {
-            var stateMachine = PlanItemStateMachineConfigurator.Configure(host.State);
+            var stateMachine = _planItemStateMachineConfigurator.Configure(host.State);
             switch (planItemDefinition)
             {
                 case Stage stage when stage.IsCasePlanModel:

@@ -14,11 +14,11 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
     [Collection(ClusterCollection.Name)]
     public class PlanItemDefinitionGrainTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public PlanItemDefinitionGrainTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
         }
 
         [Theory, AutoData]
@@ -28,7 +28,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var cpmId = ShortGuid.NewGuid();
             var defId = ShortGuid.NewGuid();
 
-            var defGrain = ClusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
+            var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             var isDefined = await defGrain.IsDefined();
 
@@ -42,7 +42,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var cpmId = ShortGuid.NewGuid();
             var defId = ShortGuid.NewGuid();
 
-            var defGrain = ClusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
+            var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             await defGrain
                 .Awaiting(x => x.Define(new PlanItemDefinition {Id = defId}))
@@ -57,7 +57,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var cpmId = ShortGuid.NewGuid();
             var defId = ShortGuid.NewGuid();
 
-            var defGrain = ClusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
+            var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             await defGrain
                 .Awaiting(x => x.Define(new PlanItemDefinition {Id = Guid.NewGuid().ToString()}))
@@ -72,7 +72,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var cpmId = ShortGuid.NewGuid();
             var defId = ShortGuid.NewGuid();
 
-            var defGrain = ClusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
+            var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             await defGrain
                 .Awaiting(x => x.Define(new PlanItemDefinition { Id = defId }))
@@ -93,7 +93,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var cpmId = ShortGuid.NewGuid();
             var defId = ShortGuid.NewGuid();
 
-            var defGrain = ClusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
+            var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             await defGrain.Define(new PlanItemDefinition {Id = defId});
 

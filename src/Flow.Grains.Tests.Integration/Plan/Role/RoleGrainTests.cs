@@ -13,11 +13,11 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
     [Collection(ClusterCollection.Name)]
     public class RoleGrainTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public RoleGrainTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -27,7 +27,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
         public async Task Authorize__Given_Undefined__When_RoleInContext__Then_False
             (Guid caseInstanceId)
         {
-            var roleGrain = ClusterClient.GetGrain<IRoleGrain>(caseInstanceId, ShortGuid.NewGuid());
+            var roleGrain = _clusterClient.GetGrain<IRoleGrain>(caseInstanceId, ShortGuid.NewGuid());
 
             CaseRequestContext.UserRoles = new[]
             {
@@ -45,7 +45,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
         public async Task Authorize__Given_Undefined__When_RoleNotInContext__Then_False
             (Guid caseInstanceId)
         {
-            var roleGrain = ClusterClient.GetGrain<IRoleGrain>(caseInstanceId, ShortGuid.NewGuid());
+            var roleGrain = _clusterClient.GetGrain<IRoleGrain>(caseInstanceId, ShortGuid.NewGuid());
 
             CaseRequestContext.UserRoles = new[]
             {
@@ -67,7 +67,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
                 Name = "admin"
             };
             
-            var roleGrain = ClusterClient.GetGrain<IRoleGrain>(caseInstanceId, role.Id);
+            var roleGrain = _clusterClient.GetGrain<IRoleGrain>(caseInstanceId, role.Id);
 
             await roleGrain.Define(caseDefinitionId, role);
 
@@ -92,7 +92,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
                 Name = "admin"
             };
 
-            var roleGrain = ClusterClient.GetGrain<IRoleGrain>(caseInstanceId, role.Id);
+            var roleGrain = _clusterClient.GetGrain<IRoleGrain>(caseInstanceId, role.Id);
 
             await roleGrain.Define(caseDefinitionId, role);
 

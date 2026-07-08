@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Flow.Grains.Infrastructure.Extensions;
@@ -20,9 +21,9 @@ namespace Flow.Grains.Executables
     // the parent JsonObject + the property name instead of a JProperty for that reason.
     public class JsonNodePropertyDescriptor : PropertyDescriptor
     {
-        private Jint.Engine Engine { get; }
-        private JsonObject Parent { get; }
-        private string PropertyName { get; }
+        private readonly Jint.Engine _engine;
+        private readonly JsonObject _parent;
+        private readonly string _propertyName;
 
         public JsonNodePropertyDescriptor(Jint.Engine engine, JsonObject parent, string propertyName, JsonNode node)
         {
@@ -30,14 +31,14 @@ namespace Flow.Grains.Executables
             Configurable = true;
             Enumerable = true;
 
-            Engine = engine;
-            Parent = parent;
-            PropertyName = propertyName;
+            _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+            _parent = parent ?? throw new ArgumentNullException(nameof(parent));
+            _propertyName = propertyName ?? throw new ArgumentNullException(nameof(propertyName));
 
             // JsonNodeExtensions.AsJsValue already maps a null node reference to JsValue.Null (a JSON
             // null) rather than JsValue.Undefined - a JS-only concept with no JSON representation. Do
             // not special-case null here; let AsJsValue's own null-check handle it.
-            Value = node.AsJsValue(Engine);
+            Value = node.AsJsValue(_engine);
         }
 
         public void SetValue(JsValue value)
@@ -46,15 +47,15 @@ namespace Flow.Grains.Executables
 
             if (value == null || value.IsUndefined())
             {
-                Parent[PropertyName] = null;
+                _parent[_propertyName] = null;
             }
             else
             {
-                var existingKind = Parent.TryGetPropertyValue(PropertyName, out var existing) && existing != null
+                var existingKind = _parent.TryGetPropertyValue(_propertyName, out var existing) && existing != null
                     ? existing.GetValueKind()
                     : JsonValueKind.Undefined;
 
-                Parent[PropertyName] = JsonObjectInstance.Convert(existingKind, value);
+                _parent[_propertyName] = JsonObjectInstance.Convert(existingKind, value);
             }
         }
     }

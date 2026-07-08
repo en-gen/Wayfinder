@@ -13,16 +13,16 @@ namespace Flow.Grains.Expressions
     public class ExpressionGrain: Grain, IExpressionGrain
     {
         private Guid _caseId;
-        private Func<string, IExecutable> Executable { get; }
+        private readonly Func<string, IExecutable> _executable;
 
-        private ILogger Logger { get; }
+        private readonly ILogger _logger;
 
         public ExpressionGrain(
             Func<string, IExecutable> executable,
             ILogger<ExpressionGrain> logger)
         {
-            Executable = executable;
-            Logger = logger;
+            _executable = executable ?? throw new ArgumentNullException(nameof(executable));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -61,14 +61,14 @@ namespace Flow.Grains.Expressions
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "failed to parse expression result {ExpressionResult} to ISO8601", result.Value);
+                _logger.LogError(ex, "failed to parse expression result {ExpressionResult} to ISO8601", result.Value);
                 return ExecutableResult<Iso8601>.Failure(ex.Message);
             }
         }
 
         private async Task<IExecutable> BuildExecutable(/*CaseContext context, */string contextRef, Expression expression)
         {
-            var executor = Executable(expression.Body);
+            var executor = _executable(expression.Body);
 
             // TODO
             //var caseFileGrain = GrainFactory.GetGrain<ICaseFileGrain>(_caseInstanceId, keyExtension: EngineConstants.CaseFileKeyExtension);

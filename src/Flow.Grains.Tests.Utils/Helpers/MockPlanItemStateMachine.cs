@@ -11,50 +11,50 @@ namespace Flow.Grains.Tests.Utils.Helpers
 {
     public class MockPlanItemStateMachine : Mock<IPlanItemStateMachine>
     {
-        private IPlanItemStateMachine StateMachine { get; }
+        private readonly IPlanItemStateMachine _stateMachine;
 
         public MockPlanItemStateMachine(IBehaviorStore store)
         {
-            StateMachine = new PlanItemStateMachine(store, Mock.Of<ILogger<PlanItemStateMachine>>());
-            
+            _stateMachine = new PlanItemStateMachine(store, Mock.Of<ILogger<PlanItemStateMachine>>());
+
             SetupGet(x => x.State)
-                .Returns(() => StateMachine.State);
+                .Returns(() => _stateMachine.State);
 
             SetupGet(x => x.ParentSuspendState)
-                .Returns(() => StateMachine.ParentSuspendState);
+                .Returns(() => _stateMachine.ParentSuspendState);
 
             SetupGet(x => x.PermittedTriggers)
-                .Returns(() => StateMachine.PermittedTriggers);
+                .Returns(() => _stateMachine.PermittedTriggers);
 
             Setup(x => x.CanFire(It.IsAny<PlanItemTransition>()))
-                .Returns<PlanItemTransition>(x => StateMachine.CanFire(x));
+                .Returns<PlanItemTransition>(x => _stateMachine.CanFire(x));
 
             Setup(x => x.Configure(It.IsAny<PlanItemState>()))
-                .Returns<PlanItemState>(x => StateMachine.Configure(x));
+                .Returns<PlanItemState>(x => _stateMachine.Configure(x));
 
             Setup(x => x.FireAsync(It.IsAny<PlanItemTransition>()))
-                .Returns<PlanItemTransition>(x => StateMachine.FireAsync(x));
+                .Returns<PlanItemTransition>(x => _stateMachine.FireAsync(x));
 
             Setup(x => x.GetPermittedTriggers(It.IsAny<object[]>()))
-                .Returns<object[]>(StateMachine.GetPermittedTriggers);
+                .Returns<object[]>(_stateMachine.GetPermittedTriggers);
 
             Setup(x => x.IsInState(It.IsAny<PlanItemState>()))
-                .Returns<PlanItemState>(StateMachine.IsInState);
+                .Returns<PlanItemState>(_stateMachine.IsInState);
 
             Setup(x => x.ActivateAsync())
-                .Returns(StateMachine.ActivateAsync);
+                .Returns(_stateMachine.ActivateAsync);
 
             Setup(x => x.DeactivateAsync())
-                .Returns(StateMachine.DeactivateAsync);
+                .Returns(_stateMachine.DeactivateAsync);
 
             Setup(x => x.GetInfo())
-                .Returns(StateMachine.GetInfo);
+                .Returns(_stateMachine.GetInfo);
 
             Setup(x => x.OnTransitionedAsync(It.IsAny<Func<PlanItemStateMachine.Transition, Task>>()))
-                .Callback<Func<PlanItemStateMachine.Transition, Task>>(x => StateMachine.OnTransitionedAsync(x));
+                .Callback<Func<PlanItemStateMachine.Transition, Task>>(x => _stateMachine.OnTransitionedAsync(x));
 
             Setup(x => x.OnUnhandledTriggerAsync(It.IsAny<Func<PlanItemState, PlanItemTransition, Task>>()))
-                .Callback<Func<PlanItemState, PlanItemTransition, Task>>(x => StateMachine.OnUnhandledTriggerAsync(x));
+                .Callback<Func<PlanItemState, PlanItemTransition, Task>>(x => _stateMachine.OnUnhandledTriggerAsync(x));
         }
     }
 }

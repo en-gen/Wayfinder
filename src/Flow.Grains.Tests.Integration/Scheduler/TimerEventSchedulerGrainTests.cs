@@ -22,11 +22,11 @@ namespace Flow.Grains.Tests.Integration.Scheduler
     [Collection(ClusterCollection.Name)]
     public class TimerEventSchedulerGrainTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public TimerEventSchedulerGrainTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
         }
 
         [Theory, AutoData]
@@ -36,7 +36,7 @@ namespace Flow.Grains.Tests.Integration.Scheduler
             var expectedTicks = 3;
             var ticks = new List<DateTimeOffset>();
 
-            var schedulerGrain = ClusterClient.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId);
+            var schedulerGrain = _clusterClient.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId);
 
             // Must match the stream identity StreamProviderExtensions.GetCaseEventStream builds -
             // the same helper TimerEventListenerBehavior's subscription (and, after the fix,
@@ -45,7 +45,7 @@ namespace Flow.Grains.Tests.Integration.Scheduler
             // namespace TimerTickJob published to - so the test only ever passed because both sides
             // agreed on the same incorrect stream, not because ticks were actually reaching a real
             // subscriber the way production behaviors subscribe.
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, (string)planItemInstanceId)
                 .SubscribeAsync((@event, token) =>
                 {
