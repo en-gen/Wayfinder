@@ -12,13 +12,13 @@ namespace Flow.Grains.Scheduler
 {
     public class TimerTickJob : IJob
     {
-        private IStreamProvider StreamProvider { get; }
-        private ILogger Logger { get; }
+        private readonly IStreamProvider _streamProvider;
+        private readonly ILogger _logger;
 
         public TimerTickJob(IClusterClient client, ILogger<TimerTickJob> logger)
         {
-            StreamProvider = client.GetStreamProvider("Default");
-            Logger = logger;
+            _streamProvider = (client ?? throw new ArgumentNullException(nameof(client))).GetStreamProvider("Default");
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public Task Execute(IJobExecutionContext context)
@@ -34,9 +34,9 @@ namespace Flow.Grains.Scheduler
             // identity mismatch fixed here.
             var elementInstanceId = (string)context.JobDetail.JobDataMap.Get("ElementInstanceId");
 
-            using (Logger.BeginScope(context.JobDetail.JobDataMap))
+            using (_logger.BeginScope(context.JobDetail.JobDataMap))
             {
-                Logger.LogInformation("{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | timer tick occurred");
+                _logger.LogInformation("{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | timer tick occurred");
             }
 
             // Must build the stream identity exactly like StreamProviderExtensions.GetCaseEventStream
@@ -46,7 +46,7 @@ namespace Flow.Grains.Scheduler
             // built StreamId.Create((string)elementInstanceId, caseInstanceId) directly - a raw
             // instance id namespace with no "TimerTickedEvent:" prefix - so ticks were published to a
             // stream nobody ever subscribed to.
-            return StreamProvider.GetCaseEventStream<TimerTickedEvent>(caseInstanceId, elementInstanceId)
+            return _streamProvider.GetCaseEventStream<TimerTickedEvent>(caseInstanceId, elementInstanceId)
                 .OnNextAsync(new TimerTickedEvent(
                     context.PreviousFireTimeUtc,
                     context.ScheduledFireTimeUtc,

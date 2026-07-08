@@ -13,17 +13,17 @@ namespace Flow.Grains.Scheduler
 {
     public class TimerEventSchedulerGrain : Grain<TimerEventSchedulerStore>, ITimerEventSchedulerGrain
     {
-        private ISchedulerFactory SchedulerFactory { get; }
-        private ILogger Logger { get; }
-        
+        private readonly ISchedulerFactory _schedulerFactory;
+        private readonly ILogger _logger;
+
         private IScheduler _scheduler;
 
         private Guid _caseInstanceId;
 
         public TimerEventSchedulerGrain(ISchedulerFactory schedulerFactory, ILogger<TimerEventSchedulerGrain> logger)
         {
-            SchedulerFactory = schedulerFactory;
-            Logger = logger;
+            _schedulerFactory = schedulerFactory ?? throw new ArgumentNullException(nameof(schedulerFactory));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -40,7 +40,7 @@ namespace Flow.Grains.Scheduler
                 reminderPeriod,
                 reminderPeriod);
 
-            _scheduler = await SchedulerFactory.GetScheduler();
+            _scheduler = await _schedulerFactory.GetScheduler();
 
             await _scheduler.Start();
         }
@@ -96,13 +96,13 @@ namespace Flow.Grains.Scheduler
         // keeps grain active, prevents deactivation
         public Task ReceiveReminder(string reminderName, TickStatus status)
         {
-            Logger.LogInformation("Scheduler activation refreshed");
+            _logger.LogInformation("Scheduler activation refreshed");
             return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            Logger.LogWarning("Scheduler shutting down: {Reason}", reason);
+            _logger.LogWarning("Scheduler shutting down: {Reason}", reason);
             return _scheduler.Shutdown(false);
         }
     }

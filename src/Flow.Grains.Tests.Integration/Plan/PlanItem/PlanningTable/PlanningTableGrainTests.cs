@@ -15,11 +15,11 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
     [Collection(ClusterCollection.Name)]
     public class PlanningTableGrainTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public PlanningTableGrainTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -38,7 +38,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
                 }
             };
 
-            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+            var subject = _clusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
 
             await subject.Define(caseDefinitionId, definition);
 
@@ -73,7 +73,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
                 }
             };
 
-            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+            var subject = _clusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
 
             await subject.Define(caseDefinitionId, definition);
 
@@ -106,7 +106,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
                 }
             };
 
-            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+            var subject = _clusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
 
             await subject.Define(caseDefinitionId, definition);
 
@@ -149,7 +149,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
                 }
             };
 
-            var subject = ClusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+            var subject = _clusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
 
             await subject.Define(caseDefinitionId, definition);
 

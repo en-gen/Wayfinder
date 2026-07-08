@@ -20,11 +20,11 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
     [Collection(ClusterCollection.Name)]
     public class OrleansFallbackJsonSerializerTests
     {
-        private Serializer Serializer { get; }
+        private readonly Serializer _serializer;
 
         public OrleansFallbackJsonSerializerTests(ClusterFixture fixture)
         {
-            Serializer = fixture.Cluster.ServiceProvider.GetRequiredService<Serializer>();
+            _serializer = fixture.Cluster.ServiceProvider.GetRequiredService<Serializer>();
         }
 
         [Fact]
@@ -37,8 +37,8 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 IsCasePlanModel = true
             };
 
-            var bytes = Serializer.SerializeToArray(original);
-            var roundTripped = Serializer.Deserialize<PlanItemDefinition>(bytes);
+            var bytes = _serializer.SerializeToArray(original);
+            var roundTripped = _serializer.Deserialize<PlanItemDefinition>(bytes);
 
             roundTripped.Should().BeOfType<Stage>();
             var stage = Assert.IsType<Stage>(roundTripped);
@@ -57,8 +57,8 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 IsBlocking = true
             };
 
-            var bytes = Serializer.SerializeToArray(original);
-            var roundTripped = Serializer.Deserialize<PlanItemDefinition>(bytes);
+            var bytes = _serializer.SerializeToArray(original);
+            var roundTripped = _serializer.Deserialize<PlanItemDefinition>(bytes);
 
             roundTripped.Should().BeOfType<HumanTask>();
             var humanTask = Assert.IsType<HumanTask>(roundTripped);

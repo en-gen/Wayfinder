@@ -19,11 +19,11 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
     [Collection(ClusterCollection.Name)]
     public class SentryGrainTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public SentryGrainTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -49,13 +49,13 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                 }
             };
 
-            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
+            var subject = _clusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
 
             await subject.Define(caseDefinitionId, sentry);
 
             var tcs = new TaskCompletionSource<bool>();
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<SentrySatisfiedEvent>(caseInstanceId, sentry.Id)
                 .SubscribeAsync((e, t) =>
                 {
@@ -68,7 +68,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                     return Task.CompletedTask;
                 });
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
                 .OnNextAsync(new PlanItemTransitionedEvent(
                     sourceScope,
@@ -99,13 +99,13 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                 }
             };
 
-            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
+            var subject = _clusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
 
             await subject.Define(caseDefinitionId, sentry);
 
             var tcs = new TaskCompletionSource<bool>();
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<SentrySatisfiedEvent>(caseInstanceId, sentry.Id)
                 .SubscribeAsync((e, t) =>
                 {
@@ -118,7 +118,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                     return Task.CompletedTask;
                 });
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
                 .OnNextAsync(new PlanItemTransitionedEvent(
                     sourceScope,
@@ -154,13 +154,13 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                 }
             };
 
-            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{ShortGuid.NewGuid()}");
+            var subject = _clusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{ShortGuid.NewGuid()}");
 
             await subject.Define(caseDefinitionId, sentry);
 
             var tcs = new TaskCompletionSource<bool>();
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<SentrySatisfiedEvent>(caseInstanceId, sentry.Id)
                 .SubscribeAsync((e, t) =>
                 {
@@ -173,7 +173,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                     return Task.CompletedTask;
                 });
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
                 .OnNextAsync(new PlanItemTransitionedEvent(
                     sourceScope,
@@ -213,14 +213,14 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                 }
             };
 
-            var subject = ClusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
+            var subject = _clusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
 
             await subject.Define(caseDefinitionId, sentry);
 
             var receivedCount = 0;
             var firstReceived = new TaskCompletionSource<bool>();
 
-            await ClusterClient.GetStreamProvider("Default")
+            await _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<SentrySatisfiedEvent>(caseInstanceId, sentry.Id)
                 .SubscribeAsync((e, t) =>
                 {
@@ -238,7 +238,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                 PlanItemState.Available,
                 PlanItemState.Completed);
 
-            var transitionedStream = ClusterClient.GetStreamProvider("Default")
+            var transitionedStream = _clusterClient.GetStreamProvider("Default")
                 .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId);
 
             // simulate at-least-once redelivery of the exact same logical transition

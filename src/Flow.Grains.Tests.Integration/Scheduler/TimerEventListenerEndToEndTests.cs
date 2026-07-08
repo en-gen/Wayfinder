@@ -32,11 +32,11 @@ namespace Flow.Grains.Tests.Integration.Scheduler
     [Collection(ClusterCollection.Name)]
     public class TimerEventListenerEndToEndTests
     {
-        private IClusterClient ClusterClient { get; }
+        private readonly IClusterClient _clusterClient;
 
         public TimerEventListenerEndToEndTests(ClusterFixture fixture)
         {
-            ClusterClient = fixture.ClusterClient;
+            _clusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -70,11 +70,11 @@ namespace Flow.Grains.Tests.Integration.Scheduler
                 }
             };
 
-            await ClusterClient
+            await _clusterClient
                 .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, @case.Id)
                 .Define(@case);
 
-            var subject = ClusterClient
+            var subject = _clusterClient
                 .GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{@case.CasePlanModel.Id}.{planItem.Id}");
 
             await subject.Define(@case.Id, planItem);

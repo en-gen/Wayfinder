@@ -23,7 +23,7 @@ namespace Flow.Grains.Plan.Case
         ICaseGrain,
         IBehaviorHost
     {
-        private IPlanItemBehaviorConfigurator BehaviorConfigurator { get; }
+        private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
 
         private IPlanItemBehavior _casePlanModel;
 
@@ -60,7 +60,7 @@ namespace Flow.Grains.Plan.Case
             ILogger<CaseGrain> logger) :
             base(logger)
         {
-            BehaviorConfigurator = behaviorConfigurator;
+            _behaviorConfigurator = behaviorConfigurator ?? throw new ArgumentNullException(nameof(behaviorConfigurator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -103,7 +103,7 @@ namespace Flow.Grains.Plan.Case
             LogContext["ElementScope"] = _scope;
             LogContext["ElementInstanceId"] = _instanceId;
 
-            _casePlanModel = await BehaviorConfigurator.Configure(this, State.Definition.CasePlanModel);
+            _casePlanModel = await _behaviorConfigurator.Configure(this, State.Definition.CasePlanModel);
         }
 
         public Task<CaseSnapshot> GetSnapshot() => Task.FromResult(State.ToSnapshot());

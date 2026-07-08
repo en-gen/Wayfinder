@@ -15,31 +15,31 @@ namespace Flow.Grains.Plan.Case
 {
     public class CaseDefinitionGrain : JournaledGrain<CaseDefinitionStore>, ICaseDefinitionGrain
     {
-        private ILogger Logger { get; }
+        private readonly ILogger _logger;
 
         private Guid _tenantId;
         private string _caseDefinitionId;
 
-        private IDictionary<string, object> LogContext { get; }
+        private readonly IDictionary<string, object> _logContext;
 
         public CaseDefinitionGrain(ILogger<CaseDefinitionGrain> logger)
         {
-            Logger = logger;
-            LogContext = new Dictionary<string, object>();
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logContext = new Dictionary<string, object>();
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _tenantId = this.GetPrimaryKey(out _caseDefinitionId);
 
-            LogContext["CorrelationId"] = System.Diagnostics.Activity.Current?.Id;
-            LogContext["Element"] = typeof(Interfaces.Model.Case).Name;
+            _logContext["CorrelationId"] = System.Diagnostics.Activity.Current?.Id;
+            _logContext["Element"] = typeof(Interfaces.Model.Case).Name;
 
             await base.OnActivateAsync(cancellationToken);
 
             if (State.Defined)
             {
-                LogContext["ElementDefinitionId"] = State.Definition.Id;
+                _logContext["ElementDefinitionId"] = State.Definition.Id;
             }
         }
 
@@ -56,7 +56,7 @@ namespace Flow.Grains.Plan.Case
                 DefinitionRoot = casePlanModelNode
             });
 
-            LogContext["ElementDefinitionId"] = definition.Id;
+            _logContext["ElementDefinitionId"] = definition.Id;
 
             LogWithContext(logger => logger.LogInformation(
                 "{Element} {ElementDefinitionId} | new case definition configured",
@@ -106,9 +106,9 @@ namespace Flow.Grains.Plan.Case
 
         private void LogWithContext(Action<ILogger> logAction)
         {
-            using (Logger.BeginScope(LogContext))
+            using (_logger.BeginScope(_logContext))
             {
-                logAction?.Invoke(Logger);
+                logAction?.Invoke(_logger);
             }
         }
     }

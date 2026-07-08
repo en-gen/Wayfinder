@@ -1,4 +1,5 @@
-﻿using Flow.Grains.Interfaces.Model;
+﻿using System;
+using Flow.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Stateless;
 
@@ -8,12 +9,12 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
     {
         public PlanItemState? ParentSuspendState { get; private set; }
 
-        private ILogger Logger { get; }
+        private readonly ILogger _logger;
 
         public PlanItemStateMachine(IBehaviorStore planItemStore, ILogger<PlanItemStateMachine> logger) :
             base(planItemStore.PlanItemState)
         {
-            Logger = logger;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             ParentSuspendState = planItemStore.ParentSuspendState;
 
@@ -22,7 +23,7 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
 
         private void ConfigureFor(PlanItemDefinition planItemDefinition)
         {
-            Logger.LogInformation("Initializing {BehaviorType} state machine", planItemDefinition.GetType().Name);
+            _logger.LogInformation("Initializing {BehaviorType} state machine", planItemDefinition.GetType().Name);
             
             switch (planItemDefinition)
             {

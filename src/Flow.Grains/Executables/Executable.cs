@@ -13,10 +13,10 @@ namespace Flow.Grains.Executables
 {
     public class Executable : IExecutable
     {
-        private Engine Engine { get; }
-        private ILogger Logger { get; }
-        private string Expression { get; }
-        private JsonSerializerOptions SerializerOptions { get; }
+        private readonly Engine _engine;
+        private readonly ILogger _logger;
+        private readonly string _expression;
+        private readonly JsonSerializerOptions _serializerOptions;
 
         public Executable(
             Engine engine,
@@ -25,11 +25,11 @@ namespace Flow.Grains.Executables
         {
             if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentNullException(nameof(expression));
 
-            Engine = engine;
-            Logger = logger;
-            Expression = expression;
+            _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _expression = expression;
 
-            SerializerOptions = new JsonSerializerOptions
+            _serializerOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
@@ -38,7 +38,7 @@ namespace Flow.Grains.Executables
             // NamingStrategy/CamelCaseText): enum members serialize using their raw C# member name
             // (PascalCase), independent of PropertyNamingPolicy above (which only affects property
             // names, not enum values).
-            SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            _serializerOptions.Converters.Add(new JsonStringEnumConverter());
         }
 
         public IExecutable WithArgument<TArgument>(TArgument argument)
@@ -47,8 +47,8 @@ namespace Flow.Grains.Executables
             if (argument != null)
             {
                 var node = ToJsonObject(argument.Value);
-                var instance = new JsonObjectInstance(Engine, node);
-                Engine.SetValue(argument.Name, instance);
+                var instance = new JsonObjectInstance(_engine, node);
+                _engine.SetValue(argument.Name, instance);
             }
 
             return this;
@@ -61,7 +61,7 @@ namespace Flow.Grains.Executables
                 var node = ToJsonObject(values);
                 foreach (var property in node)
                 {
-                    Engine.SetValue(property.Key, property.Value.AsJsValue(Engine));
+                    _engine.SetValue(property.Key, property.Value.AsJsValue(_engine));
                 }
             }
 
@@ -69,22 +69,22 @@ namespace Flow.Grains.Executables
         }
 
         private JsonObject ToJsonObject(object value) =>
-            (JsonObject)JsonSerializer.SerializeToNode(value, value.GetType(), SerializerOptions);
+            (JsonObject)JsonSerializer.SerializeToNode(value, value.GetType(), _serializerOptions);
 
         public ExecutableResult<string> ExecuteAsString()
         {
             try
             {
-                var result = Engine
-                    .Evaluate(Expression)
+                var result = _engine
+                    .Evaluate(_expression)
                     .AsString();
 
                 return ExecutableResult<string>.Success(result);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "unable to evaluate expression: {Expression} → {ErrorMessage}",
-                    Expression,
+                _logger.LogError(e, "unable to evaluate expression: {Expression} → {ErrorMessage}",
+                    _expression,
                     e.Message);
                 return ExecutableResult<string>.Failure(e.Message);
             }
@@ -94,15 +94,15 @@ namespace Flow.Grains.Executables
         {
             try
             {
-                var jsValue = Engine.Evaluate(Expression);
+                var jsValue = _engine.Evaluate(_expression);
                 var result = TypeConverter.ToBoolean(jsValue);
 
                 return ExecutableResult<bool>.Success(result);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "unable to evaluate expression: {Expression} → {ErrorMessage}",
-                    Expression,
+                _logger.LogError(e, "unable to evaluate expression: {Expression} → {ErrorMessage}",
+                    _expression,
                     e.Message);
                 return ExecutableResult<bool>.Failure(e.Message);
             }
