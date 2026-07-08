@@ -15,7 +15,7 @@ namespace Flow.Grains.Infrastructure.Extensions
     {
         public static IServiceCollection AddRuleExecutor(this IServiceCollection services) =>
             services
-                .AddTransient<Engine>()
+                .AddTransient(_ => SandboxedJintEngine.Create())
                 .AddSingleton<Func<string, IExecutable>>(sp =>
                     expression =>
                         new Executable(
