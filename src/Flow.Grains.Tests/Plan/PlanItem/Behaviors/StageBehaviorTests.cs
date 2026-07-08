@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
+using Flow.Grains.Executables;
+using Flow.Grains.Expressions;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan;
@@ -10,6 +13,7 @@ using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanningTable;
 using Flow.Grains.Plan.Sentry;
 using Flow.Grains.Tests.Utils.Helpers;
+using FluentAssertions;
 using Moq;
 using Orleans;
 using Orleans.Streams;
@@ -31,6 +35,110 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             mockMachine.Verify(x => x.Configure(PlanItemState.Available), Times.Once);
             mockMachine.Verify(x => x.Configure(PlanItemState.Active), Times.Once);
+        }
+
+        // Pinning test for the Task.Factory.StartNew(async () => ...) anti-pattern that used to wrap
+        // this branch: StartNew with an async lambda returns Task<Task>, so the inner task (and any
+        // exception it throws) was never awaited/observed by the Task.WhenAll in
+        // HandleEnterAvailableFromCreate. Now that the branch is a directly-awaited call, an exception
+        // thrown while evaluating the ManualActivationRule must propagate out of
+        // HandleEnterAvailableFromCreate instead of vanishing.
+        [Fact]
+        public async Task HandleEnterAvailableFromCreate__When_NoEntryCriteriaAndManualActivationRuleThrows__Then_ExceptionSurfaces()
+        {
+            var caseInstanceId = Guid.NewGuid();
+
+            var stage = new Stage();
+
+            var manualActivationRule = Rules.IsManuallyActivated;
+
+            var pi = new Interfaces.Model.PlanItem
+            {
+                DefinitionRef = stage.Id,
+                ItemControl = new PlanItemControl
+                {
+                    ManualActivationRule = manualActivationRule
+                }
+            };
+
+            var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
+
+            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            mockExpressionGrain
+                .Setup(x => x.ExecuteAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
+                .ThrowsAsync(new InvalidOperationException("boom"));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
+                .Returns(mockExpressionGrain.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost.Setup(x => x.Definition)
+                .Returns(pi);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic) x));
+            mockHost.Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+
+            Func<Task> act = () => (Task) typeof(StageBehavior)
+                .GetMethod("HandleEnterAvailableFromCreate", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[0]);
+
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("boom");
+        }
+
+        // Pinning test for the Task.Factory.StartNew(async () => ...) anti-pattern that used to wrap
+        // the planning table definition inside Define(): the exception thrown by the planning table
+        // grain must now surface through Define()/Task.WhenAll rather than being silently dropped.
+        [Fact]
+        public async Task DefinePlanningTable__When_PlanningTableGrainThrows__Then_ExceptionSurfaces()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var instanceId = ShortGuid.NewGuid();
+
+            var stage = new Stage
+            {
+                PlanningTable = new Interfaces.Model.PlanningTable()
+            };
+
+            var testStore = new TestPlanItemStore(piDef: stage);
+
+            var mockPlanningTableGrain = new Mock<IPlanningTableGrain>();
+            mockPlanningTableGrain
+                .Setup(x => x.Defined())
+                .ThrowsAsync(new InvalidOperationException("boom"));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanningTableGrain>(caseInstanceId, instanceId, null))
+                .Returns(mockPlanningTableGrain.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+            mockHost.Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost.Setup(x => x.InstanceId)
+                .Returns(instanceId);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+
+            Func<Task> act = () => (Task) typeof(StageBehavior)
+                .GetMethod("DefinePlanningTable", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[0]);
+
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("boom");
         }
 
         [Fact]

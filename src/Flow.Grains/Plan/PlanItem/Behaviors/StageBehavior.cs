@@ -76,17 +76,19 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                         // TODO: should raise an event to catalog sentry instance?
                     })),
                 // define planning table
-                Task.Factory.StartNew(async () =>
-                {
-                    if (PlanItemDefinition.PlanningTable == null) return;
+                DefinePlanningTable());
 
-                    var planningTableGrain = Host.GrainFactory
-                        .GetGrain<IPlanningTableGrain>(Host.CaseInstanceId, Host.InstanceId);
+        private async Task DefinePlanningTable()
+        {
+            if (PlanItemDefinition.PlanningTable == null) return;
 
-                    if (await planningTableGrain.Defined()) return;
+            var planningTableGrain = Host.GrainFactory
+                .GetGrain<IPlanningTableGrain>(Host.CaseInstanceId, Host.InstanceId);
 
-                    await planningTableGrain.Define(Host.State.CaseDefinitionId, PlanItemDefinition.PlanningTable);
-                }));
+            if (await planningTableGrain.Defined()) return;
+
+            await planningTableGrain.Define(Host.State.CaseDefinitionId, PlanItemDefinition.PlanningTable);
+        }
 
         // 8.8 - Stage and Task instance transitions
         // ~~~~~
@@ -107,18 +109,20 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // A missing entry criteria(Sentry) is considered TRUE.
                 Host.Definition.EntryCriteria.Any()
                     ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
-                    : Task.Factory.StartNew(async () =>
-                    {
-                        if (await EvaluateManualActivationRule())
-                        {
-                            await StateMachine.FireAsync(PlanItemTransition.Enable);
-                        }
-                        else
-                        {
-                            await StateMachine.FireAsync(PlanItemTransition.Start);
-                        }
-                    })
+                    : EnableOrStart()
                 );
+
+        private async Task EnableOrStart()
+        {
+            if (await EvaluateManualActivationRule())
+            {
+                await StateMachine.FireAsync(PlanItemTransition.Enable);
+            }
+            else
+            {
+                await StateMachine.FireAsync(PlanItemTransition.Start);
+            }
+        }
 
         private Task HandleEnterActiveFromStart() =>
             Task.WhenAll(PlanItemDefinition.PlanItems

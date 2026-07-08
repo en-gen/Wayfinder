@@ -64,20 +64,22 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // A missing entry criteria(Sentry) is considered TRUE.
                 Host.Definition.EntryCriteria.Any()
                     ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
-                    : Task.Factory.StartNew(async () =>
-                    {
-                        if (await EvaluateManualActivationRule())
-                        {
-                            await StateMachine.FireAsync(PlanItemTransition.Enable);
-                        }
-                        else
-                        {
-                            await StateMachine.FireAsync(PlanItemTransition.Start);
-                        }
-                    }),
+                    : EnableOrStart(),
                 PlanItemDefinition.IsBlocking
                     ? SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create)
                     : Task.CompletedTask);
+
+        private async Task EnableOrStart()
+        {
+            if (await EvaluateManualActivationRule())
+            {
+                await StateMachine.FireAsync(PlanItemTransition.Enable);
+            }
+            else
+            {
+                await StateMachine.FireAsync(PlanItemTransition.Start);
+            }
+        }
 
         // Table 5.39 - Task attributes and model associations
         // ~~~~~
