@@ -1,0 +1,16 @@
+<Project>
+
+  <!-- Vulnerable-package gate (work item #12): NuGet Audit runs during restore and
+       fails the build on any direct or transitive package with a known moderate,
+       high, or critical advisory. Enforced everywhere a restore happens - local
+       dev builds and CI alike. Low-severity advisories warn (NU1901) without
+       failing. NU1900 (audit source unreachable) stays a warning so offline
+       builds do not break. -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

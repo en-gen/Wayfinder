@@ -151,6 +151,10 @@ jobs:
           /p:InformationalVersion="$(informationalVersion)"
         displayName: Build ($(version))
 
+      # Vulnerable-package enforcement is restore-time via NuGet Audit
+      # (Directory.Build.props: NU1902-NU1904 as errors, transitive included),
+      # so the Build step above fails on any vulnerable package - no separate
+      # gate step needed (work item #12).
       - script: >
           dotnet test src/Flow.Grains.Tests/Flow.Grains.Tests.csproj
           -c Release --no-build --logger trx
