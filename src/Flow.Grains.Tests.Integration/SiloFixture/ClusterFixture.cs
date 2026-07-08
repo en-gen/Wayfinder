@@ -3,13 +3,12 @@ using System.Net;
 using System.Threading.Tasks;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
+using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using NodaTime;
 using NodaTime.Extensions;
 using Orleans;
@@ -74,22 +73,6 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
             _disposed = true;
         }
 
-        // Same predicate + settings the production silo registers (Flow.Silo/Program.cs): the
-        // XSD-generated CMMN model can't reasonably get member [Id]s, and Newtonsoft JToken is used
-        // internally by the Jint expression bridge. Both the silo and the test client below need
-        // this registered, since a TestCluster's in-process client validates serializer coverage
-        // independently. TypeNameHandling.Auto is required so the polymorphic CMMN model hierarchy
-        // (PlanItemDefinition -> Stage/Milestone/HumanTask/...) round-trips as its concrete subtype
-        // rather than silently collapsing to the statically-declared base type.
-        private static bool IsFallbackSerializedType(Type type) =>
-            (type.Namespace?.StartsWith("Flow.Grains.Interfaces.Model") ?? false) ||
-            typeof(JToken).IsAssignableFrom(type);
-
-        private static JsonSerializerSettings FallbackSerializerSettings() => new JsonSerializerSettings
-        {
-            TypeNameHandling = TypeNameHandling.Auto
-        };
-
         // Mirrors Flow.Silo/Program.cs's ConfigureDevelopmentOrleans + serializer fallback, adapted
         // to the TestCluster's class-based ISiloConfigurator (TestClusterBuilder has no delegate
         // overload equivalent to ISiloHostBuilder's old ConfigureServices(HostBuilderContext, ...)).
@@ -109,9 +92,9 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                     .ConfigureServices(ConfigureServices)
                     .ConfigureLogging(ConfigureLogging);
 
-                silo.Services.AddSerializer(s => s.AddNewtonsoftJsonSerializer(
-                    isSupported: IsFallbackSerializedType,
-                    jsonSerializerSettings: FallbackSerializerSettings()));
+                silo.Services.AddSerializer(s => s.AddJsonSerializer(
+                    isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
+                    jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
             }
 
             private static void ConfigureServices(IServiceCollection services)
@@ -153,9 +136,9 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
             {
                 clientBuilder.AddMemoryStreams("Default");
 
-                clientBuilder.Services.AddSerializer(s => s.AddNewtonsoftJsonSerializer(
-                    isSupported: IsFallbackSerializedType,
-                    jsonSerializerSettings: FallbackSerializerSettings()));
+                clientBuilder.Services.AddSerializer(s => s.AddJsonSerializer(
+                    isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
+                    jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
             }
         }
     }

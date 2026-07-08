@@ -1,14 +1,13 @@
 ﻿using System;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces.Model;
 using Jint;
 using Jint.Native;
 using Jint.Runtime;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
 
 namespace Flow.Grains.Executables
 {
@@ -17,7 +16,7 @@ namespace Flow.Grains.Executables
         private Engine Engine { get; }
         private ILogger Logger { get; }
         private string Expression { get; }
-        private JsonSerializer Serializer { get; }
+        private JsonSerializerOptions SerializerOptions { get; }
 
         public Executable(
             Engine engine,
@@ -30,13 +29,16 @@ namespace Flow.Grains.Executables
             Logger = logger;
             Expression = expression;
 
-            Serializer = new JsonSerializer
+            SerializerOptions = new JsonSerializerOptions
             {
-                Formatting = Formatting.None,
-                ContractResolver = new CamelCasePropertyNamesContractResolver()
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
 
-            Serializer.Converters.Add(new StringEnumConverter());
+            // No naming policy passed here, matching the original `new StringEnumConverter()` (no
+            // NamingStrategy/CamelCaseText): enum members serialize using their raw C# member name
+            // (PascalCase), independent of PropertyNamingPolicy above (which only affects property
+            // names, not enum values).
+            SerializerOptions.Converters.Add(new JsonStringEnumConverter());
         }
 
         public IExecutable WithArgument<TArgument>(TArgument argument)
@@ -44,7 +46,8 @@ namespace Flow.Grains.Executables
         {
             if (argument != null)
             {
-                var instance = new JObjectInstance(Engine, JObject.FromObject(argument.Value, Serializer));
+                var node = ToJsonObject(argument.Value);
+                var instance = new JsonObjectInstance(Engine, node);
                 Engine.SetValue(argument.Name, instance);
             }
 
@@ -55,7 +58,8 @@ namespace Flow.Grains.Executables
         {
             if (values != null)
             {
-                foreach (var property in JObject.FromObject(values, Serializer))
+                var node = ToJsonObject(values);
+                foreach (var property in node)
                 {
                     Engine.SetValue(property.Key, property.Value.AsJsValue(Engine));
                 }
@@ -63,6 +67,9 @@ namespace Flow.Grains.Executables
 
             return this;
         }
+
+        private JsonObject ToJsonObject(object value) =>
+            (JsonObject)JsonSerializer.SerializeToNode(value, value.GetType(), SerializerOptions);
 
         public ExecutableResult<string> ExecuteAsString()
         {

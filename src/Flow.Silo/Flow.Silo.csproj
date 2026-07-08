@@ -10,7 +10,7 @@
     <!-- Microsoft.Extensions.Hosting comes transitively via Microsoft.Orleans.Server / the Web SDK -->
     <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Reminders" Version="10.2.1" />
-    <PackageReference Include="Microsoft.Orleans.Serialization.NewtonsoftJson" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
     <!--
