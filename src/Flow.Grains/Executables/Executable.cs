@@ -45,7 +45,7 @@ namespace Flow.Grains.Executables
             if (argument != null)
             {
                 var instance = new JObjectInstance(Engine, JObject.FromObject(argument.Value, Serializer));
-                Engine.SetValue(argument.Name, new JsValue(instance));
+                Engine.SetValue(argument.Name, instance);
             }
 
             return this;
@@ -69,8 +69,7 @@ namespace Flow.Grains.Executables
             try
             {
                 var result = Engine
-                    .Execute(Expression)
-                    .GetCompletionValue()
+                    .Evaluate(Expression)
                     .AsString();
 
                 return ExecutableResult<string>.Success(result);
@@ -88,9 +87,7 @@ namespace Flow.Grains.Executables
         {
             try
             {
-                var jsValue = Engine
-                    .Execute(Expression)
-                    .GetCompletionValue();
+                var jsValue = Engine.Evaluate(Expression);
                 var result = TypeConverter.ToBoolean(jsValue);
 
                 return ExecutableResult<bool>.Success(result);

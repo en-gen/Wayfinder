@@ -1,11 +1,13 @@
 ﻿using System;
 using Flow.Grains.Interfaces.Model;
+using Orleans;
 
 namespace Flow.Grains.Events
 {
-    [Serializable]
+    [GenerateSerializer]
     public class CaseFileItemTransitionedEvent : BaseEvent
     {
+        [Id(0)]
         public CaseFileItemTransition StandardEvent { get; }
 
         public CaseFileItemTransitionedEvent(string caseFileItemId, string caseFileItemRef, CaseFileItemTransition standardEvent) :

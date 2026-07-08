@@ -1,15 +1,19 @@
 ﻿using System;
 using Flow.Grains.Executables;
 using Flow.Grains.Plan.PlanItem.Events;
+using Orleans;
 
 namespace Flow.Grains.Plan.PlanItem.Behaviors.Stores
 {
-    [Serializable]
+    [GenerateSerializer]
     public class TimerEventListenerBehaviorStore
     {
+        [Id(0)]
         public DateTime? TimerStart { get; private set; }
 
+        [Id(1)]
         public Iso8601 TimerSchedule { get; private set; }
+        [Id(2)]
         public string TimerScheduleEvaluationError { get; private set; }
 
         public void Apply(TimerStartTriggerOccurred @event)

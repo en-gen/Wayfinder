@@ -6,7 +6,6 @@ using Flow.Grains.Plan.Role;
 using Flow.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
-using Orleans.Hosting;
 using Xunit;
 
 namespace Flow.Grains.Tests.Integration.Plan.Role
@@ -14,12 +13,10 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
     [Collection(ClusterCollection.Name)]
     public class RoleGrainTests
     {
-        private ISiloHost SiloHost { get; }
         private IClusterClient ClusterClient { get; }
 
         public RoleGrainTests(ClusterFixture fixture)
         {
-            SiloHost = fixture.SiloHost;
             ClusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");

@@ -10,7 +10,6 @@ using Flow.Grains.Tests.Integration.SiloFixture;
 using Flow.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
-using Orleans.Hosting;
 using Orleans.Streams;
 using Xunit;
 
@@ -19,12 +18,10 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
     [Collection(ClusterCollection.Name)]
     public class SentryGrainTests
     {
-        private ISiloHost SiloHost { get; }
         private IClusterClient ClusterClient { get; }
 
         public SentryGrainTests(ClusterFixture fixture)
         {
-            SiloHost = fixture.SiloHost;
             ClusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");

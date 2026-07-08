@@ -2,12 +2,16 @@
 using System.Runtime.Serialization;
 using Flow.Grains.Plan.Case.Events;
 using Flow.Grains.Plan.PlanItem.Definitions;
+using Orleans;
 
 namespace Flow.Grains.Plan.Case
 {
+    [GenerateSerializer]
     public class CaseDefinitionStore : BaseStore
     {
+        [Id(0)]
         public Interfaces.Model.Case Definition { get; private set; }
+        [Id(1)]
         public IDictionary<string, DefinitionGraphNode> DefinitionIndex { get; private set; }
 
         [IgnoreDataMember]

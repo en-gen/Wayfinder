@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using Orleans;
 
 namespace Flow.Grains.Interfaces.Plan.PlanItem.Behaviors
 {
-    [Serializable]
+    [GenerateSerializer]
     public class StageBehaviorSnapshot
     {
         // PlanItemDefinitionId => PlanItemInstanceId => Repetition
+        [Id(0)]
         public IDictionary<string, IDictionary<string, int>> Children { get; set; }
     }
 }

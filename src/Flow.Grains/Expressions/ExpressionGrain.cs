@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Executables;
 using Flow.Grains.Interfaces.Model;
@@ -24,10 +25,10 @@ namespace Flow.Grains.Expressions
             Logger = logger;
         }
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _caseId = this.GetPrimaryKey();
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public async Task<ExecutableResult<bool>> ExecuteAsBool(string contextRef, Expression expression)

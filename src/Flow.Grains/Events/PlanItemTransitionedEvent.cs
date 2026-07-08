@@ -1,17 +1,23 @@
 ﻿using System;
 using Flow.Grains.Interfaces.Model;
+using Orleans;
 
 namespace Flow.Grains.Events
 {
-    [Serializable]
+    [GenerateSerializer]
     public class PlanItemTransitionedEvent : BaseEvent
     {
+        [Id(0)]
         public string SourceInstanceId { get; }
+        [Id(1)]
         public PlanItemTransition StandardEvent { get; }
 
+        [Id(2)]
         public PlanItemState Source { get; }
+        [Id(3)]
         public PlanItemState Destination { get; }
 
+        [Id(4)]
         public string ExitCriterionRef { get; }
 
         public PlanItemTransitionedEvent(

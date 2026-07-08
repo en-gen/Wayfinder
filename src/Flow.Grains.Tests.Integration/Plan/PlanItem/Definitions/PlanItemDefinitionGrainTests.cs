@@ -7,7 +7,6 @@ using Flow.Grains.Plan.PlanItem.Definitions;
 using Flow.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
-using Orleans.Hosting;
 using Xunit;
 
 namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
@@ -15,12 +14,10 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
     [Collection(ClusterCollection.Name)]
     public class PlanItemDefinitionGrainTests
     {
-        private ISiloHost SiloHost { get; }
         private IClusterClient ClusterClient { get; }
 
         public PlanItemDefinitionGrainTests(ClusterFixture fixture)
         {
-            SiloHost = fixture.SiloHost;
             ClusterClient = fixture.ClusterClient;
         }
 

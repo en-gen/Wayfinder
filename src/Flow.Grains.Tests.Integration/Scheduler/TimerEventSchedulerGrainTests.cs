@@ -13,7 +13,6 @@ using FluentAssertions;
 using NodaTime;
 using NodaTime.Text;
 using Orleans;
-using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
@@ -24,12 +23,10 @@ namespace Flow.Grains.Tests.Integration.Scheduler
     [Collection(ClusterCollection.Name)]
     public class TimerEventSchedulerGrainTests
     {
-        private ISiloHost SiloHost { get; }
         private IClusterClient ClusterClient { get; }
 
         public TimerEventSchedulerGrainTests(ClusterFixture fixture)
         {
-            SiloHost = fixture.SiloHost;
             ClusterClient = fixture.ClusterClient;
         }
 
@@ -42,8 +39,9 @@ namespace Flow.Grains.Tests.Integration.Scheduler
 
             var schedulerGrain = ClusterClient.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId);
 
+            var streamId = StreamId.Create((string)planItemInstanceId, caseInstanceId);
             await ClusterClient.GetStreamProvider("Default")
-                .GetStream<TimerTickedEvent>(caseInstanceId, planItemInstanceId)
+                .GetStream<TimerTickedEvent>(streamId)
                 .SubscribeAsync((@event, token) =>
                 {
                     ticks.Add(@event.FireTime);

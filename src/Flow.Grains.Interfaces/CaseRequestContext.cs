@@ -7,10 +7,11 @@ namespace Flow.Grains.Interfaces
 {
     public static class CaseRequestContext
     {
-        static CaseRequestContext()
-        {
-            RequestContext.PropagateActivityId = true;
-        }
+        // RequestContext.PropagateActivityId was removed from modern Orleans (it relied on
+        // System.Diagnostics.Trace.CorrelationManager.ActivityId, which NETStandard doesn't
+        // support). Cross-grain correlation now flows through System.Diagnostics.Activity;
+        // see CmmnElementGrain/CaseDefinitionGrain, which log Activity.Current?.Id instead of
+        // RequestContext.ActivityId.
 
         private const string TenantIdKey = "TENANT_ID";
         private const string UserIdKey = "USER_ID";

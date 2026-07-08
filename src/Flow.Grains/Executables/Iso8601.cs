@@ -1,19 +1,26 @@
 ﻿using System;
 using System.Linq;
 using NodaTime.Text;
+using Orleans;
 
 namespace Flow.Grains.Executables
 {
-    [Serializable]
+    [GenerateSerializer]
     public class Iso8601
     {
+        [Id(0)]
         public string RawValue { get; }
-        
+
+        [Id(1)]
         public bool HasRepetitions { get; }
+        [Id(2)]
         public int? Repetitions { get; }
-        
+
+        [Id(3)]
         public DateTime? Start { get;  }
+        [Id(4)]
         public DateTime? End { get; }
+        [Id(5)]
         public TimeSpan? Duration { get; }
 
         public Iso8601(string iso8601)

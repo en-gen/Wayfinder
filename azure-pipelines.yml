@@ -13,9 +13,6 @@
 # release/1.0.0 -> 1.0.0-rc.<n>, PR -> 1.0.0-PullRequest<id>.<n>.
 # At GA, tag mainline `Case.Flow-1.0.0`; main then emits clean 1.0.0 and
 # develop advances to 1.1.0-develop.<n> automatically.
-#
-# netcoreapp3.1 is EOL; tests run on a modern runtime via DOTNET_ROLL_FORWARD.
-# Remove the roll-forward once the .NET 8 retarget (roadmap M0) lands.
 
 trigger:
   branches:
@@ -129,15 +126,14 @@ jobs:
       assemblySemVer: $[dependencies.Version.outputs['publish.AssemblySemVer']]
       assemblySemFileVer: $[dependencies.Version.outputs['publish.AssemblySemFileVer']]
       informationalVersion: $[dependencies.Version.outputs['publish.InformationalVersion']]
-      DOTNET_ROLL_FORWARD: LatestMajor
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
     steps:
       - task: UseDotNet@2
-        displayName: Install .NET SDK 8.x
+        displayName: Install .NET SDK 10.x
         inputs:
           packageType: sdk
-          version: 8.x
+          version: 10.x
 
       - script: >
           dotnet build src/CaseFlow.sln -c Release -v minimal

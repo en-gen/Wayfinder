@@ -1,4 +1,5 @@
 ﻿using System;
+using Orleans;
 
 namespace Flow.Grains.Interfaces
 {
@@ -6,6 +7,7 @@ namespace Flow.Grains.Interfaces
     /// Represents a globally unique identifier (GUID) with a
     /// shorter string value. Sguid
     /// </summary>
+    [GenerateSerializer]
     public struct ShortGuid
     {
         #region Static
@@ -20,7 +22,9 @@ namespace Flow.Grains.Interfaces
 
         #region Fields
 
+        [Id(0)]
         Guid _guid;
+        [Id(1)]
         string _value;
 
         #endregion

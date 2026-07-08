@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces;
@@ -40,10 +41,10 @@ namespace Flow.Grains.Plan.CmmnElement
             LogContext = new Dictionary<string, object>();
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _caseInstanceId = this.GetPrimaryKey(out _address);
-            
+
             var chunks = _address.Split('.');
             _scope = chunks.Length > 0
                 ? string.Join('.', chunks.Take(chunks.Length - 1))
@@ -56,15 +57,15 @@ namespace Flow.Grains.Plan.CmmnElement
             LogContext["TenantId"] = CaseRequestContext.TenantId;
             LogContext["UserId"] = CaseRequestContext.UserId;
             LogContext["@UserRoles"] = CaseRequestContext.UserRoles;
-            LogContext["CorrelationId"] = RequestContext.ActivityId;
+            LogContext["CorrelationId"] = System.Diagnostics.Activity.Current?.Id;
             LogContext["CaseInstanceId"] = _caseInstanceId;
             LogContext["ElementAddress"] = _address;
             LogContext["ElementScope"] = _scope;
             LogContext["ElementParentId"] = _parentId;
             LogContext["ElementInstanceId"] = _instanceId;
             LogContext["Element"] = typeof(TDefinition).Name;
-            
-            await base.OnActivateAsync();
+
+            await base.OnActivateAsync(cancellationToken);
 
             if (TentativeState.Defined)
             {
@@ -90,7 +91,7 @@ namespace Flow.Grains.Plan.CmmnElement
         }
         
         private IAsyncStream<TEvent> GetCaseEventStream<TEvent>(string eventSourceRef) =>
-            GetStreamProvider("Default").GetCaseEventStream<TEvent>(_caseInstanceId, eventSourceRef);
+            this.GetStreamProvider("Default").GetCaseEventStream<TEvent>(_caseInstanceId, eventSourceRef);
 
         protected async Task SubscribeTo<TEvent>(
             string eventSourceId,

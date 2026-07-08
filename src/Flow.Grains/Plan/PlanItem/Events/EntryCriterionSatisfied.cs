@@ -1,8 +1,9 @@
 ﻿using System;
+using Orleans;
 
 namespace Flow.Grains.Plan.PlanItem.Events
 {
-    [Serializable]
+    [GenerateSerializer]
     public class EntryCriterionSatisfied : CriterionSatisfied
     {
     }

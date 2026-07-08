@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Expressions;
@@ -43,9 +44,9 @@ namespace Flow.Grains.Plan.Sentry
         {
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
 
             if (TentativeState.Defined)
             {

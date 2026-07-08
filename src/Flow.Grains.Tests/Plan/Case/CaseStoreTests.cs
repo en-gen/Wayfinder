@@ -51,7 +51,6 @@ namespace Flow.Grains.Tests.Plan.Case
         public void Apply__Given_CaseCreated__Then_UpdateState()
         {
             var caseDefId = ShortGuid.NewGuid();
-            var planItem = new Interfaces.Model.PlanItem();
             var casePlanModel = new Stage();
             var @case = new Interfaces.Model.Case
             {
@@ -70,20 +69,20 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Created.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Created);
+                .And.Be(@event.Created);
 
             subject.Updated.Should().BeNull();
 
             subject.Defined.Should().BeTrue();
 
             subject.CaseDefinitionId.Should().NotBeEmpty()
-                .And.IsSameOrEqualTo(caseDefId);
+                .And.Be(caseDefId);
 
             subject.Definition.Should().NotBeNull()
-                .And.IsSameOrEqualTo(planItem);
+                .And.Be(@case);
 
             subject.PlanItemDefinition.Should().NotBeNull()
-                .And.IsSameOrEqualTo(casePlanModel);
+                .And.Be(casePlanModel);
 
             subject.BehaviorExtension.Should().NotBeNull()
                 .And.BeOfType<StageBehaviorStore>();
@@ -106,7 +105,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.PlanItemState.Should().Be(@event.Destination);
 
@@ -133,7 +132,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.EntryCriterionStore.State.Should().HaveFlag(CriterionState.Satisfied);
             if (onPartOccurred)
@@ -168,7 +167,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.ExitCriterionStore.State.Should().HaveFlag(CriterionState.Satisfied);
             if (onPartOccurred)
@@ -198,7 +197,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.Required.Should().Be(ruleResult);
         }
@@ -213,7 +212,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
         }
 
         [Fact]
@@ -226,7 +225,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
         }
 
         [Fact]
@@ -247,7 +246,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.ParentSuspendState.Should().Be(preSuspendedState);
         }
@@ -273,7 +272,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.ParentSuspendState.Should().BeNull();
         }
@@ -288,7 +287,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
         }
 
         [Fact]
@@ -301,7 +300,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.UserCompletable.Should().BeTrue();
         }
@@ -316,7 +315,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
         }
 
         [Fact]
@@ -329,7 +328,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
             subject.Repeated.Should().BeTrue();
         }
 
@@ -343,7 +342,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
         }
 
         [Theory, AutoData]
@@ -368,7 +367,7 @@ namespace Flow.Grains.Tests.Plan.Case
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
             subject.BehaviorExtension.Should().BeOfType<StageBehaviorStore>();
 
             var stageStore = subject.BehaviorExtension.As<StageBehaviorStore>();

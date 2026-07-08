@@ -1,17 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans;
 
 namespace Flow.Grains.Plan.PlanItem.Definitions
 {
-    [Serializable]
+    [GenerateSerializer]
     public class DefinitionGraphNode
     {
         public string Scope => $"{Parent?.Scope}{(string.IsNullOrEmpty(Parent?.Scope) ? "" : ".")}{Parent?.Id}";
         public string Address => $"{Scope}{(string.IsNullOrEmpty(Scope) ? "" : ".")}{Id}";
+        [Id(0)]
         public string Id { get; }
 
+        [Id(1)]
         public DefinitionGraphNode Parent { get; protected set; }
+        [Id(2)]
         private ICollection<DefinitionGraphNode> _children;
         public IEnumerable<DefinitionGraphNode> Children => _children?.ToArray();
 
