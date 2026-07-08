@@ -1,9 +1,10 @@
 ﻿using System;
 using Flow.Grains.Executables;
+using Orleans;
 
 namespace Flow.Grains.Plan.PlanItem.Events
 {
-    [Serializable]
+    [GenerateSerializer]
     public class TimerExpressionEvaluated : RuleEvaluated<Iso8601>
     {
     }

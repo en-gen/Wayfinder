@@ -8,7 +8,6 @@ using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
-using Orleans.Hosting;
 using Xunit;
 
 namespace Flow.Grains.Tests.Integration.Plan.PlanItem
@@ -16,12 +15,10 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
     [Collection(ClusterCollection.Name)]
     public class PlanItemGrainTests
     {
-        private ISiloHost SiloHost { get; }
         private IClusterClient ClusterClient { get; }
 
         public PlanItemGrainTests(ClusterFixture fixture)
         {
-            SiloHost = fixture.SiloHost;
             ClusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
@@ -37,7 +34,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
             var result = await subject.GetSnapshot();
 
             result.Should().NotBeNull();
-            result.PlanItemState.Should().BeEquivalentTo(PlanItemState.Uninitialized);
+            result.PlanItemState.Should().Be(PlanItemState.Uninitialized);
         }
 
         // TODO: these tests need to define the plan item first in order for StateMachine to be initialized
@@ -147,7 +144,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
             var result = await subject.GetSnapshot();
 
             result.Should().NotBeNull();
-            result.PlanItemState.Should().BeEquivalentTo(PlanItemState.Available);
+            result.PlanItemState.Should().Be(PlanItemState.Available);
         }
     }
 }

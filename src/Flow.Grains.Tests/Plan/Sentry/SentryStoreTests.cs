@@ -22,7 +22,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.OccurredOnParts.Should().Contain(@event.OnPart);
         }
@@ -37,7 +37,7 @@ namespace Flow.Grains.Tests.Plan.Sentry
             subject.Apply(@event);
 
             subject.Updated.Should().HaveValue()
-                .And.IsSameOrEqualTo(@event.Updated);
+                .And.Be(@event.Updated);
 
             subject.Satisfied.Should().BeTrue();
         }

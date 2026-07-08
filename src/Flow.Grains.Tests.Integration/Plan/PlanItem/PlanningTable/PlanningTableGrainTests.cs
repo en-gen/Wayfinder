@@ -8,7 +8,6 @@ using Flow.Grains.Tests.Integration.SiloFixture;
 using Flow.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
-using Orleans.Hosting;
 using Xunit;
 
 namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
@@ -16,12 +15,10 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
     [Collection(ClusterCollection.Name)]
     public class PlanningTableGrainTests
     {
-        private ISiloHost SiloHost { get; }
         private IClusterClient ClusterClient { get; }
 
         public PlanningTableGrainTests(ClusterFixture fixture)
         {
-            SiloHost = fixture.SiloHost;
             ClusterClient = fixture.ClusterClient;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");

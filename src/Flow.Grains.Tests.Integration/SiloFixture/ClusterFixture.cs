@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -7,19 +7,20 @@ using AutoMapper;
 using Flow.Grains.Infrastructure.AutoMapper;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using NodaTime;
 using NodaTime.Extensions;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.TestingHost;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -30,81 +31,33 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
 {
     public class ClusterFixture : IDisposable, IAsyncLifetime
     {
-        public ISiloHost SiloHost { get; private set; }
+        public TestCluster Cluster { get; private set; }
         public IClusterClient ClusterClient { get; private set; }
 
         private bool _disposed = false;
 
-        public async Task InitializeAsync()
+        public Task InitializeAsync()
         {
-            SiloHost = new SiloHostBuilder()
-                .UseLocalhostClustering()
-                
-                .Configure<ClusterOptions>(options =>
-                {
-                    options.ClusterId = "integration";
-                    options.ServiceId = "Case.Flow";
-                })
+            var builder = new TestClusterBuilder();
 
-                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                
-                .ConfigureServices(ConfigureServices)
-                .ConfigureLogging(ConfigureLogging)
+            builder.Options.ClusterId = "integration";
+            builder.Options.ServiceId = "Case.Flow";
 
-                .AddMemoryGrainStorageAsDefault() // grain state
-                .AddLogStorageBasedLogConsistencyProvider() // journaled grain
-                .AddMemoryGrainStorage("PubSubStore") // stream storage
-                .AddSimpleMessageStreamProvider("Default", options => options.FireAndForgetDelivery = true) // cluster stream provider
-                .UseInMemoryReminderService()
+            builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
+            builder.AddClientBuilderConfigurator<TestClientConfigurator>();
 
-                .ConfigureApplicationParts(parts => parts
-                    .AddApplicationPart(typeof(IPlanItemInternalGrain).Assembly)
-                    .WithReferences())
+            Cluster = builder.Build();
+            Cluster.Deploy();
 
-                .UseSiloUnobservedExceptionsHandler()
-                
-                .Build();
+            ClusterClient = Cluster.Client;
 
-            await SiloHost.StartAsync();
-
-            ClusterClient = SiloHost.Services.GetRequiredService<IClusterClient>();
-
-            await ClusterClient.Connect();
+            return Task.CompletedTask;
         }
 
-        public async Task DisposeAsync()
+        public Task DisposeAsync()
         {
-            await ClusterClient.Close();
-            await SiloHost.StopAsync();
-        }
-
-        private static void ConfigureServices(HostBuilderContext ctx, IServiceCollection services)
-        {
-            services
-                .AddSingleton<IClock>(SystemClock.Instance.InUtc())
-                .AddRuleExecutor()
-                .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
-                .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
-                .AddAutoMapper(cfg => cfg.AddProfile<CaseFlowProfile>(), Enumerable.Empty<Assembly>())
-                .AddQuartz(QuartzSchedulerConfig.Volatile);
-        }
-
-        private static void ConfigureLogging(HostBuilderContext ctx, ILoggingBuilder logging)
-        {
-            var levelSwitch = new LoggingLevelSwitch
-            {
-                MinimumLevel = LogEventLevel.Debug
-            };
-
-            logging.AddSerilog(new LoggerConfiguration()
-                .MinimumLevel.ControlledBy(levelSwitch)
-                .Enrich.FromLogContext()
-                .Enrich.WithExceptionDetails()
-                .WriteTo.Seq(
-                    "http://localhost:5341",
-                    controlLevelSwitch: levelSwitch
-                )
-                .CreateLogger());
+            Cluster.StopAllSilos();
+            return Task.CompletedTask;
         }
 
         public void Dispose()
@@ -123,6 +76,92 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
             }
 
             _disposed = true;
+        }
+
+        // Same predicate + settings the production silo registers (Flow.Silo/Program.cs): the
+        // XSD-generated CMMN model can't reasonably get member [Id]s, and Newtonsoft JToken is used
+        // internally by the Jint expression bridge. Both the silo and the test client below need
+        // this registered, since a TestCluster's in-process client validates serializer coverage
+        // independently. TypeNameHandling.Auto is required so the polymorphic CMMN model hierarchy
+        // (PlanItemDefinition -> Stage/Milestone/HumanTask/...) round-trips as its concrete subtype
+        // rather than silently collapsing to the statically-declared base type.
+        private static bool IsFallbackSerializedType(Type type) =>
+            (type.Namespace?.StartsWith("Flow.Grains.Interfaces.Model") ?? false) ||
+            typeof(JToken).IsAssignableFrom(type);
+
+        private static JsonSerializerSettings FallbackSerializerSettings() => new JsonSerializerSettings
+        {
+            TypeNameHandling = TypeNameHandling.Auto
+        };
+
+        // Mirrors Flow.Silo/Program.cs's ConfigureDevelopmentOrleans + serializer fallback, adapted
+        // to the TestCluster's class-based ISiloConfigurator (TestClusterBuilder has no delegate
+        // overload equivalent to ISiloHostBuilder's old ConfigureServices(HostBuilderContext, ...)).
+        private class TestSiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder silo)
+            {
+                silo
+                    .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+
+                    .AddMemoryGrainStorageAsDefault() // grain state
+                    .AddLogStorageBasedLogConsistencyProvider() // journaled grain
+                    .AddMemoryGrainStorage("PubSubStore") // stream storage
+                    .AddMemoryStreams("Default") // cluster stream provider
+                    .UseInMemoryReminderService()
+
+                    .ConfigureServices(ConfigureServices)
+                    .ConfigureLogging(ConfigureLogging);
+
+                silo.Services.AddSerializer(s => s.AddNewtonsoftJsonSerializer(
+                    isSupported: IsFallbackSerializedType,
+                    jsonSerializerSettings: FallbackSerializerSettings()));
+            }
+
+            private static void ConfigureServices(IServiceCollection services)
+            {
+                services
+                    .AddSingleton<IClock>(SystemClock.Instance.InUtc())
+                    .AddRuleExecutor()
+                    .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
+                    .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
+                    .AddAutoMapper(cfg => cfg.AddProfile<CaseFlowProfile>(), Enumerable.Empty<Assembly>())
+                    .AddQuartz(QuartzSchedulerConfig.Volatile);
+            }
+
+            private static void ConfigureLogging(ILoggingBuilder logging)
+            {
+                var levelSwitch = new LoggingLevelSwitch
+                {
+                    MinimumLevel = LogEventLevel.Debug
+                };
+
+                logging.AddSerilog(new LoggerConfiguration()
+                    .MinimumLevel.ControlledBy(levelSwitch)
+                    .Enrich.FromLogContext()
+                    .Enrich.WithExceptionDetails()
+                    .WriteTo.Seq(
+                        "http://localhost:5341",
+                        controlLevelSwitch: levelSwitch
+                    )
+                    .CreateLogger());
+            }
+        }
+
+        // TestCluster's in-process client independently validates serializer coverage for every
+        // type reachable from grain interfaces, so it needs the same fallback registration as the
+        // silo above - without this, client-side calls that touch CMMN model types throw
+        // CodecNotFoundException even though the silo itself is configured correctly.
+        private class TestClientConfigurator : IClientBuilderConfigurator
+        {
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.AddMemoryStreams("Default");
+
+                clientBuilder.Services.AddSerializer(s => s.AddNewtonsoftJsonSerializer(
+                    isSupported: IsFallbackSerializedType,
+                    jsonSerializerSettings: FallbackSerializerSettings()));
+            }
         }
     }
 }

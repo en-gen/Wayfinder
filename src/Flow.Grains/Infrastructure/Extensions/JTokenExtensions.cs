@@ -13,10 +13,10 @@ namespace Flow.Grains.Infrastructure.Extensions
             switch (token.Type)
             {
                 case JTokenType.Array:
-                    return engine.Array.Construct(token.Select(x => x.AsJsValue(engine)).ToArray());
+                    return engine.Intrinsics.Array.Construct(token.Select(x => x.AsJsValue(engine)).ToArray());
 
                 case JTokenType.Boolean:
-                    return new JsValue(token.Value<bool>());
+                    return token.Value<bool>();
 
                 case JTokenType.Bytes:
                     throw new NotSupportedException();
@@ -28,16 +28,19 @@ namespace Flow.Grains.Infrastructure.Extensions
                     throw new NotSupportedException();
 
                 case JTokenType.Date:
-                    return engine.Date.Construct(DateTime.Parse(token.ToString()));
+                    // Intrinsics has no Date constructor accessor in Jint 4.x; go through the JS
+                    // engine itself, which always exposes the Date constructor.
+                    var epochMillis = new DateTimeOffset(DateTime.Parse(token.ToString())).ToUnixTimeMilliseconds();
+                    return engine.Evaluate($"new Date({epochMillis})");
 
                 case JTokenType.Float:
-                    return new JsValue(token.Value<float>());
+                    return (double)token.Value<float>();
 
                 case JTokenType.Guid:
-                    return new JsValue(token.Value<Guid>().ToString());
+                    return token.Value<Guid>().ToString();
 
                 case JTokenType.Integer:
-                    return new JsValue(token.Value<int>());
+                    return token.Value<int>();
 
                 case JTokenType.None:
                     throw new NotSupportedException();
@@ -55,7 +58,7 @@ namespace Flow.Grains.Infrastructure.Extensions
                     throw new NotSupportedException();
 
                 case JTokenType.String:
-                    return new JsValue(token.Value<string>());
+                    return token.Value<string>();
 
                 case JTokenType.TimeSpan:
                     throw new NotSupportedException();

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.Case.Events;
@@ -27,14 +28,14 @@ namespace Flow.Grains.Plan.Case
             LogContext = new Dictionary<string, object>();
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _tenantId = this.GetPrimaryKey(out _caseDefinitionId);
 
-            LogContext["CorrelationId"] = RequestContext.ActivityId;
+            LogContext["CorrelationId"] = System.Diagnostics.Activity.Current?.Id;
             LogContext["Element"] = typeof(Interfaces.Model.Case).Name;
 
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
 
             if (State.Defined)
             {

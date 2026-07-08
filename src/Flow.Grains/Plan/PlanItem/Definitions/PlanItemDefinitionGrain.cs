@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Orleans;
@@ -12,12 +13,12 @@ namespace Flow.Grains.Plan.PlanItem.Definitions
         private string _scope;
         private string _id;
 
-        public override Task OnActivateAsync()
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _tenantId = this.GetPrimaryKey(out var address);
             _scope = address.Substring(0, address.LastIndexOf('.'));
             _id = address.Split('.').Last();
-            return base.OnActivateAsync();
+            return base.OnActivateAsync(cancellationToken);
         }
 
         public Task Define(PlanItemDefinition planItemDefinition)

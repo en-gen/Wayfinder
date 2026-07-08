@@ -1,8 +1,13 @@
-﻿namespace Flow.Grains.Executables
+﻿using Orleans;
+
+namespace Flow.Grains.Executables
 {
+    [GenerateSerializer]
     public class ExecutableResult<TResult>
     {
+        [Id(0)]
         public TResult Value { get; }
+        [Id(1)]
         public string Message { get; }
 
         public bool IsError => !string.IsNullOrWhiteSpace(Message);

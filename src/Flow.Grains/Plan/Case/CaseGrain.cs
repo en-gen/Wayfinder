@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AutoMapper;
 using Flow.Grains.Interfaces;
@@ -65,9 +66,9 @@ namespace Flow.Grains.Plan.Case
             Mapper = mapper;
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
 
             if (State.Defined)
             {

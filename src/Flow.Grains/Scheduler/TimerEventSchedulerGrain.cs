@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Executables;
 using Microsoft.Extensions.Logging;
@@ -25,22 +26,22 @@ namespace Flow.Grains.Scheduler
             Logger = logger;
         }
 
-        public override async Task OnActivateAsync()
+        public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             _caseInstanceId = this.GetPrimaryKey();
 
-            await base.OnActivateAsync();
+            await base.OnActivateAsync(cancellationToken);
 
             // based on default grain inactivity limit of 2 hours
             var reminderPeriod = TimeSpan.FromMinutes(118);
 
-            await RegisterOrUpdateReminder(
+            await this.RegisterOrUpdateReminder(
                 $"Keepalive_{_caseInstanceId}",
                 reminderPeriod,
                 reminderPeriod);
 
             _scheduler = await SchedulerFactory.GetScheduler();
-            
+
             await _scheduler.Start();
         }
 
@@ -99,9 +100,9 @@ namespace Flow.Grains.Scheduler
             return Task.CompletedTask;
         }
 
-        public override Task OnDeactivateAsync()
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            Logger.LogWarning("Scheduler shutting down");
+            Logger.LogWarning("Scheduler shutting down: {Reason}", reason);
             return _scheduler.Shutdown(false);
         }
     }

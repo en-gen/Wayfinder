@@ -1,11 +1,14 @@
 ﻿using System;
+using Orleans;
 
 namespace Flow.Grains.Events
 {
-    [Serializable]
+    [GenerateSerializer]
     public class PlanItemRepetitionCriteriaMetEvent : BaseEvent
     {
+        [Id(0)]
         public string PlanItemInstanceId { get; }
+        [Id(1)]
         public int CurrentRepetition { get; }
 
         public PlanItemRepetitionCriteriaMetEvent(

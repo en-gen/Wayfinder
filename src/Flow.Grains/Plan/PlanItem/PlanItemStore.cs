@@ -4,33 +4,49 @@ using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.CmmnElement.Events;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
+using Orleans;
 
 namespace Flow.Grains.Plan.PlanItem
 {
-    [Serializable]
+    [GenerateSerializer]
     public class PlanItemStore : CmmnElementStore<Interfaces.Model.PlanItem>, IBehaviorStore
     {
+        [Id(0)]
         public PlanItemDefinition PlanItemDefinition { get; private set; }
 
+        [Id(1)]
         public bool UserCompletable { get; private set; }
 
+        [Id(2)]
         public bool Required { get; private set; }
+        [Id(3)]
         public string RequiredEvaluationError { get; private set; }
 
+        [Id(4)]
         public bool Repeatable { get; private set; }
+        [Id(5)]
         public string RepeatableEvaluationError { get; private set; }
+        [Id(6)]
         public bool Repeated { get; private set; }
+        [Id(7)]
         public int Repetition { get; private set; }
 
+        [Id(8)]
         public bool ManuallyActivatable { get; private set; }
+        [Id(9)]
         public string ManuallyActivatableEvaluationError { get; private set; }
 
+        [Id(10)]
         public PlanItemState PlanItemState { get; private set; }
+        [Id(11)]
         public PlanItemState? ParentSuspendState { get; private set; }
 
+        [Id(12)]
         public CriterionStore EntryCriterionStore { get; } = new CriterionStore();
+        [Id(13)]
         public CriterionStore ExitCriterionStore { get; } = new CriterionStore();
 
+        [Id(14)]
         public object BehaviorExtension { get; private set; }
         
         public void Apply(Defined @event)

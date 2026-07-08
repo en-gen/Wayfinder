@@ -4,6 +4,7 @@ using Flow.Grains.Events;
 using Flow.Grains.Interfaces;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Quartz;
 
@@ -30,7 +31,8 @@ namespace Flow.Grains.Scheduler
                 Logger.LogInformation("{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | timer tick occurred");
             }
 
-            return StreamProvider.GetStream<TimerTickedEvent>(caseInstanceId, elementInstanceId)
+            var streamId = StreamId.Create((string)elementInstanceId, caseInstanceId);
+            return StreamProvider.GetStream<TimerTickedEvent>(streamId)
                 .OnNextAsync(new TimerTickedEvent(
                     context.PreviousFireTimeUtc,
                     context.ScheduledFireTimeUtc,
