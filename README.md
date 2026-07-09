@@ -10,15 +10,18 @@ Implemented today:
 
 - Case plan model, stage, and task lifecycles (state machines per CMMN §8.4)
 - Human tasks, milestones, and event listeners (timer, user)
-- Sentry/criterion evaluation — entry and exit criteria, onPart AND-semantics
+- Sentry/criterion evaluation — entry and exit criteria, onPart AND-semantics, ifPart conditions over case data
+- Case file items (§8.3) — full lifecycle, JSON content, and case-file events that drive sentries and timer start-triggers
 - Planning tables, discretionary items, and applicability rules (risk-based tailoring)
 - Manual activation, repetition, and required rules
+- Expression evaluation with case-file context — conditions like `value.amount > 100` evaluate over the referenced case file item (sandboxed Jint)
 - Multi-tenant case isolation via Orleans compound grain keys
 - Event sourcing via Orleans JournaledGrain — a full audit trail by construction
 
 Known gaps (tracked as work items; see the roadmap):
 
-- Expression evaluation runs without case-file context yet — data-driven rule conditions degrade to defaults (M1, in progress)
+- `ICaseGrain.Create()` does not yet instantiate the case plan model's plan items (behavior stub — Bug #55); tests drive plan-item grains directly
+- IfPart-only sentries (no onParts) never evaluate, and multi-onPart sentries don't re-arm after a false ifPart (work item #18)
 - ProcessTask / CaseTask / DecisionTask exist in the model but have no runtime behaviors
 - No REST API yet — clients use the Orleans grain interfaces (M2)
 - No production deployment configuration (localhost clustering + volatile timers; M2)
