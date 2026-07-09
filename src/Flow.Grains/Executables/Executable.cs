@@ -68,6 +68,16 @@ namespace Flow.Grains.Executables
             return this;
         }
 
+        // See IExecutable.WithJsonArgument for why this does not route through ToJsonObject.
+        public IExecutable WithJsonArgument(string name, JsonNode value)
+        {
+            if (string.IsNullOrWhiteSpace(name)) throw new ArgumentNullException(nameof(name));
+
+            _engine.SetValue(name, value.AsJsValue(_engine));
+
+            return this;
+        }
+
         private JsonObject ToJsonObject(object value) =>
             (JsonObject)JsonSerializer.SerializeToNode(value, value.GetType(), _serializerOptions);
 

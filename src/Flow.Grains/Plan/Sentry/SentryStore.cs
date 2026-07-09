@@ -36,5 +36,22 @@ namespace Flow.Grains.Plan.Sentry
             Updated = @event.Updated;
             Satisfied = true;
         }
+
+        // 8.5 - Sentry
+        // ~~~~~
+        // All OnParts had occurred (the AND-join was complete) when this was raised, but the IfPart
+        // evaluated false, so the sentry as a whole is not satisfied. Clearing OccurredOnPartIds
+        // here - rather than leaving them recorded forever - is what lets a SUBSEQUENT occurrence of
+        // an OnPart (e.g. a second CaseFileItemTransition.Update on the same CaseFileItem) retrigger
+        // the AND-join and IfPart re-check per 8.5's "must re-evaluate on subsequent relevant events."
+        // Without this, HandleOnPartOccurred's redelivery guard (OccurredOnPartIds.Contains(onPart.Id))
+        // - which exists to make true at-least-once stream redelivery of the *same* logical transition
+        // a no-op - would also permanently swallow every later, genuinely distinct occurrence of that
+        // OnPart, since OnPart.Id is the fixed model-element id, not a per-occurrence identifier.
+        public void Apply(IfPartNotSatisfied @event)
+        {
+            Updated = @event.Updated;
+            _occurredOnPartIds.Clear();
+        }
     }
 }

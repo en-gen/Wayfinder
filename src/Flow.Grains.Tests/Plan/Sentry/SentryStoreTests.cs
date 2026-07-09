@@ -68,5 +68,28 @@ namespace Flow.Grains.Tests.Plan.Sentry
 
             subject.Satisfied.Should().BeTrue();
         }
+
+        // 8.5 - a sentry whose OnParts have all occurred but whose IfPart is false must be able to
+        // re-evaluate on a subsequent occurrence (see SentryGrain.HandleOnPartOccurred and this
+        // event's remarks). Pins that IfPartNotSatisfied forgets recorded occurrences rather than
+        // only updating the timestamp - the mechanism this re-evaluation depends on.
+        [Fact]
+        public void Apply__Given_IfPartNotSatisfied__Then_ClearsOccurredOnPartIds()
+        {
+            var onPartId = ShortGuid.NewGuid();
+            var subject = new SentryStore();
+            subject.Apply(new OnPartOccurred { OnPart = new PlanItemOnPart { Id = onPartId } });
+
+            subject.OccurredOnPartIds.Should().Contain(onPartId, "the OnPart must be recorded as occurred before this test proves it gets cleared");
+
+            var @event = new IfPartNotSatisfied();
+            subject.Apply(@event);
+
+            subject.Updated.Should().HaveValue()
+                .And.Be(@event.Updated);
+
+            subject.OccurredOnPartIds.Should().BeEmpty();
+            subject.Satisfied.Should().BeFalse("IfPartNotSatisfied means the sentry is explicitly NOT satisfied");
+        }
     }
 }
