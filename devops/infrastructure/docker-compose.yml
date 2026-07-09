@@ -1,0 +1,32 @@
+# Local Azurite stack backing Flow.Silo's Development journaled-grain storage
+# (work item #54). Blob is the only service Flow.Silo consumes today - queue
+# and table ports are exposed because they cost nothing and match the
+# well-known Azurite port trio, in case later work items need them.
+services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    container_name: case-flow-azurite
+    restart: unless-stopped
+    ports:
+      - "10000:10000" # blob
+      - "10001:10001" # queue
+      - "10002:10002" # table
+    volumes:
+      - azurite-data:/data
+    # --skipApiVersionCheck: current Azure.Storage.Blobs SDK versions send x-ms-version headers
+    # newer than Azurite has caught up to (e.g. "The API version ... is not supported by
+    # Azurite" - see Azure/Azurite#2562, #2564, #2626); this is Azurite's own documented
+    # workaround, not a hack. Without it, this stack breaks whenever the SDK ships before
+    # Azurite's next release.
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --skipApiVersionCheck
+    healthcheck:
+      # Azurite's image is Node-based with no shell utility for a real HTTP probe;
+      # a bare TCP connect to the blob port is enough to confirm the process is up.
+      test: ["CMD", "node", "-e", "require('net').connect(10000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  azurite-data:

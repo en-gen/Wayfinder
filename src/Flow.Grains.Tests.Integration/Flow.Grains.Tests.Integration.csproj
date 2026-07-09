@@ -10,6 +10,14 @@
 
   <ItemGroup>
     <PackageReference Include="AutoFixture.Xunit2" Version="4.18.1" />
+    <!-- Azurite restart-survival suite (work item #54): AzuriteClusterFixture mirrors Flow.Silo's
+         AddAzureClients config-section registration path exactly (Microsoft.Extensions.Azure +
+         Azure.Identity for the UseCredential fallback); Azure.Storage.Blobs also backs the
+         belt-and-braces assertion that the journal actually lands in blob storage, not a silent
+         fallback to memory. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
     <PackageReference Include="coverlet.msbuild" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -17,6 +25,8 @@
     <!-- pinned: last version before v8's Xceed commercial license -->
     <PackageReference Include="FluentAssertions" Version="7.2.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <!-- Azurite restart-survival suite (work item #54): journaled-grain storage backend under test. -->
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
