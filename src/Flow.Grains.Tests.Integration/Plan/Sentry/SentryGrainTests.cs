@@ -133,6 +133,61 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
             handlerInvoked.Should().BeTrue();
         }
 
+        // D1 - single OnPart + IfPart, IfPart false: the OnPart occurring is necessary but not
+        // sufficient. 8.5: "a sentry whose OnParts have all occurred but whose IfPart is false does
+        // NOT fire." (Re-evaluation on a SUBSEQUENT occurrence is pinned by
+        // CaseFileItemSentryIntegrationTests.CaseFileItemUpdate__Given_SentryWithCaseFileItemOnPartAndIfPart__Then_SentryOnlyFiresWhenConditionTrue,
+        // which has a toggleable condition source; PlanItemOnPart sentries have no equivalent
+        // repeatable/stateful trigger to exercise the same re-arm behavior against.)
+        [Theory, AutoData]
+        public async Task HandlePlanItemTransitioned__Given_PlanItemTransitionedEvent__When_IfPartFalse__Then_NotSatisfied
+            (string caseDefinitionId, Guid caseInstanceId, string sourceScope, string sourcePlanItemId)
+        {
+            var sentry = new Interfaces.Model.Sentry
+            {
+                OnParts =
+                {
+                    new PlanItemOnPart
+                    {
+                        SourceRef = sourcePlanItemId,
+                        StandardEvent = PlanItemTransition.Occur
+                    }
+                },
+                IfPart = new IfPart
+                {
+                    Condition = Rules.FalsyExpression
+                }
+            };
+
+            var subject = _clusterClient.GetGrain<ISentryGrain>(caseInstanceId, $"{sourceScope}.{sentry.Id}");
+
+            await subject.Define(caseDefinitionId, sentry);
+
+            var tcs = new TaskCompletionSource<bool>();
+
+            await _clusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<SentrySatisfiedEvent>(caseInstanceId, sentry.Id)
+                .SubscribeAsync((e, t) =>
+                {
+                    tcs.TrySetResult(true);
+                    return Task.CompletedTask;
+                });
+
+            await _clusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<PlanItemTransitionedEvent>(caseInstanceId, sourcePlanItemId)
+                .OnNextAsync(new PlanItemTransitionedEvent(
+                    sourceScope,
+                    ShortGuid.NewGuid(),
+                    sourcePlanItemId,
+                    PlanItemTransition.Occur,
+                    PlanItemState.Available,
+                    PlanItemState.Completed));
+
+            var handlerInvoked = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromMilliseconds(500))) == tcs.Task;
+
+            handlerInvoked.Should().BeFalse("the OnPart occurred but the IfPart evaluates false, so the sentry must not publish SentrySatisfiedEvent");
+        }
+
         [Theory, AutoData]
         public async Task HandlePlanItemTransitioned__Given_PlanItemTransitionedEvent__When_MultiOnPart__Then_NotSatisfied
             (string caseDefinitionId, Guid caseInstanceId, string sourceScope, string sourcePlanItemId)

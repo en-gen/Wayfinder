@@ -325,6 +325,197 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
             occurred.Should().BeTrue("TimerEventListenerBehavior's CaseFileItemStartTrigger subscription should have captured the CaseFileItem Create transition as the timer's start trigger");
         }
 
+        // THE D1 FLAGSHIP: CaseFileItemOnPart + IfPart together, context-bound.
+        //
+        // Case shape: same as the D2 flagship above, plus an IfPart on the entry sentry:
+        //   Sentry "EntrySentry" { CaseFileItemOnPart { SourceRef = "TheCaseFileItem",
+        //                                               StandardEvent = Update },
+        //                          IfPart { ContextRef = "TheCaseFileItem",
+        //                                   Condition = "value.amount > 100" } }
+        //
+        // Before this work item, EvaluateIfPart already called
+        // GrainFactory.GetGrain<IExpressionGrain>(...).ExecuteAsBool(ContextRef, Condition) (see
+        // SentryGrain), but ExpressionGrain.BuildExecutable never bound the referenced
+        // CaseFileItem's Value into the Jint scope - `value.amount` had nothing to see. This test
+        // is the D1 unlock: the OnPart occurring is necessary but not sufficient: only once the
+        // bound value's amount exceeds 100 does the sentry actually fire.
+        [Fact]
+        public async Task CaseFileItemUpdate__Given_SentryWithCaseFileItemOnPartAndIfPart__Then_SentryOnlyFiresWhenConditionTrue()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
+            const string caseFileItemId = "TheCaseFileItem";
+            const string sentryInstanceId = "EntrySentry";
+
+            var entrySentryDefinition = new SentryModel
+            {
+                Id = sentryInstanceId,
+                OnParts =
+                {
+                    new CaseFileItemOnPart
+                    {
+                        SourceRef = caseFileItemId,
+                        StandardEvent = CaseFileItemTransition.Update
+                    }
+                },
+                IfPart = new IfPart
+                {
+                    ContextRef = caseFileItemId,
+                    Condition = new Expression
+                    {
+                        Language = ExpressionLanguage.Jint,
+                        Body = "value.amount > 100"
+                    }
+                }
+            };
+
+            var milestoneDefinition = new Milestone { Id = "MilestoneA" };
+            var planItem = new Interfaces.Model.PlanItem
+            {
+                Id = "PlanItemA",
+                DefinitionRef = milestoneDefinition.Id,
+                EntryCriteria =
+                {
+                    new EntryCriterion { SentryRef = entrySentryDefinition.Id }
+                }
+            };
+
+            var @case = new CaseModel
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRoles(),
+                CasePlanModel = new Stage
+                {
+                    Id = Scope,
+                    Sentries = { entrySentryDefinition },
+                    PlanItemDefinitions = { milestoneDefinition },
+                    PlanItems = { planItem }
+                }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var milestoneGrain = _clusterClient
+                .GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{planItem.Id}");
+            await milestoneGrain.Define(caseDefinitionId, planItem);
+            await milestoneGrain.Trigger(PlanItemTransition.Create);
+
+            var sentryGrain = _clusterClient
+                .GetGrain<ISentryGrain>(caseInstanceId, $"{Scope}.{sentryInstanceId}");
+            await sentryGrain.Define(caseDefinitionId, entrySentryDefinition);
+
+            var caseFileItemGrain = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+            await caseFileItemGrain.Create(caseDefinitionId, new Interfaces.Model.CaseFileItem { Id = caseFileItemId }, JsonNode.Parse("""{"amount": 0}"""));
+
+            // Step 1: update with amount = 50 - the CaseFileItemOnPart(Update) occurs, but the
+            // IfPart (value.amount > 100) evaluates false, so the sentry must NOT fire and the
+            // Milestone must stay Available.
+            await caseFileItemGrain.Update(JsonNode.Parse("""{"amount": 50}"""));
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            var afterFirstUpdate = await milestoneGrain.GetSnapshot();
+            afterFirstUpdate.PlanItemState.Should().Be(PlanItemState.Available,
+                "the OnPart occurred but the IfPart condition (value.amount > 100) is false at amount=50, so the sentry must not be satisfied");
+
+            // Step 2: update with amount = 150 - another CaseFileItemOnPart(Update) occurrence,
+            // this time with the IfPart re-evaluated against the now-current case-file state and
+            // TRUE, so the sentry fires and the Milestone completes.
+            await caseFileItemGrain.Update(JsonNode.Parse("""{"amount": 150}"""));
+
+            var completed = await PollUntil(
+                async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed,
+                TimeSpan.FromSeconds(10));
+
+            completed.Should().BeTrue("the second Update transition should re-evaluate the IfPart against amount=150, satisfying the sentry and completing the Milestone");
+        }
+
+        // Same shape, but the CaseFileItem named by IfPart.ContextRef is never created. Per this
+        // work item's documented deviation (see ExpressionGrain.BuildExecutable), this is treated
+        // as an expression failure, and per SentryGrain.EvaluateIfPart, an IfPart evaluation
+        // failure means the ifPart is NOT satisfied - the OnPart occurring is not enough to fire
+        // the sentry, and the Milestone must stay Available indefinitely.
+        [Fact]
+        public async Task CaseFileItemUpdate__Given_IfPartContextRefNeverCreated__Then_SentryNeverFires()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
+            const string caseFileItemId = "TheCaseFileItem";
+            const string missingContextCaseFileItemId = "NeverCreatedCaseFileItem";
+            const string sentryInstanceId = "EntrySentry";
+
+            var entrySentryDefinition = new SentryModel
+            {
+                Id = sentryInstanceId,
+                OnParts =
+                {
+                    new CaseFileItemOnPart
+                    {
+                        SourceRef = caseFileItemId,
+                        StandardEvent = CaseFileItemTransition.Update
+                    }
+                },
+                IfPart = new IfPart
+                {
+                    ContextRef = missingContextCaseFileItemId,
+                    Condition = new Expression
+                    {
+                        Language = ExpressionLanguage.Jint,
+                        Body = "value.amount > 100"
+                    }
+                }
+            };
+
+            var milestoneDefinition = new Milestone { Id = "MilestoneA" };
+            var planItem = new Interfaces.Model.PlanItem
+            {
+                Id = "PlanItemA",
+                DefinitionRef = milestoneDefinition.Id,
+                EntryCriteria =
+                {
+                    new EntryCriterion { SentryRef = entrySentryDefinition.Id }
+                }
+            };
+
+            var @case = new CaseModel
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRoles(),
+                CasePlanModel = new Stage
+                {
+                    Id = Scope,
+                    Sentries = { entrySentryDefinition },
+                    PlanItemDefinitions = { milestoneDefinition },
+                    PlanItems = { planItem }
+                }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var milestoneGrain = _clusterClient
+                .GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{planItem.Id}");
+            await milestoneGrain.Define(caseDefinitionId, planItem);
+            await milestoneGrain.Trigger(PlanItemTransition.Create);
+
+            var sentryGrain = _clusterClient
+                .GetGrain<ISentryGrain>(caseInstanceId, $"{Scope}.{sentryInstanceId}");
+            await sentryGrain.Define(caseDefinitionId, entrySentryDefinition);
+
+            // deliberately never create "NeverCreatedCaseFileItem"
+            var caseFileItemGrain = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+            await caseFileItemGrain.Create(caseDefinitionId, new Interfaces.Model.CaseFileItem { Id = caseFileItemId }, JsonNode.Parse("""{"amount": 0}"""));
+
+            await caseFileItemGrain.Update(JsonNode.Parse("""{"amount": 150}"""));
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            var afterUpdate = await milestoneGrain.GetSnapshot();
+            afterUpdate.PlanItemState.Should().Be(PlanItemState.Available,
+                "the IfPart's contextRef names a CaseFileItem that was never created, so evaluation fails and the sentry must not be satisfied");
+        }
+
         private static async Task<bool> PollUntil(Func<Task<bool>> condition, TimeSpan timeout)
         {
             var deadline = DateTime.UtcNow + timeout;

@@ -60,6 +60,18 @@ namespace Flow.Grains.Plan.Sentry
             await SubscribeToOnPartTransitions(StreamFlags.Create);
         }
 
+        // DEVIATION/SIMPLIFICATION (out of scope for this work item, documented rather than silently
+        // left unhandled): 8.5's last sentence - "Sentries with no OnPart must have an IfPart, and
+        // that IfPart will be evaluated for all CaseFileItem events" - describes a standalone-IfPart
+        // sentry (Definition.OnParts.Count == 0) that re-evaluates on every case-file event, not just
+        // ones from a specific sourceRef. SubscribeToOnPartTransitions below only ever subscribes to
+        // Definition.OnParts, so a 0-OnPart sentry subscribes to nothing and its IfPart is never
+        // evaluated at all - EvaluateIfPart is unreachable for such a sentry today (it is only called
+        // from HandleOnPartOccurred, which requires an OnPart to have fired first). This work item's
+        // scope is IfPart evaluation *given* an OnPart occurrence (the flagship's
+        // CaseFileItemOnPart + IfPart shape); wiring a 0-OnPart sentry to subscribe case-wide to every
+        // CaseFileItemTransitionedEvent regardless of sourceRef is a materially different subscription
+        // topology change and is left as a follow-on concern.
         private Task SubscribeToOnPartTransitions(StreamFlags flags) =>
             Task.WhenAll(Definition.OnParts
                 .Select(onPart =>
@@ -149,9 +161,33 @@ namespace Flow.Grains.Plan.Sentry
                 OnPart = onPart
             });
 
-            if (TentativeState.OccurredOnPartIds.Count() == Definition.OnParts.Count && await EvaluateIfPart())
+            if (TentativeState.OccurredOnPartIds.Count() == Definition.OnParts.Count)
             {
-                RaiseEvent(new Satisfied());
+                if (await EvaluateIfPart())
+                {
+                    RaiseEvent(new Satisfied());
+                }
+                else if (Definition.OnParts.Count == 1)
+                {
+                    // 8.5: "a sentry whose OnParts have all occurred but whose IfPart is false does
+                    // NOT fire... and must re-evaluate on subsequent relevant events." Forget the
+                    // recorded occurrence so a later, distinct occurrence of this OnPart (e.g. a
+                    // second CaseFileItemTransition.Update on the same CaseFileItem) re-triggers this
+                    // AND-join/IfPart check, instead of being permanently swallowed by the redelivery
+                    // guard above (see SentryStore.Apply(IfPartNotSatisfied)).
+                    //
+                    // DEVIATION/SIMPLIFICATION (documented per this work item's brief): scoped to
+                    // single-OnPart sentries only. For 2+ OnParts, clearing every occurrence here
+                    // would also forget an OnPart whose own source transition is inherently one-shot
+                    // (e.g. a PlanItemTransition that only ever fires once in that plan item's
+                    // lifecycle) - which would make the AND-join permanently unreachable rather than
+                    // re-armed, the opposite of this fix's intent. The spec does not resolve which
+                    // OnPart(s) should be "forgotten" versus which should stay recorded when only
+                    // some of a multi-OnPart sentry's sources are repeatable, and no existing test
+                    // exercises that combination; re-evaluation for multi-OnPart sentries gated by an
+                    // IfPart is left as a follow-on concern rather than guessed at here.
+                    RaiseEvent(new IfPartNotSatisfied());
+                }
             }
 
             await ConfirmEvents();

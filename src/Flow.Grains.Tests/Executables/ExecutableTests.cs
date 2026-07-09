@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using Flow.Grains.Executables;
 using Flow.Grains.Interfaces.Model;
 using Jint;
@@ -170,6 +171,71 @@ namespace Flow.Grains.Tests.Executables
 
             Assert.False(result.IsError);
             Assert.Equal("unaffected", result.Value);
+        }
+
+        // WithJsonArgument binds an already-parsed JsonNode directly (via JsonNodeExtensions.AsJsValue),
+        // without the CLR-object round-trip WithArgument/WithContext perform (JsonSerializer
+        // .SerializeToNode(...) then a hard cast to JsonObject). That round-trip cannot carry a scalar
+        // or array JsonNode - a CaseFileItem's Value (5.3.2) may legitimately be either - so this is
+        // covered independently of WithArgument/WithContext's existing coverage above.
+
+        [Fact]
+        public void WithJsonArgument__Given_ObjectNode__Then_PropertiesAccessible()
+        {
+            var node = JsonNode.Parse("""{"amount": 150}""");
+
+            var result = CreateSubject("argName.amount > 100")
+                .WithJsonArgument("argName", node)
+                .ExecuteAsBool();
+
+            Assert.False(result.IsError, result.Message);
+            Assert.True(result.Value);
+        }
+
+        [Fact]
+        public void WithJsonArgument__Given_ScalarStringNode__Then_BoundAsScalar()
+        {
+            var node = JsonValue.Create("filed");
+
+            var result = CreateSubject("argName")
+                .WithJsonArgument("argName", node)
+                .ExecuteAsString();
+
+            Assert.False(result.IsError, result.Message);
+            Assert.Equal("filed", result.Value);
+        }
+
+        [Fact]
+        public void WithJsonArgument__Given_ArrayNode__Then_BoundAsIndexableArray()
+        {
+            var node = JsonNode.Parse("[1, 2, 3]");
+
+            var result = CreateSubject("argName.length + ':' + argName[1]")
+                .WithJsonArgument("argName", node)
+                .ExecuteAsString();
+
+            Assert.False(result.IsError, result.Message);
+            Assert.Equal("3:2", result.Value);
+        }
+
+        [Fact]
+        public void WithJsonArgument__Given_NullNode__Then_BoundAsJsNull()
+        {
+            var result = CreateSubject("argName === null")
+                .WithJsonArgument("argName", null)
+                .ExecuteAsBool();
+
+            Assert.False(result.IsError, result.Message);
+            Assert.True(result.Value);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData(" ")]
+        public void WithJsonArgument__Given_NullOrEmptyName__Then_ArgNullEx(string name)
+        {
+            Assert.Throws<ArgumentNullException>(() => CreateSubject("true").WithJsonArgument(name, JsonValue.Create(1)));
         }
 
         private static Executable CreateSubject(string expression)
