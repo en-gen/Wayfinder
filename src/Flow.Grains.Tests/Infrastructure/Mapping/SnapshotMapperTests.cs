@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using AutoFixture.Xunit2;
 using Flow.Grains.Infrastructure.Mapping;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Interfaces.Plan.Case;
+using Flow.Grains.Interfaces.Plan.CaseFileItem;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.Case;
 using Flow.Grains.Plan.Case.Events;
+using Flow.Grains.Plan.CaseFileItem;
+using Flow.Grains.Plan.CaseFileItem.Events;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
@@ -43,7 +47,8 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             typeof(StageBehaviorSnapshot),
             typeof(TimerEventListenerBehaviorSnapshot),
             typeof(PlanItemSnapshot),
-            typeof(CaseSnapshot)
+            typeof(CaseSnapshot),
+            typeof(CaseFileItemSnapshot)
         };
 
         // Walks every public property on a fully-populated snapshot instance (recursing into
@@ -447,6 +452,69 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
 
             snapshot.CasePlanModel.Should().BeNull();
             snapshot.BehaviorExtension.Should().BeNull();
+        }
+
+        // Exercises the Available (0-valued) branch of CaseFileItemState explicitly by value,
+        // rather than through AssertAllPropertiesPopulated's generic sweep - that sweep treats any
+        // 0-valued enum as "unset" (see StageBehaviorStore/PlanItemState precedent above), so the
+        // full-sweep coverage for this mapping instead runs against the Discarded (non-zero)
+        // state below.
+        [Theory, AutoData]
+        public void ToSnapshot__Given_CaseFileItemStore__Then_AllMembersMapped
+            (string caseDefinitionId, string definitionId, string childId)
+        {
+            var definition = new Flow.Grains.Interfaces.Model.CaseFileItem { Id = definitionId };
+            var value = JsonValue.Create("some content");
+
+            var store = new Flow.Grains.Plan.CaseFileItem.CaseFileItemStore();
+            store.Apply(new Flow.Grains.Plan.CmmnElement.Events.CmmnElementDefined<Flow.Grains.Interfaces.Model.CaseFileItem>
+            {
+                CaseDefinitionId = caseDefinitionId,
+                Definition = definition
+            });
+            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.ValueChanged { Value = value });
+            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.ChildAdded { ChildCaseFileItemId = childId });
+
+            var snapshot = store.ToSnapshot();
+
+            snapshot.Definition.Should().BeSameAs(store.Definition)
+                .And.BeSameAs(definition);
+            snapshot.CaseFileItemState.Should().Be(store.CaseFileItemState)
+                .And.Be(CaseFileItemState.Available);
+            snapshot.Value.Should().BeSameAs(store.Value)
+                .And.BeSameAs(value);
+            snapshot.Value.ToString().Should().Contain("some content");
+        }
+
+        // Table 8.2: delete (Available -> Discarded). Runs the full reflection-based
+        // "every property populated" sweep (see AssertAllPropertiesPopulated) since Discarded's
+        // non-zero enum value is what that sweep needs to confirm CaseFileItemState round-trips.
+        [Theory, AutoData]
+        public void ToSnapshot__Given_CaseFileItemStore_Discarded__Then_AllMembersMapped
+            (string caseDefinitionId, string definitionId)
+        {
+            var value = JsonValue.Create("some content");
+
+            var store = new Flow.Grains.Plan.CaseFileItem.CaseFileItemStore();
+            store.Apply(new Flow.Grains.Plan.CmmnElement.Events.CmmnElementDefined<Flow.Grains.Interfaces.Model.CaseFileItem>
+            {
+                CaseDefinitionId = caseDefinitionId,
+                Definition = new Flow.Grains.Interfaces.Model.CaseFileItem { Id = definitionId }
+            });
+            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.ValueChanged { Value = value });
+            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.Discarded());
+
+            var snapshot = store.ToSnapshot();
+
+            snapshot.CaseFileItemState.Should().Be(CaseFileItemState.Discarded);
+
+            AssertAllPropertiesPopulated(snapshot, nameof(CaseFileItemSnapshot));
+        }
+
+        [Fact]
+        public void ToSnapshot__Given_Null_CaseFileItemStore__Then_Null()
+        {
+            ((Flow.Grains.Plan.CaseFileItem.CaseFileItemStore)null).ToSnapshot().Should().BeNull();
         }
 
         private static Flow.Grains.Executables.Iso8601 BuildIso8601(string discriminator) =>
