@@ -169,8 +169,9 @@ jobs:
       # Azure.Storage.Blobs SDK versions sending x-ms-version headers newer than Azurite
       # recognizes (Azure/Azurite#2562, #2564, #2626) - without it, Azurite rejects every
       # request from the test client. AzuriteFact (Flow.Grains.Tests.Integration/Storage)
-      # TCP-probes 127.0.0.1:10000 at test discovery and skips (does not fail) if this step's
-      # container isn't reachable, so a readiness wait here is what turns "skipped" into
+      # probes 127.0.0.1:10000 at test discovery - a TCP connect plus one blob service call -
+      # and skips (does not fail) if this step's container isn't reachable or rejects the
+      # SDK's API version, so a readiness wait here is what turns "skipped" into
       # "executed" - not a correctness requirement for the step itself.
       - script: >
           docker run -d --name azurite -p 10000:10000
