@@ -68,4 +68,18 @@ dotnet build src/CaseFlow.sln
 dotnet test src/CaseFlow.sln
 ```
 
-Requires the .NET 10 SDK. Integration tests need no external dependencies — Orleans TestCluster with in-memory storage and streams. The build fails on vulnerable packages by design.
+Requires the .NET 10 SDK. Most integration tests need no external dependencies — Orleans TestCluster with in-memory storage and streams. The build fails on vulnerable packages by design.
+
+### Local development
+
+Journaled-grain (case-file) state persists to Azure Blob Storage, backed locally by
+[Azurite](https://github.com/Azure/Azurite):
+
+```bash
+docker compose -f devops/infrastructure/docker-compose.yml up -d
+```
+
+Then run the silo as usual — `Flow.Silo`'s Development configuration already points at
+Azurite's well-known dev connection string. The Azurite-dependent test suite
+(`Flow.Grains.Tests.Integration`'s `Storage` tests) skips itself automatically when Azurite
+isn't running, so `dotnet test` works with or without the compose stack up.

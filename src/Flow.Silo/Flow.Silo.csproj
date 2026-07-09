@@ -8,7 +8,18 @@
 
   <ItemGroup>
     <!-- Microsoft.Extensions.Hosting comes transitively via Microsoft.Orleans.Server / the Web SDK -->
+    <!-- BlobServiceClient registered from the Azure:Storage config SECTION (AddAzureClients):
+         the section's shape picks the auth mode - connectionString locally/Azurite, serviceUri +
+         credential when deployed. Azure.Identity supplies the DefaultAzureCredential wired as the
+         global fallback TokenCredential (UseCredential) so the deployed flip is config-only.
+         See Program.cs ConfigureServices and AzureOptions. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
     <PackageReference Include="Microsoft.Orleans.EventSourcing" Version="10.2.1" />
+    <!-- Journaled-grain (LogStorage log-consistency) storage backend: Azure Blob, Azurite in
+         Development (work item #54). See Program.cs ConfigureDevelopmentOrleans for the slot
+         this is wired into and why. -->
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Reminders" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />

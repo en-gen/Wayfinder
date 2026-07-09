@@ -1,0 +1,126 @@
+using System;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
+using Azure.Storage.Blobs;
+using FluentAssertions;
+using Orleans;
+using Xunit;
+
+namespace Flow.Grains.Tests.Integration.Storage
+{
+    // Azurite restart-survival proof for work item #54: the journaled-grain storage path
+    // (JournaledGrain + [LogConsistencyProvider("LogStorage")]) is backed by Azure Blob in
+    // Development, not memory. See Flow.Silo/Program.cs ConfigureDevelopmentOrleans for the
+    // Orleans-source citation establishing which storage slot that grain shape actually
+    // resolves, and AzuriteClusterFixture for the TestCluster wiring that mirrors it.
+    //
+    // Opt-in via AzuriteFact: skipped (not failed) when Azurite isn't reachable at
+    // 127.0.0.1:10000, per the constraint that this suite must never fail a machine that
+    // simply isn't running docker compose -f devops/infrastructure/docker-compose.yml up -d.
+    [Collection(AzuriteClusterCollection.Name)]
+    public class AzuriteJournalStorageTests
+    {
+        private const string AzuriteConnectionString = "UseDevelopmentStorage=true";
+
+        private readonly IClusterClient _clusterClient;
+        private readonly string _containerName;
+
+        public AzuriteJournalStorageTests(AzuriteClusterFixture fixture)
+        {
+            _clusterClient = fixture.ClusterClient;
+            _containerName = fixture.ContainerName;
+        }
+
+        [AzuriteFact]
+        public async Task GetState__Given_EventsRaisedThenGrainDeactivated__When_CalledAgain__Then_StateRehydratesFromJournal()
+        {
+            var grain = _clusterClient.GetGrain<IAzuriteJournalTestGrain>(Guid.NewGuid());
+
+            await grain.Increment(3, "first");
+            await grain.Increment(4, "second");
+
+            var stateBeforeDeactivate = await grain.GetState();
+            stateBeforeDeactivate.Counter.Should().Be(7);
+            stateBeforeDeactivate.LastLabel.Should().Be("second");
+
+            // DeactivateOnIdle forces the next call onto a fresh activation, which must
+            // rehydrate state from the configured IGrainStorage (Azure Blob) rather than
+            // finding it still resident in memory - this is the restart-survival gate.
+            await grain.DeactivateNow();
+            await Task.Delay(TimeSpan.FromMilliseconds(250)); // let deactivation complete before reactivating
+
+            var stateAfterReactivate = await grain.GetState();
+
+            stateAfterReactivate.Counter.Should().Be(7, "state must rehydrate from blob storage, not memory, after deactivation");
+            stateAfterReactivate.LastLabel.Should().Be("second");
+        }
+
+        // Regression pin for the grain-storage serializer (work item #16, adapted for blob):
+        // a serializer that cannot round-trip System.Text.Json.Nodes values does not FAIL the
+        // write - the log-consistency LogViewAdaptor retries it forever and the grain call never
+        // returns (observed on #16 as a 30s client timeout with the activation spinning). The
+        // whole journal -> deactivate -> rehydrate cycle is therefore bounded so a regression
+        // (e.g. losing the OrleansGrainStorageSerializer pin in AzuriteClusterFixture) fails
+        // FAST with a diagnosis instead of hanging the run. JsonArray is the known-poisonous
+        // shape per the #16 value-shape matrix; content equality via JsonNode.DeepEquals - never
+        // assert on runtime JsonValue subtypes, which legitimately change across a round-trip.
+        [AzuriteFact]
+        public async Task GetState__Given_JsonNodeDocumentWithNestedArrayJournaled__When_DeactivatedAndCalledAgain__Then_DocumentRehydratesFromBlob()
+        {
+            var grain = _clusterClient.GetGrain<IAzuriteJournalTestGrain>(Guid.NewGuid());
+
+            var document = new JsonObject
+            {
+                ["caseFile"] = "audit-2026-042",
+                ["items"] = new JsonArray("evidence-1", 2, true),
+                ["nested"] = new JsonObject { ["tags"] = new JsonArray("risk", "controls") }
+            };
+
+            var scenario = JournalDeactivateRehydrate();
+            var winner = await Task.WhenAny(scenario, Task.Delay(TimeSpan.FromSeconds(20)));
+
+            winner.Should().Be(scenario,
+                "a hung journal write means the grain-storage serializer cannot round-trip JsonNode " +
+                "state - the LogViewAdaptor retries the failed write forever (work item #16); check " +
+                "the GrainStorageSerializer pin in AzuriteClusterFixture");
+
+            var state = await scenario;
+
+            JsonNode.DeepEquals(state.Document, document).Should().BeTrue(
+                "the rehydrated document must equal the journaled document by content; rehydrated: " +
+                $"{state.Document?.ToJsonString() ?? "<null>"}");
+
+            async Task<AzuriteJournalTestState> JournalDeactivateRehydrate()
+            {
+                await grain.SetDocument(document);
+                await grain.DeactivateNow();
+                await Task.Delay(TimeSpan.FromMilliseconds(250)); // let deactivation complete before reactivating
+                return await grain.GetState();
+            }
+        }
+
+        // Belt-and-braces: prove the journal actually lands in Azurite blob storage, not a
+        // silent fallback to memory grain storage (which would make the test above pass for
+        // the wrong reason - state would simply never have left the still-running silo process
+        // if AddAzureBlobGrainStorageAsDefault were, say, shadowed by a stray
+        // AddMemoryGrainStorageAsDefault registration).
+        [AzuriteFact]
+        public async Task Increment__Given_EventRaised__Then_ContainerHoldsGrainBlob()
+        {
+            var grain = _clusterClient.GetGrain<IAzuriteJournalTestGrain>(Guid.NewGuid());
+
+            await grain.Increment(5, "belt-and-braces");
+
+            var blobServiceClient = new BlobServiceClient(AzuriteConnectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(_containerName);
+
+            var blobCount = 0;
+            await foreach (var _ in containerClient.GetBlobsAsync())
+            {
+                blobCount++;
+            }
+
+            blobCount.Should().BeGreaterThan(0, "the grain's journal state should be persisted as a blob in the Azurite container, not held only in memory");
+        }
+    }
+}
