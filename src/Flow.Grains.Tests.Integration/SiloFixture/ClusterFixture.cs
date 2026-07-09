@@ -9,12 +9,14 @@ using Flow.Grains.Services.PlanItemStateMachineConfigurator;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NodaTime;
 using NodaTime.Extensions;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Serialization;
+using Orleans.Storage;
 using Orleans.TestingHost;
 using Serilog;
 using Serilog.Core;
@@ -83,9 +85,9 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 silo
                     .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
 
-                    .AddMemoryGrainStorageAsDefault() // grain state
+                    .AddMemoryGrainStorageAsDefault(ConfigureMemoryStorage) // grain state
                     .AddLogStorageBasedLogConsistencyProvider() // journaled grain
-                    .AddMemoryGrainStorage("PubSubStore") // stream storage
+                    .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
                     .AddMemoryStreams("Default") // cluster stream provider
                     .UseInMemoryReminderService()
 
@@ -96,6 +98,22 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
                     jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
             }
+
+            // MemoryGrainStorage's default IGrainStorageSerializer is JsonGrainStorageSerializer -
+            // a reflection-based JSON storage serializer that is a SEPARATE stack from the Orleans
+            // wire serializer (and from the fallback JSON codec registered above). It cannot
+            // round-trip System.Text.Json.Nodes values held in grain state: journaling a
+            // CaseFileItemStore whose Value contains a JsonArray fails inside the storage write,
+            // which the log-consistency protocol (LogViewAdaptor) retries indefinitely - the grain
+            // call never completes (observed as a client-side 30s timeout with the activation
+            // spinning at ~6k scheduler work items/sec; see work item #16). Pinning the storage
+            // serializer to OrleansGrainStorageSerializer routes grain-state persistence through
+            // the same Orleans serializer used on the wire, which handles the JsonNode family
+            // natively (see JsonNodeOrleansSerializationTests). Must match Flow.Silo/Program.cs's
+            // development configuration identically.
+            private static void ConfigureMemoryStorage(OptionsBuilder<MemoryGrainStorageOptions> options) =>
+                options.Configure<Serializer>((storageOptions, serializer) =>
+                    storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer));
 
             private static void ConfigureServices(IServiceCollection services)
             {

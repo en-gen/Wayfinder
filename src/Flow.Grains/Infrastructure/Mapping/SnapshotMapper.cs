@@ -1,8 +1,10 @@
 using Flow.Grains.Executables;
 using Flow.Grains.Interfaces.Plan.Case;
+using Flow.Grains.Interfaces.Plan.CaseFileItem;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
 using Flow.Grains.Plan.Case;
+using Flow.Grains.Plan.CaseFileItem;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 
@@ -127,6 +129,18 @@ namespace Flow.Grains.Infrastructure.Mapping
                 // A direct cast (rather than `as`) preserves AutoMapper's original failure mode:
                 // it would have thrown rather than silently producing a null snapshot here.
                 BehaviorExtension = ((StageBehaviorStore)src.BehaviorExtension).ToSnapshot()
+            };
+        }
+
+        public static CaseFileItemSnapshot ToSnapshot(this CaseFileItemStore src)
+        {
+            if (src == null) return null;
+
+            return new CaseFileItemSnapshot
+            {
+                Definition = src.Definition,
+                CaseFileItemState = src.CaseFileItemState,
+                Value = src.Value
             };
         }
 

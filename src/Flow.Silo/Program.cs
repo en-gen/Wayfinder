@@ -137,7 +137,7 @@ namespace Flow.Silo
                 // holds the grain's blob (see AzuriteJournalStorageTests).
                 .AddAzureBlobGrainStorageAsDefault(ConfigureBlobStorage)
                 .AddLogStorageBasedLogConsistencyProvider() // journaled grain: selects the LogStorage log-view adaptor: chooses HOW the view is replicated, not WHERE it is stored (see comment above)
-                .AddMemoryGrainStorage("PubSubStore") // stream storage
+                .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
                 .AddMemoryStreams("Default") // cluster stream provider (replaces removed AddSimpleMessageStreamProvider)
                 .UseInMemoryReminderService();
         }
@@ -208,6 +208,20 @@ namespace Flow.Silo
 
             public Task InitializeAsync(BlobServiceClient client) => _container.CreateIfNotExistsAsync();
         }
+
+        // MemoryGrainStorage's default IGrainStorageSerializer is JsonGrainStorageSerializer - a
+        // reflection-based JSON storage serializer that is a SEPARATE stack from the Orleans wire
+        // serializer (and from the fallback JSON codec registered in ConfigureOrleans above). It
+        // cannot round-trip System.Text.Json.Nodes values held in grain state: journaling a
+        // CaseFileItemStore whose Value contains a JsonArray fails inside the storage write, which
+        // the log-consistency protocol (LogViewAdaptor) retries indefinitely - the grain call
+        // never completes (see work item #16 and JsonNodeOrleansSerializationTests). Pinning the
+        // storage serializer to OrleansGrainStorageSerializer routes grain-state persistence
+        // through the same Orleans serializer used on the wire, which handles the JsonNode family
+        // natively. Must match ClusterFixture's TestSiloConfigurator identically.
+        private static void ConfigureMemoryStorage(OptionsBuilder<MemoryGrainStorageOptions> options) =>
+            options.Configure<Serializer>((storageOptions, serializer) =>
+                storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer));
 
         private static void ConfigureDeployedOrleans(HostBuilderContext context, ISiloBuilder silo)
         {

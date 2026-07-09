@@ -89,10 +89,17 @@ namespace Flow.Grains.Plan.Case
                 Definition = @case
             });
 
+            // PostDefine() (below) reads State.CaseDefinitionId/State.Definition - the confirmed
+            // projection, not TentativeState - so the CaseCreated event raised above must be
+            // confirmed first or both reads NRE (State.Definition is still null pre-confirmation).
+            // Matches the established RaiseEvent-then-ConfirmEvents-then-PostDefine sequencing
+            // PlanItemGrain.DefineRepetition already uses for the equivalent Defined event.
+            await ConfirmEvents();
+
             await Task.WhenAll(@case.CaseRoles.Roles
                 .Select(x => GrainFactory.GetGrain<IRoleGrain>(_caseInstanceId, x.Id)
                     .Define(caseDefinitionId, x)));
-            
+
             await PostDefine();
         }
 
