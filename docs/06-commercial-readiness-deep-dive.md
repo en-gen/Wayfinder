@@ -46,6 +46,8 @@ The XSD-generated metamodel (`Spec.CMMN.MODEL.cs`, generated from the official O
 
 ### 2.3 Confirmed deviations (adjudicated, with false positives removed)
 
+> **Registry status:** this document is the point-in-time analysis (2026-07-06); living status is maintained on the wiki's *Current State and Gaps* page. Resolved since authoring: **D1** (PR !18, 2026-07-09 — `ExpressionGrain` binds the context CaseFileItem into sandboxed Jint), **D2** (PR !17, 2026-07-09 — `CaseFileItemGrain`, full §8.3 lifecycle, events wired to sentries/timers). Found post-authoring: `ICaseGrain.Create()` never instantiates plan items (`CasePlanModelBehavior` stub — Bug #55); sentry onPart occurrences were permanently swallowed after a false ifPart (fixed in PR !18 for single-onPart sentries; multi-onPart re-arm semantics → work item #18).
+
 Two findings initially flagged as critical were **overturned by direct spec reading** and are *not* bugs:
 - *ManualActivationRule default*: Table 5.51 (spec p. 52) says absence ⇒ "considered TRUE". `BaseBehavior.cs:152` matches. (Note for product: Flowable inverts this pragmatically; keep an engine option in mind.)
 - *EventListener ignoring sentries*: EventListeners may not carry item-control rules (Table 5.51) and act as event sources, not sentry-triggered items; the no-op handler is fine.
@@ -89,6 +91,8 @@ Conformance implication unchanged (no class claimable until the feature plus §5
 **Verdict: EVOLVE, do not rewrite.** The CMMN→virtual-actor mapping (grain per case/plan-item/sentry, behavior composition over a Stateless FSM, event-sourced stores with pure `Apply` projections, spec-section comments throughout) is architecturally sound and rare in quality for a domain engine. The GitNexus graph confirms clean clustering (Behaviors 169 / PlanItem 80 / Case 50 / Sentry 20) with `Apply` as the most-referenced symbol (102 callers) — the event-sourcing discipline is real.
 
 ### 3.1 Production blockers
+
+> **Status:** B4 resolved (PR !15 — `SandboxedJintEngine` timeout/statement/memory budgets, pinned by tests). B1–B3, B5, B6 remain open (#30, #31, #33). Journaled-grain storage is now durable in Development (Azure Blob via Azurite, PR !16); B1's deployed-configuration gap is unchanged.
 
 | ID | Blocker | Evidence |
 |---|---|---|
