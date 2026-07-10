@@ -228,6 +228,29 @@ namespace Flow.Grains.Tests.Plan.Case
                 .And.Be(@event.Updated);
         }
 
+        // 8.6.4 RepetitionRule
+        // ~~~~~
+        // "That first instantiation ... is not considered a repetition and therefore the value of
+        // the RepetitionRule's condition is discarded." Mirrors PlanItemStore's handling - the
+        // CaseStore projection applies the same event type for the outermost Stage.
+        [Fact]
+        public void Apply__Given_RepetitionRuleEvaluated_Discarded__Then_RepeatableUnchanged()
+        {
+            var subject = new CaseStore();
+
+            var @event = new RepetitionRuleEvaluated
+            {
+                Result = true,
+                Discard = true
+            };
+
+            subject.Apply(@event);
+
+            subject.Repeatable.Should().BeFalse("a discarded first evaluation must not persist its Result as Repeatable");
+            subject.Updated.Should().HaveValue()
+                .And.Be(@event.Updated, "the event still marks the store as updated for audit purposes");
+        }
+
         [Fact]
         public void Apply__Given_ParentSuspended__Then_ParentSuspendedStateSet()
         {

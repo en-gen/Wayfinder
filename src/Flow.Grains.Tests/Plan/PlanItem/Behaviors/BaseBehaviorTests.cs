@@ -558,6 +558,112 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             capturedEvent.Result.Should().BeTrue();
         }
 
+        // 8.6.4 RepetitionRule
+        // ~~~~~
+        // "The first time a Milestone, Stage, or Task instance is instantiated and transitions to
+        // the Available state it is not considered a repetition, nevertheless the RepetitionRule
+        // MUST be evaluated and its result discarded." The discard flag rides the
+        // RepetitionRuleEvaluated event so the store can skip persisting Result as Repeatable
+        // (see PlanItemStoreTests/CaseStoreTests) while the evaluation itself still happens.
+        [Theory, AutoData]
+        public async Task EvaluateRepetitionRule__Given_Discard__Then_EventFlaggedDiscarded(Guid caseInstanceId)
+        {
+            var planItem = new Interfaces.Model.PlanItem
+            {
+                ItemControl = new PlanItemControl
+                {
+                    RepetitionRule = Rules.IsRepeatableRule
+                }
+            };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost
+                .Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost
+                .Setup(x => x.Definition)
+                .Returns(planItem);
+
+            RepetitionRuleEvaluated capturedEvent = null;
+            mockHost
+                .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
+                .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
+
+            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            mockExpressionGrain
+                .Setup(x => x.ExecuteAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
+                .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory
+                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
+                .Returns(mockExpressionGrain.Object);
+            mockHost
+                .Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
+
+            // the rule is still evaluated (the spec demands evaluation, only the RESULT is
+            // discarded) and the raised event still carries the Result for audit purposes
+            var result = await subject.EvaluateRepetitionRule(discard: true);
+
+            result.Should().BeTrue("the evaluation itself still happens and still returns its value");
+
+            capturedEvent.Should().NotBeNull();
+            capturedEvent.Discard.Should().BeTrue("the first (Create -> Available) evaluation must be flagged so stores discard its Result");
+            capturedEvent.Result.Should().BeTrue();
+        }
+
+        [Theory, AutoData]
+        public async Task EvaluateRepetitionRule__Given_DefaultCall__Then_EventNotFlaggedDiscarded(Guid caseInstanceId)
+        {
+            var planItem = new Interfaces.Model.PlanItem
+            {
+                ItemControl = new PlanItemControl
+                {
+                    RepetitionRule = Rules.IsRepeatableRule
+                }
+            };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost
+                .Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost
+                .Setup(x => x.Definition)
+                .Returns(planItem);
+
+            RepetitionRuleEvaluated capturedEvent = null;
+            mockHost
+                .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
+                .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
+
+            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            mockExpressionGrain
+                .Setup(x => x.ExecuteAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
+                .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory
+                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
+                .Returns(mockExpressionGrain.Object);
+            mockHost
+                .Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
+
+            await subject.EvaluateRepetitionRule();
+
+            capturedEvent.Should().NotBeNull();
+            capturedEvent.Discard.Should().BeFalse("re-evaluations (entry-criterion satisfaction, complete/terminate) are real, persistable evaluations");
+        }
+
         private PlanItemStore CreateStore(
             string caseDefId = null,
             PlanItemDefinition piDef = null,
@@ -597,7 +703,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             protected override Task HandleParentTransitioned(PlanItemTransitionedEvent @event, StreamSequenceToken token = null) => Task.CompletedTask;
 
             public new Task EvaluateRequiredRule() => base.EvaluateRequiredRule();
-            public new Task<bool> EvaluateRepetitionRule() => base.EvaluateRepetitionRule();
+            public new Task<bool> EvaluateRepetitionRule(bool discard = false) => base.EvaluateRepetitionRule(discard);
             public new Task<bool> EvaluateManualActivationRule() => base.EvaluateManualActivationRule();
 
             public PlanItemControl GetItemControl()

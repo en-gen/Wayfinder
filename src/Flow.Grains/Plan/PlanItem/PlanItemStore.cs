@@ -100,6 +100,10 @@ namespace Flow.Grains.Plan.PlanItem
         {
             Updated = @event.Updated;
 
+            // 8.6.4 - the first (Create -> Available) evaluation's result MUST be discarded, not
+            // treated as the item's repeatable determination - see RepetitionRuleEvaluated.Discard.
+            if (@event.Discard) return;
+
             Repeatable = @event.Result;
             RepeatableEvaluationError = @event.Error;
         }

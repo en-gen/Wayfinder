@@ -119,6 +119,17 @@ namespace Flow.Grains.Plan.Case
         {
             if (_casePlanModel == null) throw new InvalidOperationException("attempted Trigger on Uninitialized Case");
 
+            // 8.4.1/Table 8.5 - Closed: "Terminal state. In this state no new activity is allowed
+            // in the Case." PlanItemStateMachine.ConfigureForCasePlanModel already has no outgoing
+            // Permit(...) edges from Closed, so an unhandled trigger would already silently no-op
+            // via BaseBehavior.HandleUnhandledTrigger's log-only handler - this guard turns that
+            // implicit immutability into an explicit, observable failure at the Case's own public
+            // surface instead of a silent success-shaped no-op.
+            if (State.PlanItemState == PlanItemState.Closed)
+            {
+                throw new InvalidOperationException($"case {_caseInstanceId} is Closed; no further transitions are allowed");
+            }
+
             await _casePlanModel.Trigger(transition);
             return await GetSnapshot();
         }

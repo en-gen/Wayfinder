@@ -219,6 +219,61 @@ namespace Flow.Grains.Tests.Plan.PlanItem
         }
 
         [Fact]
+        public void Apply__Given_RepetitionRuleEvaluated__Then_RepeatableSet()
+        {
+            var subject = new PlanItemStore();
+
+            subject.Apply(new RepetitionRuleEvaluated
+            {
+                Result = true
+            });
+
+            subject.Repeatable.Should().BeTrue();
+        }
+
+        // 8.6.4 RepetitionRule
+        // ~~~~~
+        // "That first instantiation ... is not considered a repetition and therefore the value of
+        // the RepetitionRule's condition is discarded." A Discard-flagged evaluation must not
+        // become the persisted Repeatable determination.
+        [Fact]
+        public void Apply__Given_RepetitionRuleEvaluated_Discarded__Then_RepeatableUnchanged()
+        {
+            var subject = new PlanItemStore();
+
+            var @event = new RepetitionRuleEvaluated
+            {
+                Result = true,
+                Discard = true
+            };
+
+            subject.Apply(@event);
+
+            subject.Repeatable.Should().BeFalse("a discarded first evaluation must not persist its Result as Repeatable");
+            subject.RepeatableEvaluationError.Should().BeNull();
+            subject.Updated.Should().HaveValue()
+                .And.Be(@event.Updated, "the event still marks the store as updated for audit purposes");
+        }
+
+        [Fact]
+        public void Apply__Given_RepetitionRuleEvaluated_Discarded__Then_PriorRepeatablePreserved()
+        {
+            var subject = new PlanItemStore();
+            subject.Apply(new RepetitionRuleEvaluated
+            {
+                Result = true
+            });
+
+            subject.Apply(new RepetitionRuleEvaluated
+            {
+                Result = false,
+                Discard = true
+            });
+
+            subject.Repeatable.Should().BeTrue("a discarded evaluation must not overwrite an earlier real determination");
+        }
+
+        [Fact]
         public void Apply__Given_ParentSuspended__Then_ParentSuspendedStateSet()
         {
             var preSuspendedState = PlanItemState.Enabled;

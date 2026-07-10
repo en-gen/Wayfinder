@@ -42,11 +42,17 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // ~~~~~
         // A PlanItem that is defined by an EventListener or Milestone MUST NOT have
         // exitCriteriaRefs.
-        private Task HandleEnterAvailableFromCreate() =>
-            Task.WhenAll(
-                EvaluateRepetitionRule(),
-                EvaluateRequiredRule(),
-                SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create));
+        // Sequential, not Task.WhenAll - see StageBehavior.HandleEnterAvailableFromCreate's
+        // remarks (#19). A Milestone has no EnableOrStart cascade, but the same
+        // raise/confirm interleaving hazard exists between the two rule evaluations
+        // (EvaluateRequiredRule confirms internally while EvaluateRepetitionRule is
+        // mid-flight to the expression grain).
+        private async Task HandleEnterAvailableFromCreate()
+        {
+            await EvaluateRepetitionRule(discard: true);
+            await EvaluateRequiredRule();
+            await SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create);
+        }
 
         protected override async Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null)
         {

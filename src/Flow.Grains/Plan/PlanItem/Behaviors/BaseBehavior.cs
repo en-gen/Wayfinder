@@ -30,11 +30,21 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             PlanItemDefinition = planItemDefinition ?? throw new ArgumentNullException(nameof(planItemDefinition));
             StateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
 
+            // TryRepeatOnCompleteOrTerminate is registered per-TRIGGER, not per-state: Table 8.8
+            // attaches the no-entry-criteria RepetitionRule re-evaluation to the "complete" and
+            // "terminate" transitions specifically, and its "exit" row (exit criteria satisfied,
+            // or propagation from an outer Stage terminating) carries no such note - so an
+            // Exit-triggered arrival in Terminated must NOT re-evaluate. This matters doubly for
+            // parent cascades: a terminating Stage propagates Exit to its children (see
+            // HandleParentTransitioned), and respawning a child while its parent shuts down would
+            // be exactly backwards.
             StateMachine.Configure(PlanItemState.Completed)
-                .OnEntryAsync(HandleEnterTerminal);
+                .OnEntryAsync(HandleEnterTerminal)
+                .OnEntryFromAsync(PlanItemTransition.Complete, TryRepeatOnCompleteOrTerminate);
 
             StateMachine.Configure(PlanItemState.Terminated)
-                .OnEntryAsync(HandleEnterTerminal);
+                .OnEntryAsync(HandleEnterTerminal)
+                .OnEntryFromAsync(PlanItemTransition.Terminate, TryRepeatOnCompleteOrTerminate);
 
             StateMachine.OnTransitionedAsync(HandleTransitioned);
 
@@ -52,10 +62,62 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                     ? Define()
                     : Task.CompletedTask);
 
-        public Task Trigger(PlanItemTransition transition) => StateMachine.FireAsync(transition);
+        // virtual: StageBehavior overrides this to gate an externally-invoked manual Complete
+        // on Table 8.12's completion criteria (8.6.1) - see its remarks.
+        public virtual Task Trigger(PlanItemTransition transition) => StateMachine.FireAsync(transition);
 
-        private Task HandleEnterTerminal() => Task.WhenAll(Host.Definition.ExitCriteria
+        // protected: CasePlanModelBehavior reuses this for its own Closed-state entry (8.4.1/
+        // Table 8.5) - Closed is reached from Completed/Terminated/Failed/Suspended, and only the
+        // first two of those already run this cleanup on their own entry, so re-running it on
+        // entry to Closed guarantees no dangling ExitCriteria subscription survives into the
+        // Case's terminal, immutable state regardless of which prior state it came from.
+        protected Task HandleEnterTerminal() => Task.WhenAll(Host.Definition.ExitCriteria
             .Select(c => Host.UnsubscribeFrom<SentrySatisfiedEvent>(c.SentryRef)));
+
+        // 8.6.4 RepetitionRule / 5.4.11.3
+        // ~~~~~
+        // "Stage and Task instances with a RepetitionRule that do not have any entry criteria,
+        // will try to create a new instance every time an instance transitions into the Complete
+        // or Terminate state. Under that condition the RepetitionRule is re-evaluated and if the
+        // Expression evaluates to TRUE, a new instance is created." Registered as a second entry
+        // action alongside HandleEnterTerminal, never folded into it - HandleEnterTerminal also
+        // backs CasePlanModelBehavior's Closed entry, which must NOT re-run this repetition check
+        // (Closed is not "Complete or Terminate").
+        //
+        // Scoped to "Stage and Task instances" per the spec text: EventListeners "cannot have
+        // RepetitionRule" (5.4.11.3), and a Milestone's no-entry-criteria case is not granted
+        // this re-spawn trigger (8.6.4 names only Stage and Task for it) - so the type-check is
+        // the spec's own scoping, not defensive noise. The outermost CasePlanModel Stage is
+        // excluded: it implements the CASE lifecycle (8.4.1), whose Table 8.6 defines no
+        // repetition semantics, and it has no parent Stage listening for a repeat to instantiate.
+        //
+        // Publish-before-Repeated ordering matches the entry-criterion repetition path
+        // (StageBehavior/TaskBehavior.HandleSentrySatisfied). The trailing ConfirmEvents() is
+        // Bug #61 discipline: this method runs as a state ENTRY action, i.e. AFTER
+        // HandleTransitioned already raised-and-confirmed the Transitioned event (Stateless
+        // invokes the transition callback before the destination state's entry actions), so the
+        // RepetitionRuleEvaluated/Repeated events raised here have no later confirm to ride on
+        // and would otherwise sit queued in TentativeState indefinitely.
+        private async Task TryRepeatOnCompleteOrTerminate()
+        {
+            if (!(PlanItemDefinition is Stage || PlanItemDefinition is BaseTask)) return;
+            if (PlanItemDefinition is Stage { IsCasePlanModel: true }) return;
+            if (Host.Definition.EntryCriteria.Any()) return;
+            if (GetItemControl()?.RepetitionRule == null) return;
+
+            if (await EvaluateRepetitionRule())
+            {
+                await Host.Publish(new PlanItemRepetitionCriteriaMetEvent(
+                    Host.Scope,
+                    Host.InstanceId,
+                    Host.DefinitionId,
+                    Host.State.Repetition));
+
+                Host.RaiseEvent(new Repeated());
+            }
+
+            await Host.ConfirmEvents();
+        }
 
         private async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
         {
@@ -193,17 +255,26 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // time an entry criterion with an OnPart is satisfied the RepetitionRule’s condition is re-evaluated and if it evaluates to
         // TRUE, a new instance of the Task, Stage, or Milestone is created and transition to Available. This allows users to
         // control the number of repetitions, and under what conditions repetitions should occur.
-        protected Task<bool> EvaluateRepetitionRule()
+        //
+        // discard: true only for the FIRST evaluation (HandleEnterAvailableFromCreate, on the
+        // Create -> Available transition) - the rule is still evaluated (so a malformed
+        // expression still surfaces as a Fault, same as any other evaluation) and a
+        // RepetitionRuleEvaluated is still raised for audit purposes, but flagged so
+        // PlanItemStore/CaseStore do not let its Result update the persisted Repeatable flag, and
+        // the boolean this method returns MUST NOT be acted on by the discarding caller. Every
+        // other call site (entry-criterion OnPart satisfied; the no-entry-criteria Complete/
+        // Terminate re-evaluation above) is a real, actionable evaluation and leaves this false.
+        protected Task<bool> EvaluateRepetitionRule(bool discard = false)
         {
             var itemControl = GetItemControl();
             var rule = itemControl?.RepetitionRule;
             // 5.5.1 - PlanItemControl attributes and model associations
             // ~~~~~
             // If no RepetitionRule object is specified, the default is FALSE.
-            return EvaluateRule<RepetitionRuleEvaluated>(rule, false);
+            return EvaluateRule<RepetitionRuleEvaluated>(rule, false, @event => @event.Discard = discard);
         }
 
-        private async Task<bool> EvaluateRule<TEvent>(IExecutableRule rule, bool defaultResult)
+        private async Task<bool> EvaluateRule<TEvent>(IExecutableRule rule, bool defaultResult, Action<TEvent> configureEvent = null)
             where TEvent : RuleEvaluated<bool>
         {
             ExecutableResult<bool> ruleResult = null;
@@ -217,6 +288,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             var @event = Activator.CreateInstance<TEvent>();
             @event.Result = result;
             @event.Error = ruleResult?.Message;
+            configureEvent?.Invoke(@event);
 
             Host.RaiseEvent(@event);
 
