@@ -27,5 +27,20 @@ namespace Flow.Grains.Plan.CaseFileItem
         public const string Scope = "casefile";
 
         public static string For(string caseFileItemDefinitionId) => $"{Scope}.{caseFileItemDefinitionId}";
+
+        // D3 - 8.5's last sentence: "Sentries with no OnPart must have an IfPart, and that IfPart
+        // will be evaluated for all CaseFileItem events because IfPart expressions are based on
+        // CaseFileItem properties." A standalone-IfPart Sentry (Definition.OnParts.Count == 0) has
+        // no per-item sourceRef to subscribe to - CaseFileItemGrain.PublishTransition additionally
+        // publishes every transition here, a case-wide stream keyed by this fixed sentinel rather
+        // than any specific CaseFileItem id, which such a Sentry subscribes to instead (see
+        // SentryGrain.SubscribeToOnPartTransitions). Chosen over enumerating every CaseFileItem id
+        // from the Case's caseFileModel (topology (a)): CaseFileItem instances are created ad-hoc,
+        // not from a model-driven definition graph (see this class's other remarks, from #16) - no
+        // such enumerable list of "every CaseFileItem id for this case" exists to walk, and new
+        // items can appear at any time during a case's life, which a fixed-at-subscription-time
+        // per-id fan-out could never keep up with. A case-wide stream needs no such enumeration and
+        // naturally covers dynamically-created items.
+        public const string CaseWideSentinel = "casefile.*";
     }
 }

@@ -272,6 +272,47 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockPlanningTableGrain.Verify(x => x.Define(testStore.CaseDefinitionId, stage.PlanningTable), Times.Once);
         }
 
+        // D6 - a Stage's ExitCriteria must be subscribed on the create path, not left to
+        // base.Activate()'s Resume-only subscription (which is a no-op unless a subscription handle
+        // already exists - see StageBehavior.HandleEnterAvailableFromCreate's remarks). Mirrors
+        // TaskBehavior's existing (IsBlocking-gated) exit-criteria-on-create subscription, but
+        // unconditional per Table 5.34 (no equivalent gate exists for Stage.exitCriteria).
+        [Fact]
+        public async Task HandleEnterAvailableFromCreate__Given_StageWithExitCriteria__Then_SubscribeExitCriteriaWithCreateFlag()
+        {
+            var exitSentryId = ShortGuid.NewGuid();
+
+            var stage = new Stage();
+
+            var pi = new Interfaces.Model.PlanItem
+            {
+                DefinitionRef = stage.Id,
+                ExitCriteria = { new ExitCriterion { SentryRef = exitSentryId } }
+            };
+
+            var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Definition)
+                .Returns(pi);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+
+            await (Task) typeof(StageBehavior)
+                .GetMethod("HandleEnterAvailableFromCreate", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[0]);
+
+            mockHost.Verify(x => x.SubscribeTo(
+                exitSentryId,
+                It.IsAny<Func<SentrySatisfiedEvent, StreamSequenceToken, Task>>(),
+                StreamFlags.Create),
+                Times.Once);
+        }
+
         [Fact]
         public async Task HandleEnterActiveFromStart__Given_StageWithPlanItems__Then_CreateEachChild()
         {
