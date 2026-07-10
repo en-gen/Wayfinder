@@ -9,8 +9,9 @@ Case.Flow is a distributed CMMN runtime. Each case instance, plan item, sentry, 
 Implemented today:
 
 - Case plan model, stage, and task lifecycles (state machines per CMMN §8.4)
+- Model-driven case instantiation — `ICaseGrain.Create()` builds the plan-item tree from the CasePlanModel (discretionary items excluded, per §8.7 planning semantics)
 - Human tasks, milestones, and event listeners (timer, user)
-- Sentry/criterion evaluation — entry and exit criteria, onPart AND-semantics, ifPart conditions over case data
+- Sentry/criterion evaluation — entry and exit criteria, onPart AND-semantics, ifPart conditions over case data, standalone-ifPart sentries, per-onPart re-arm across repetitions
 - Case file items (§8.3) — full lifecycle, JSON content, and case-file events that drive sentries and timer start-triggers
 - Planning tables, discretionary items, and applicability rules (risk-based tailoring)
 - Manual activation, repetition, and required rules
@@ -20,8 +21,7 @@ Implemented today:
 
 Known gaps (tracked as work items; see the roadmap):
 
-- `ICaseGrain.Create()` does not yet instantiate the case plan model's plan items (behavior stub — Bug #55); tests drive plan-item grains directly
-- IfPart-only sentries (no onParts) never evaluate, and multi-onPart sentries don't re-arm after a false ifPart (work item #18)
+- A stage's bookkeeping of repeated child instances is incomplete — repetition works at the plan-item level, but the owning stage never learns of repeated instances (Bug #62)
 - ProcessTask / CaseTask / DecisionTask exist in the model but have no runtime behaviors
 - No REST API yet — clients use the Orleans grain interfaces (M2)
 - No production deployment configuration (localhost clustering + volatile timers; M2)
