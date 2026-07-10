@@ -14,9 +14,6 @@ using Orleans.Streams;
 
 namespace Flow.Grains.Plan.PlanItem.Behaviors
 {
-    // TODO: subscribe to PlanItem ExitCriteria (when?)
-    // TODO: subscribe to PlanItemDefinition ExitCriteria (when?)
-
     public class StageBehavior : BaseBehavior<Stage>
     {
         private StageBehaviorStore StageStore => Host.State.BehaviorExtension as StageBehaviorStore ?? throw new InvalidOperationException();
@@ -99,6 +96,25 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // transition. The RequiredRule Boolean expression MUST be
         // evaluated in this transition, and its Boolean value SHOULD be
         // maintained for the rest of the life of the Stage or Task instance.
+        // ==========
+        // D6 - exit-criteria subscription on the create path
+        // ~~~~~
+        // 8.5: "Exit criterion sentries are considered ready for evaluation while the ... Stage ...
+        // is in Active state." A Stage's ExitCriteria are only reachable (StateMachine.CanFire
+        // (PlanItemTransition.Exit) from Available/Enabled/Active/etc. - see
+        // PlanItemStateMachine.ConfigureForStageOrTask) once this create path has already run, so
+        // there is no later "when Active" moment that separately arms the subscription - it MUST
+        // happen here, same as EntryCriteria a few lines above and same as
+        // TaskBehavior.HandleEnterAvailableFromCreate already does for its own ExitCriteria.
+        // Before this fix, only base.Activate()'s Resume-only subscription
+        // (BaseBehavior.Activate -> SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Resume))
+        // ever touched this stream; CmmnElementGrain.SubscribeTo's Resume branch is a no-op unless a
+        // subscription handle already exists (GetAllSubscriptionHandles().Any()), and nothing ever
+        // created one - so a Stage's exit criteria were not merely delayed until a
+        // deactivate/reactivate cycle, they were never subscribed at all. Unlike TaskBehavior's
+        // ExitCriteria (gated by IsBlocking - a non-blocking Task completes immediately and 5.24
+        // forbids it from declaring exitCriteriaRefs at all), Table 5.34 places no equivalent
+        // condition on a Stage's ExitCriteria, so this subscription is unconditional.
         private Task HandleEnterAvailableFromCreate() =>
             Task.WhenAll(
                 EvaluateRepetitionRule(),
@@ -109,8 +125,8 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // A missing entry criteria(Sentry) is considered TRUE.
                 Host.Definition.EntryCriteria.Any()
                     ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
-                    : EnableOrStart()
-                );
+                    : EnableOrStart(),
+                SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create));
 
         private async Task EnableOrStart()
         {

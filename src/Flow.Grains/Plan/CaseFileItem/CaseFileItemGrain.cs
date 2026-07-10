@@ -2,11 +2,14 @@ using System;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
+using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Mapping;
 using Flow.Grains.Interfaces.Plan.CaseFileItem;
 using Flow.Grains.Plan.CaseFileItem.Events;
 using Flow.Grains.Plan.CmmnElement;
 using Microsoft.Extensions.Logging;
+using Orleans;
+using Orleans.Streams;
 
 namespace Flow.Grains.Plan.CaseFileItem
 {
@@ -29,6 +32,10 @@ namespace Flow.Grains.Plan.CaseFileItem
     // as an IDREF (see Spec.CMMN.MODEL.cs). No new stream-key plumbing was needed: reusing the
     // inherited publish path is what makes SentryGrain's and TimerEventListenerBehavior's existing
     // (already-subscribing) handlers receive these events for the first time.
+    //
+    // D3 addendum: PublishTransition below ALSO publishes every transition to a second, case-wide
+    // stream (CaseFileItemAddress.CaseWideSentinel), for standalone-IfPart Sentries (0 OnParts) to
+    // subscribe to - see CaseFileItemAddress.CaseWideSentinel's and SentryGrain's remarks.
     //
     // Note SentryGrain.HandleCaseFileItemTransitioned matches purely on
     // "x.SourceRef.Equals(@event.SourceDefinitionId)" - unlike HandlePlanItemTransitioned, it does
@@ -176,7 +183,26 @@ namespace Flow.Grains.Plan.CaseFileItem
             }
         }
 
-        private Task PublishTransition(Interfaces.Model.CaseFileItemTransition standardEvent) =>
-            PublishEvent(new CaseFileItemTransitionedEvent(_scope, Definition.Id, standardEvent));
+        // D3 - see CaseFileItemAddress.CaseWideSentinel's remarks for why every transition is ALSO
+        // published to a fixed, case-wide stream: a standalone-IfPart Sentry (no OnParts) has no
+        // specific CaseFileItem sourceRef to subscribe to per 8.5's last sentence, and needs to
+        // re-evaluate its IfPart against every CaseFileItem event regardless of which item
+        // transitioned. Two distinct publishes (not one call with two subscribers merged) because
+        // the per-item stream (keyed on Definition.Id) and the case-wide stream (keyed on the fixed
+        // sentinel) are genuinely different Orleans streams with different keys - PublishEvent
+        // (inherited from CmmnElementGrain) only ever targets Definition.Id, so the case-wide
+        // publish needs its own call.
+        private async Task PublishTransition(Interfaces.Model.CaseFileItemTransition standardEvent)
+        {
+            var @event = new CaseFileItemTransitionedEvent(_scope, Definition.Id, standardEvent);
+
+            await Task.WhenAll(
+                PublishEvent(@event),
+                GetCaseWideEventStream<CaseFileItemTransitionedEvent>().OnNextAsync(@event));
+        }
+
+        private IAsyncStream<TEvent> GetCaseWideEventStream<TEvent>() =>
+            this.GetStreamProvider("Default")
+                .GetCaseEventStream<TEvent>(_caseInstanceId, CaseFileItemAddress.CaseWideSentinel);
     }
 }
