@@ -124,9 +124,36 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             }
         }
 
-        private Task HandleEnterActiveFromStart() =>
-            Task.WhenAll(PlanItemDefinition.PlanItems
+        // Shared with CasePlanModelBehavior: 8.6.1 Stage semantics describe child PlanItem
+        // instantiation as happening on entry to Active, regardless of which trigger reaches
+        // Active (Start/ManualStart for an ordinary Stage; Create for the CasePlanModel's
+        // outermost Stage - see Table 8.6/Table 5.31, and CasePlanModelBehavior's remarks).
+        //
+        // 5.4.9.2/8.7 - DiscretionaryItem / Planning
+        // ~~~~~
+        // Only PlanItemDefinition.PlanItems (the plan) are instantiated here.
+        // PlanningTable.DiscretionaryItems are NOT instantiated on entry to Active: a
+        // DiscretionaryItem instance is planned "to the discretion" of a Case worker, moved
+        // into the plan only when a worker selects it from the PlanningTable at run-time
+        // (8.7 Planning). Auto-instantiating them here would contradict that definition.
+        //
+        // ConfirmEvents() here (found necessary while wiring CasePlanModelBehavior, #55): Stateless
+        // invokes StateMachine.OnTransitionedAsync's callback (BaseBehavior.HandleTransitioned,
+        // which raises Transitioned and confirms it) BEFORE the destination state's
+        // OnEntryFromAsync action - i.e. THIS method runs after that confirm has already
+        // happened, not before. Each CreateChild call below raises a ChildCreated event on THIS
+        // Stage/CasePlanModel instance (not the child - the child confirms its own Defined/
+        // Transitioned independently), and nothing later in the current transition confirms
+        // them, so without an explicit confirm here they remain queued in TentativeState
+        // indefinitely. Confirmed once after all children are created rather than per-child:
+        // ConfirmEvents() persists everything queued so far, so one call covers the batch.
+        protected async Task HandleEnterActiveFromStart()
+        {
+            await Task.WhenAll(PlanItemDefinition.PlanItems
                 .Select(x => CreateChild(x)));
+
+            await Host.ConfirmEvents();
+        }
 
         protected override async Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null)
         {
