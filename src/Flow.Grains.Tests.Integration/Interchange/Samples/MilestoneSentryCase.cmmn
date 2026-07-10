@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #20 flagship sample: the same shape CasePlanModelInstantiationIntegrationTests /
+  CaseFileItemSentryIntegrationTests build by hand in C# (Milestone + Sentry with a
+  CaseFileItemOnPart + IfPart, plus a CaseFileItemDefinition), authored here as spec-conformant
+  CMMN 1.1 XML interchange (spec §9.3) instead. CmmnImportDeployIntegrationTests imports this
+  file, deploys it through the existing ICaseDefinitionGrain.Define/ICaseGrain.Create seam
+  unchanged, drives the case file item, and asserts the Milestone completes - a .cmmn FILE running
+  end-to-end.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             xmlns:tns="http://case.flow/samples/milestone-sentry"
+             targetNamespace="http://case.flow/samples/milestone-sentry"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_MilestoneSentry"
+             name="MilestoneSentrySample"
+             exporter="Case.Flow sample author"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CaseFileItemDefinition_1"
+                          name="TheCaseFileItemDef"
+                          definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="MilestoneSentryCase" name="MilestoneSentryCase">
+    <caseFileModel>
+      <caseFileItem id="TheCaseFileItem"
+                    name="TheCaseFileItem"
+                    definitionRef="tns:CaseFileItemDefinition_1"
+                    multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="EntrySentry"/>
+      </planItem>
+      <sentry id="EntrySentry" name="EntrySentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="TheCaseFileItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+        <ifPart id="IfPart_1" contextRef="TheCaseFileItem">
+          <condition language="expression://lang/jint" body="value.amount &gt; 100"/>
+        </ifPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>
