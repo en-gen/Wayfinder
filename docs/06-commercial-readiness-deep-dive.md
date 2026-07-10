@@ -46,7 +46,7 @@ The XSD-generated metamodel (`Spec.CMMN.MODEL.cs`, generated from the official O
 
 ### 2.3 Confirmed deviations (adjudicated, with false positives removed)
 
-> **Registry status:** this document is the point-in-time analysis (2026-07-06); living status is maintained on the wiki's *Current State and Gaps* page. Resolved since authoring: **D1** (PR !18, 2026-07-09 — `ExpressionGrain` binds the context CaseFileItem into sandboxed Jint), **D2** (PR !17, 2026-07-09 — `CaseFileItemGrain`, full §8.3 lifecycle, events wired to sentries/timers). Found post-authoring: `ICaseGrain.Create()` never instantiates plan items (`CasePlanModelBehavior` stub — Bug #55); sentry onPart occurrences were permanently swallowed after a false ifPart (fixed in PR !18 for single-onPart sentries; multi-onPart re-arm semantics → work item #18).
+> **Registry status:** this document is the point-in-time analysis (2026-07-06). It is deliberately NOT maintained row-by-row — the registry is being burned down at a pace that would make any enumeration here stale within days. The living status of every deviation and blocker (including rows resolved since authoring and deviations discovered after it) is maintained on the wiki's *Current State and Gaps* page — consult it before citing any row below as open.
 
 Two findings initially flagged as critical were **overturned by direct spec reading** and are *not* bugs:
 - *ManualActivationRule default*: Table 5.51 (spec p. 52) says absence ⇒ "considered TRUE". `BaseBehavior.cs:152` matches. (Note for product: Flowable inverts this pragmatically; keep an engine option in mind.)
