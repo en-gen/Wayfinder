@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.6 Case instance transitions (terminate / reactivate).
+  ~~~~~
+  Table 8.6: "terminate: [Active -> Terminated]"..."reactivate: [{Completed,Terminated,Suspended,
+  Failed} -> Active] Transition that allows a Case worker (human) to reactivate a Case instance
+  that is in one of the semi-terminal or terminal states." Driven purely through
+  ICaseGrain.Trigger - the outermost Stage instance's OWN lifecycle (8.4.1), not a cascade to any
+  child.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-case-terminate-reactivate"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleCaseTerminateReactivate"
+             name="LifecycleCaseTerminateReactivateSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleCaseTerminateReactivateCase" name="LifecycleCaseTerminateReactivateCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA"/>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

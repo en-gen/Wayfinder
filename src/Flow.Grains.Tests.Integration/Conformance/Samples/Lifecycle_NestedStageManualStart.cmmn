@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.8 manual start (Stage) + 8.7 nested instantiation.
+  ~~~~~
+  Table 8.8 (manual start): "Enabled -> Active. Transition by Case worker (human) decision" - for
+  a Stage, entering Active instantiates its planned PlanItems (8.7: "If a Stage instance is in
+  Active state, then the planned PlanItems are instantiated"). StageA declares no
+  manualActivationRule (Table 5.51 default TRUE), so it waits in Enabled for the Case worker's
+  ManualStart; TaskA (FALSE rule) then auto-starts inside it. This is the manual-start
+  counterpart of KnownGap_NestedStageAutoStart.cmmn - the auto-start route crashes today, this
+  route works, and this suite pins the working one while quarantining the broken one. Also the
+  fixture for the nested-stage suspend-cascade probe (KnownGapScenarios - propagation is
+  stream-dead today).
+
+  MODELING NOTE: TaskA's definition is hoisted to the casePlanModel level (5.4.3 ancestor
+  references) - see KnownGap_NestedDefinitionDeclaration.cmmn for why.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-nested-stage-manual-start"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleNestedStageManualStart"
+             name="LifecycleNestedStageManualStartSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleNestedStageManualStartCase" name="LifecycleNestedStageManualStartCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageA" name="PlanItemStageA" definitionRef="StageA"/>
+      <stage id="StageA" name="StageA" autoComplete="false">
+        <planItem id="PlanItemTaskA" name="PlanItemTaskA" definitionRef="TaskA"/>
+      </stage>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_Task">
+          <manualActivationRule id="MAR_Task">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

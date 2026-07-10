@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.5 Sentry AND-join semantics.
+  ~~~~~
+  8.5: "A Sentry is satisfied when... All of the OnParts are satisfied." EntrySentry declares TWO
+  CaseFileItemOnParts (ItemA update, ItemB update) with no IfPart - both must occur, in either
+  order, before MilestoneA's entry criterion is satisfied; either alone must not be enough.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-and-join"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryAndJoin"
+             name="SentryAndJoinSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryAndJoinCase" name="SentryAndJoinCase">
+    <caseFileModel>
+      <caseFileItem id="ItemA" name="ItemA" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+      <caseFileItem id="ItemB" name="ItemB" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="EntrySentry"/>
+      </planItem>
+      <sentry id="EntrySentry" name="EntrySentry">
+        <caseFileItemOnPart id="OnPart_A" sourceRef="ItemA">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+        <caseFileItemOnPart id="OnPart_B" sourceRef="ItemB">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

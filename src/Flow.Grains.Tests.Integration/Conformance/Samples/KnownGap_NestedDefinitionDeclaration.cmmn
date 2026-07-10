@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 5.4.8 tStage.planItemDefinitions nested declaration (KNOWN GAP,
+  discovered by this suite).
+  ~~~~~
+  5.4.8/Table 5.34: a Stage aggregates its own planItemDefinitions - declaring TaskA INSIDE
+  <stage id="StageA"> is the spec's primary containment shape (CMMN11.xsd tStage carries the
+  planItemDefinition substitution group at every Stage level, not just the casePlanModel), and
+  the capability lint accepts it. Expected per 8.7: when StageA becomes Active, PlanItemTaskA is
+  instantiated from the nested TaskA definition. Every other conformance sample in this suite
+  hoists definitions to the casePlanModel level (5.4.3 ancestor references) specifically to route
+  around this gap - this file is the one that does NOT, pinning the gap itself. StageA declares
+  no manualActivationRule and is manual-started by the scenario, keeping the separate auto-start
+  gap (KnownGap_NestedStageAutoStart.cmmn) out of this probe's way. See KnownGapScenarios.cs for
+  the observed failure mode and evidence.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/knowngap-nested-definition-declaration"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_KnownGapNestedDefinitionDeclaration"
+             name="KnownGapNestedDefinitionDeclarationSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="KnownGapNestedDefinitionDeclarationCase" name="KnownGapNestedDefinitionDeclarationCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageA" name="PlanItemStageA" definitionRef="StageA"/>
+      <stage id="StageA" name="StageA" autoComplete="false">
+        <planItem id="PlanItemTaskA" name="PlanItemTaskA" definitionRef="TaskA"/>
+        <humanTask id="TaskA" name="TaskA" isBlocking="true"/>
+      </stage>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

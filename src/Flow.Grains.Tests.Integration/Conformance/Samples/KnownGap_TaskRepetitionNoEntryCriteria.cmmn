@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.6.4 RepetitionRule, no-entry-criteria repeat-on-complete
+  (D7, KNOWN GAP).
+  ~~~~~
+  8.6.4: "Stage and Task instances with a RepetitionRule that do not have any entry criteria will
+  try to create a new instance every time an instance transitions into the Complete or Terminate
+  state." SourceTask has RepetitionRule=TRUE and declares NO entryCriterion at all, so it
+  auto-starts to Active on Create - completing it once must, per this exact clause, cause the
+  owning CasePlanModel to instantiate a second SourceTask instance. See KnownGapScenarios.cs for
+  the observed (non-conformant) result and bug citation.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/knowngap-task-repetition-no-entry-criteria"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_KnownGapTaskRepetitionNoEntryCriteria"
+             name="KnownGapTaskRepetitionNoEntryCriteriaSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="KnownGapTaskRepetitionNoEntryCriteriaCase" name="KnownGapTaskRepetitionNoEntryCriteriaCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemSource" name="PlanItemSource" definitionRef="SourceTask"/>
+      <humanTask id="SourceTask" name="SourceTask" isBlocking="true">
+        <defaultControl id="Control_1">
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+          <repetitionRule id="RR_1">
+            <condition language="expression://lang/jint" body="true"/>
+          </repetitionRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

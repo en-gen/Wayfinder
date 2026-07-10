@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Tables 8.10/8.11 Milestone instance lifecycle.
+  ~~~~~
+  Table 8.11: "create: [0 -> Available]", "suspend: [Available -> Suspended] Transition by Case
+  worker (human) decision", "resume: [Suspended -> Available]", "terminate: [Available ->
+  Terminated] Transition by Case worker (human) decision." MilestoneA has an entry criterion
+  referencing a sentry that never fires in this scenario (WaitSentry, keyed to a CaseFileItem the
+  scenario never touches), so it stays Available while the scenario drives the Case-worker
+  transitions directly. autoComplete=false keeps the Case Active when MilestoneA terminates.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-milestone"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleMilestone"
+             name="LifecycleMilestoneSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="LifecycleMilestoneCase" name="LifecycleMilestoneCase">
+    <caseFileModel>
+      <caseFileItem id="NeverTouchedItem" name="NeverTouchedItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="WaitSentry"/>
+      </planItem>
+      <sentry id="WaitSentry" name="WaitSentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="NeverTouchedItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

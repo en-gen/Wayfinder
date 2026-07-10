@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.5 Sentry ifPart over CaseFile context (D1 context binding).
+  ~~~~~
+  8.5: "the IfPart specifies a condition... that evaluates over the CaseFile." StatusItem's
+  update must occur (OnPart) AND its bound value's `status` property must equal "approved"
+  (IfPart, contextRef-bound) before EntrySentry is satisfied - a string-typed condition,
+  deliberately distinct from the numeric threshold the ADO #20/#17 flagship samples use, to pin
+  the context binder against a different JSON shape.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-ifpart-context"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryIfPartContext"
+             name="SentryIfPartContextSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="StatusItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryIfPartContextCase" name="SentryIfPartContextCase">
+    <caseFileModel>
+      <caseFileItem id="StatusItem" name="StatusItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="EntrySentry"/>
+      </planItem>
+      <sentry id="EntrySentry" name="EntrySentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="StatusItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+        <ifPart id="IfPart_1" contextRef="StatusItem">
+          <condition language="expression://lang/jint" body="value.status == 'approved'"/>
+        </ifPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

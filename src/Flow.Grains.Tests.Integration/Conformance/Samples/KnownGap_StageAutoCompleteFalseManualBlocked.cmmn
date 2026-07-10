@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.12 Stage completion, autoComplete=FALSE (D4, KNOWN GAP).
+  ~~~~~
+  Table 8.12 (autoComplete=FALSE): a Stage completes when "There are no Active children AND (all
+  children are in {Disabled, Completed, Terminated, Failed} AND there are no DiscretionaryItems)
+  OR (Manual Completion AND all required (requiredRule evaluates to TRUE) children are in
+  {Disabled, Completed, Terminated, Failed})". Per the project's adjudicated reading of that
+  OR-structure (deviation D4, docs/06 2.3), the Manual-Completion branch requires only the
+  REQUIRED children to be terminal - a non-required child still Active must not block a Case
+  worker's manual completion option. StageA has one required task (RequiredTask) and one
+  non-required task (NonRequiredTask, never completed by the scenario): once RequiredTask
+  completes, manual completion must become available. See KnownGapScenarios.cs for the observed
+  result and work-item citation.
+
+  MODELING NOTES: task definitions are hoisted to the casePlanModel level (5.4.3 ancestor-stage
+  references) - see KnownGap_NestedDefinitionDeclaration.cmmn for why nested declaration is
+  avoided. The requiredRule rides on the planItem's itemControl (5.24: a PlanItem's
+  PlanItemControl overrides the definition's DefaultControl). StageA declares no
+  manualActivationRule and is manual-started by the scenario, keeping the separate auto-start gap
+  (KnownGap_NestedStageAutoStart.cmmn) out of this probe's way.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/knowngap-stage-autocomplete-false"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_KnownGapStageAutoCompleteFalse"
+             name="KnownGapStageAutoCompleteFalseSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="KnownGapStageAutoCompleteFalseCase" name="KnownGapStageAutoCompleteFalseCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageA" name="PlanItemStageA" definitionRef="StageA"/>
+      <stage id="StageA" name="StageA" autoComplete="false">
+        <planItem id="PlanItemRequired" name="PlanItemRequired" definitionRef="RequiredTask">
+          <itemControl id="ItemControl_Required">
+            <manualActivationRule id="MAR_Required">
+              <condition language="expression://lang/jint" body="false"/>
+            </manualActivationRule>
+            <requiredRule id="ReqR_1">
+              <condition language="expression://lang/jint" body="true"/>
+            </requiredRule>
+          </itemControl>
+        </planItem>
+        <planItem id="PlanItemNonRequired" name="PlanItemNonRequired" definitionRef="NonRequiredTask"/>
+      </stage>
+      <humanTask id="RequiredTask" name="RequiredTask" isBlocking="true"/>
+      <humanTask id="NonRequiredTask" name="NonRequiredTask" isBlocking="true">
+        <defaultControl id="Control_NonRequired">
+          <manualActivationRule id="MAR_NonRequired">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

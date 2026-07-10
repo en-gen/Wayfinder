@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 5.51 / Table 8.8.
+  ~~~~~
+  Table 5.51 (PDF p.70-71): "If no ManualActivationRule is specified, then the default is
+  considered TRUE." Table 8.8: a Stage/Task instance whose ManualActivationRule evaluates TRUE
+  transitions Available -[enable]-> Enabled, not straight to Active - it then waits for a Case
+  worker's ManualStart. TaskA below declares NO manualActivationRule at all, pinning the DEFAULT
+  itself, not an explicitly-authored rule.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-manual-activation-default"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleManualActivationDefault"
+             name="LifecycleManualActivationDefaultSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleManualActivationDefaultCase" name="LifecycleManualActivationDefaultCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA"/>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

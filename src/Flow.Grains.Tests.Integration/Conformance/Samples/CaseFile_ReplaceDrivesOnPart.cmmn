@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.3 Table 8.2 CaseFileItem operation: replace.
+  ~~~~~
+  Table 8.2: "replace (Available -> Available)... Content replacement" is its own standardEvent,
+  distinct from update (Table 8.1's "property-level" change) - a Sentry keyed specifically to
+  replace must fire on ICaseFileItemGrain.Replace(...) and must NOT fire on a plain Update(...).
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/casefile-replace-drives-onpart"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_CaseFileReplaceDrivesOnPart"
+             name="CaseFileReplaceDrivesOnPartSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="CaseFileReplaceDrivesOnPartCase" name="CaseFileReplaceDrivesOnPartCase">
+    <caseFileModel>
+      <caseFileItem id="TheItem" name="TheItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="EntrySentry"/>
+      </planItem>
+      <sentry id="EntrySentry" name="EntrySentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="TheItem">
+          <standardEvent>replace</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>
