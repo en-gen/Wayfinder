@@ -36,4 +36,10 @@
     <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- ADO #20 - round-trip fidelity sample; embedded so tests never depend on the test
+         assembly's output directory layout. -->
+    <EmbeddedResource Include="Interchange\Samples\*.cmmn" />
+  </ItemGroup>
+
 </Project>

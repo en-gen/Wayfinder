@@ -47,4 +47,10 @@
     <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- ADO #20 - the flagship .cmmn file; embedded so the test never depends on the test
+         assembly's output directory layout. -->
+    <EmbeddedResource Include="Interchange\Samples\*.cmmn" />
+  </ItemGroup>
+
 </Project>
