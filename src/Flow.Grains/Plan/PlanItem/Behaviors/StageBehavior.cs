@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Interfaces.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
 using Flow.Grains.Plan.PlanItem.StateMachine;
@@ -115,18 +116,36 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // ExitCriteria (gated by IsBlocking - a non-blocking Task completes immediately and 5.24
         // forbids it from declaring exitCriteriaRefs at all), Table 5.34 places no equivalent
         // condition on a Stage's ExitCriteria, so this subscription is unconditional.
-        private Task HandleEnterAvailableFromCreate() =>
-            Task.WhenAll(
-                EvaluateRepetitionRule(),
-                EvaluateRequiredRule(),
-                // 8.7 - Stage and Task instances states
-                // ~~~~~
-                // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
-                // A missing entry criteria(Sentry) is considered TRUE.
-                Host.Definition.EntryCriteria.Any()
-                    ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
-                    : EnableOrStart(),
-                SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create));
+        // Sequential, not Task.WhenAll (#19, found via the D7 e2e): interleaving
+        // EvaluateRequiredRule's internal ConfirmEvents with EnableOrStart's nested
+        // FireAsync(Enable) (whose HandleTransitioned raises + confirms again) on the same
+        // journaled-grain adaptor intermittently NREs reading TentativeState mid-confirm -
+        // observed as a racy "Object reference not set" inside HandleTransitioned's log action
+        // during Trigger(Create), and, when the create arrives via a stream-delivery turn
+        // (HandleChildRepeated -> CreateChild), swallowed silently by the streaming agent
+        // (= Bug #62's missing repetitions). Rule evaluations stay ordered before any
+        // transition cascade; subscriptions are armed before EnableOrStart so nothing the
+        // cascade produces can be missed.
+        private async Task HandleEnterAvailableFromCreate()
+        {
+            await EvaluateRepetitionRule(discard: true);
+            await EvaluateRequiredRule();
+
+            await SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create);
+
+            // 8.7 - Stage and Task instances states
+            // ~~~~~
+            // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
+            // A missing entry criteria(Sentry) is considered TRUE.
+            if (Host.Definition.EntryCriteria.Any())
+            {
+                await SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create);
+            }
+            else
+            {
+                await EnableOrStart();
+            }
+        }
 
         private async Task EnableOrStart()
         {
@@ -347,13 +366,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
             }
 
-            var childSnapshots = await Task.WhenAll(StageStore.Children
-                .SelectMany(kvp => kvp.Value.Keys)
-                .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemInternalGrain>(
-                        Host.CaseInstanceId,
-                        $"{Host.Address}.{piInstanceId}")
-                    .GetSnapshot()));
-
+            var childSnapshots = await GetChildSnapshots();
 
             if (!Host.State.UserCompletable &&
                 StateMachine.CanFire(PlanItemTransition.Complete) &&
@@ -363,16 +376,22 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 Host.RaiseEvent(new UserCompletableCriteriaMet());
             }
 
-            // 8.6.1 - Stage.autoComplete
+            // Table 8.12 - Stage instance termination criteria
             // ~~~~~
             // autoComplete = TRUE
             // There are no Active children, AND all required (requiredRule evaluates to TRUE) children are
             // in {Disabled, Completed, Terminated, Failed}.
             //
             // autoComplete = FALSE
-            // There are no Active children AND (all children are in {Disabled, Completed, Terminated, Failed}
+            // (There are no Active children AND all children are in {Disabled, Completed, Terminated, Failed}
             // AND there are no DiscretionaryItems) OR (Manual Completion AND all required (requiredRule evaluates
             // to TRUE) children are in { Disabled, Completed, Terminated, Failed}).
+            //
+            // These are two INDEPENDENT OR-branches, not one combined condition: Branch 1 (below)
+            // is the automatic path this method evaluates on every child transition; Branch 2
+            // ("Manual Completion") is NOT evaluated here at all - it is an explicitly-invoked
+            // action (an external Trigger(Complete) call), gated by Trigger's override below,
+            // and deliberately does not require non-required children to also be done.
             if (@event.Destination.IsTerminal())
             {
                 if (PlanItemDefinition.AutoComplete)
@@ -387,15 +406,27 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                         await StateMachine.FireAsync(PlanItemTransition.Complete);
                     }
                 }
-                // ...There are no Active Children AND all children are in {Disabled, Completed, Terminated, Failed}
+                // Branch 1: ...There are no Active children AND all children (not just required
+                // ones) are in {Disabled, Completed, Terminated, Failed} AND there are no
+                // DiscretionaryItems left that a Case worker could still plan. "No
+                // DiscretionaryItems" is a standalone structural condition - it must not depend on
+                // Host.State.UserCompletable (a latched UI hint related to Branch 2, a different
+                // OR-branch entirely); conflating the two here was the original bug: a stage whose
+                // PlanningTable's items were all already planned could only complete if the
+                // UserCompletable latch happened to be set, and (because .All() on an empty
+                // sequence is true) a PlanningTable with zero DiscretionaryItems demanded the same
+                // latch for no reason. NOTE the null-check IS still doing double duty as "no
+                // DiscretionaryItems": an absent PlanningTable and a present-but-fully-planned one
+                // are both correctly "none pending" - .All() covers the empty table too.
                 else
                 {
+                    var noDiscretionaryItemsPending =
+                        PlanItemDefinition.PlanningTable == null ||
+                        PlanItemDefinition.PlanningTable.DiscretionaryItems
+                            .All(di => childSnapshots.Any(snap => snap.Definition.Id == di.Id));
+
                     if (childSnapshots.All(x => x.PlanItemState.IsTerminal()) &&
-                        // ...there are no (unplanned) DiscretionaryItems
-                        (PlanItemDefinition.PlanningTable == null ||
-                         Host.State.UserCompletable &&
-                         PlanItemDefinition.PlanningTable.DiscretionaryItems
-                             .All(di => childSnapshots.Any(snap => snap.Definition.Id == di.Id))) &&
+                        noDiscretionaryItemsPending &&
                         StateMachine.CanFire(PlanItemTransition.Complete))
                     {
                         Host.RaiseEvent(new FullyCompleteCriteriaMet());
@@ -404,6 +435,79 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
             }
         }
+
+        // Table 8.12 - Stage instance termination criteria, evaluated LIVE at the moment of an
+        // externally-invoked (manual) Complete - a Case worker completing a Stage by hand is
+        // exactly a Trigger(Complete) call arriving from outside (via IPlanItemGrain.Trigger /
+        // ICaseGrain.Trigger), as opposed to Branch 1 above, which HandleChildTransitioned
+        // evaluates and fires automatically on its own.
+        //
+        // autoComplete=FALSE, Branch 2 ("Manual Completion AND all required (requiredRule
+        // evaluates to TRUE) children are in {Disabled, Completed, Terminated, Failed}"): read the
+        // OR-structure precisely - unlike Branch 1 and unlike the autoComplete=TRUE column, this
+        // branch does NOT carry a "there are no Active children" conjunct and does NOT care about
+        // pending DiscretionaryItems. A still-Active NON-required child therefore must not block
+        // manual completion - which is the D4 headline: previously no manual-completion gate
+        // existed at all, so an external Complete fell through to the bare Stateless permit with
+        // no Table 8.12 check whatsoever, while the only criteria evaluation that DID exist (the
+        // automatic one above) required ALL children terminal.
+        //
+        // autoComplete=TRUE has no manual branch in Table 8.12 - its single column IS the
+        // completion criteria for any complete transition (8.8/Table 8.8: "For a Stage instance,
+        // the termination criteria described in Table 8.12 ... must be satisfied"), so a manual
+        // Complete on an autoComplete stage is held to that same column: no Active children AND
+        // required children terminal.
+        //
+        // Evaluated live from child snapshots rather than from the latched
+        // Host.State.UserCompletable flag: the latch is monotonic (never reset), so it both
+        // understates (a stage whose only blocker was a non-required Active child never latched
+        // under the old combined condition) and can overstate (a repetition spawning a NEW
+        // required child after the latch would leave it stale-true). The latched event remains as
+        // a UI hint; enforcement reads current state.
+        protected virtual async Task<bool> ManualCompletionCriteriaSatisfied()
+        {
+            var childSnapshots = await GetChildSnapshots();
+
+            var requiredChildrenTerminal = childSnapshots
+                .Where(x => x.Required)
+                .All(x => x.PlanItemState.IsTerminal());
+
+            return PlanItemDefinition.AutoComplete
+                ? childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) && requiredChildrenTerminal
+                : requiredChildrenTerminal;
+        }
+
+        // Gate ONLY an externally-invoked Complete, and only when the state machine could
+        // otherwise fire it - a Complete attempted from a non-Active state still falls through to
+        // the existing silent unhandled-trigger no-op (BaseBehavior.HandleUnhandledTrigger), same
+        // as every other invalid transition. When the machine is willing but Table 8.12 is not,
+        // fail loudly: this is a rule violation at the public surface, not an idempotent replay.
+        public override async Task Trigger(PlanItemTransition transition)
+        {
+            if (transition == PlanItemTransition.Complete &&
+                StateMachine.CanFire(PlanItemTransition.Complete) &&
+                !await ManualCompletionCriteriaSatisfied())
+            {
+                throw new InvalidOperationException(
+                    $"stage {Host.Scope}.{Host.InstanceId} does not satisfy Table 8.12's completion criteria: " +
+                    (PlanItemDefinition.AutoComplete
+                        ? "autoComplete=true requires no Active children and all required children terminal"
+                        : "manual completion requires all required children to be in {Disabled, Completed, Terminated, Failed}"));
+            }
+
+            await base.Trigger(transition);
+        }
+
+        // Live snapshots of every child instance this stage has created (including repetitions) -
+        // the same set HandleChildTransitioned's automatic criteria evaluate, reused by the
+        // manual-completion gate so both Table 8.12 paths judge the same population.
+        protected async Task<PlanItemSnapshot[]> GetChildSnapshots() =>
+            await Task.WhenAll(StageStore.Children
+                .SelectMany(kvp => kvp.Value.Keys)
+                .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemInternalGrain>(
+                        Host.CaseInstanceId,
+                        $"{Host.Address}.{piInstanceId}")
+                    .GetSnapshot()));
 
         private async Task HandleChildRepeated(PlanItemRepetitionCriteriaMetEvent @event, StreamSequenceToken token = null)
         {
@@ -425,12 +529,21 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 return;
             }
 
+            // Bug #62 root cause (fixed, #19): this template previously declared SIX placeholders
+            // but passed FIVE arguments (the long-standing CA2017 warning). Message-template
+            // renderers that format eagerly (MEL's FormattedLogValues via String.Format - e.g.
+            // the console logger, or Orleans.TestingHost's file logger) THROW FormatException on
+            // the mismatch, MEL rethrows it as AggregateException, and since this runs inside a
+            // stream-delivery turn the fault was swallowed by the streaming agent's
+            // retry-then-drop - so HandleChildRepeated appeared "never reached" and repetitions
+            // silently never spawned. The subscription wiring was correct the whole time.
             Host.LogWithContext(logger => logger.LogInformation(
-                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | instantiating repetition {ChildElementInstanceId} of {ChildElementDefinitionId}",
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | instantiating repetition {Repetition} of {ChildElementDefinitionId}",
                 Host.Definition.GetType().Name,
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
                 Host.InstanceId,
+                @event.CurrentRepetition + 1,
                 child.Id));
 
             Host.RaiseEvent(new ChildRepeated());

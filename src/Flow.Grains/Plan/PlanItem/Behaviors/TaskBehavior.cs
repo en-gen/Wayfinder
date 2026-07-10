@@ -54,20 +54,35 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // 5.24 - PlanItemAttributes
         // exitCriteria: A PlanItem that is defined by a Task that is non-blocking (isBlocking set
         // to FALSE) MUST NOT have exitCriteriaRefs.
-        private Task HandleEnterAvailableFromCreate() =>
-            Task.WhenAll(
-                EvaluateRepetitionRule(),
-                EvaluateRequiredRule(),
-                // 8.7 - Stage and Task instances states
-                // ~~~~~
-                // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
-                // A missing entry criteria(Sentry) is considered TRUE.
-                Host.Definition.EntryCriteria.Any()
-                    ? SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create)
-                    : EnableOrStart(),
-                PlanItemDefinition.IsBlocking
-                    ? SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create)
-                    : Task.CompletedTask);
+        // Sequential, not Task.WhenAll - see StageBehavior.HandleEnterAvailableFromCreate's
+        // remarks (#19): the WhenAll interleaving of EvaluateRequiredRule's ConfirmEvents with
+        // EnableOrStart's nested FireAsync intermittently corrupts the journaled-grain
+        // tentative-state read mid-confirm. Same ordering rationale: rules first, subscriptions
+        // armed before any transition cascade EnableOrStart may set off (a non-blocking task
+        // cascades all the way to Completed inside this call).
+        private async Task HandleEnterAvailableFromCreate()
+        {
+            await EvaluateRepetitionRule(discard: true);
+            await EvaluateRequiredRule();
+
+            if (PlanItemDefinition.IsBlocking)
+            {
+                await SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create);
+            }
+
+            // 8.7 - Stage and Task instances states
+            // ~~~~~
+            // While available, the Stage or Task instance is waiting for its entry criteria (Sentry) to become TRUE.
+            // A missing entry criteria(Sentry) is considered TRUE.
+            if (Host.Definition.EntryCriteria.Any())
+            {
+                await SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Create);
+            }
+            else
+            {
+                await EnableOrStart();
+            }
+        }
 
         private async Task EnableOrStart()
         {
