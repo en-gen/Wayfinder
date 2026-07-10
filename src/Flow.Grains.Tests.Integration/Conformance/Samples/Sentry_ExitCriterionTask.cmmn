@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.8 exit row + 8.5 exit-criterion readiness.
+  ~~~~~
+  Table 8.8: "exit: [{Available, Active, Enabled, Disabled, Suspended, Failed} -> Terminated]
+  Transition when the exit criteria of the Stage or Task instance becomes TRUE." 8.5: "Exit
+  criterion sentries are considered ready for evaluation while the CasePlanModel, State [sic],
+  or Task is in Active state." TaskA auto-starts to Active; updating ExitItem satisfies
+  ExitSentry, which must terminate TaskA without any Case-worker trigger.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-exit-criterion-task"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryExitCriterionTask"
+             name="SentryExitCriterionTaskSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryExitCriterionTaskCase" name="SentryExitCriterionTaskCase">
+    <caseFileModel>
+      <caseFileItem id="ExitItem" name="ExitItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA">
+        <exitCriterion id="ExitCriterion_1" sentryRef="ExitSentry"/>
+      </planItem>
+      <sentry id="ExitSentry" name="ExitSentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="ExitItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_1">
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

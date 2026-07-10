@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.8 start (Stage) + 8.7 instantiation (KNOWN GAP,
+  discovered by this suite).
+  ~~~~~
+  Table 8.8 (start): with a FALSE ManualActivationRule a Stage moves Available -> Active with no
+  Case-worker involvement, and 8.7 requires its planned PlanItems to instantiate on that entry to
+  Active. StageA below is exactly that shape - and its activation crashes the engine today: the
+  auto-start path (EnableOrStart firing Start while the Create trigger is still being processed)
+  reaches StageBehavior.HandleEnterActiveFromStart on a non-activation thread, and the first
+  Host.GrainFactory access throws "Activation access violation". The same model with a
+  default-TRUE ManualActivationRule (Enabled + an explicit ManualStart grain call) instantiates
+  its children fine - see Lifecycle_NestedStageManualStart.cmmn. TaskA's definition is hoisted to
+  the casePlanModel level, so definition resolution (the separate
+  KnownGap_NestedDefinitionDeclaration gap) plays no part in this failure. See
+  KnownGapScenarios.cs for the observed stack and evidence.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/knowngap-nested-stage-auto-start"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_KnownGapNestedStageAutoStart"
+             name="KnownGapNestedStageAutoStartSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="KnownGapNestedStageAutoStartCase" name="KnownGapNestedStageAutoStartCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageA" name="PlanItemStageA" definitionRef="StageA"/>
+      <stage id="StageA" name="StageA" autoComplete="false">
+        <defaultControl id="Control_Stage">
+          <manualActivationRule id="MAR_Stage">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+        <planItem id="PlanItemTaskA" name="PlanItemTaskA" definitionRef="TaskA"/>
+      </stage>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_Task">
+          <manualActivationRule id="MAR_Task">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

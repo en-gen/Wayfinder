@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.8 fault / re-activate + terminate rows.
+  ~~~~~
+  Table 8.8: "fault: [Active -> Failed] Transition when an exception or software failure occurs.
+  This state MUST NOT propagate", "re-activated: [Failed -> Active] Transition by the systems, an
+  administrator, or by Case worker (human) when the source of the failure has been resolved", and
+  "terminate: [Active -> Terminated] Transition by Case worker (human) decision". TaskA
+  auto-starts (explicit FALSE ManualActivationRule) so each scenario picks up at Active.
+  autoComplete=false keeps the Case Active around TaskA's excursions.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-task-fault-reactivate"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleTaskFaultReactivate"
+             name="LifecycleTaskFaultReactivateSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleTaskFaultReactivateCase" name="LifecycleTaskFaultReactivateCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA"/>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_1">
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance fixture - Table 8.6 suspend/re-activate + Table 8.5's propagation MUST.
+  ~~~~~
+  A single auto-starting blocking task under an autoComplete=false CasePlanModel. Used three
+  ways: (1) LifecycleScenarios pins the CASE instance's own Table 8.6 suspend and re-activate
+  rows (green); (2) KnownGapScenarios' CaseSuspend probe pins Table 8.5's "A Case instance MUST
+  propagate this [Suspended] state ... down to the outermost Stage instance's contained ... Task
+  instances" (quarantined: parent-to-child propagation is stream-dead today); (3) KnownGapScenarios'
+  CaseReactivate probe pins the release of cascade-suspended children on re-activate (quarantined:
+  blocked by the same propagation gap, and the release semantics themselves are work item #19/D8).
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-case-suspend-reactivate-cascade"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleCaseSuspendReactivateCascade"
+             name="LifecycleCaseSuspendReactivateCascadeSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleCaseSuspendReactivateCascadeCase" name="LifecycleCaseSuspendReactivateCascadeCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA"/>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_Task">
+          <manualActivationRule id="MAR_Task">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

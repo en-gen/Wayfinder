@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.8 disable / re-enable rows.
+  ~~~~~
+  Table 8.8: "disabled: [Enabled -> Disabled] Transition by Case worker (human) decision" and
+  "re-enable: [Disabled -> Enabled] Transition by a Case worker (human) decision." TaskA declares
+  no manualActivationRule (Table 5.51 default TRUE), so it lands in Enabled - from there the
+  scenario walks disable -> re-enable -> manual start -> complete, the full Case-worker-driven
+  path of Table 8.8. autoComplete=false keeps the Case Active while TaskA sits Disabled
+  (Disabled is semi-terminal - Table 8.4 - and would otherwise complete an autoComplete=true
+  parent mid-scenario).
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-task-disable-reenable"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleTaskDisableReenable"
+             name="LifecycleTaskDisableReenableSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleTaskDisableReenableCase" name="LifecycleTaskDisableReenableCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA"/>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

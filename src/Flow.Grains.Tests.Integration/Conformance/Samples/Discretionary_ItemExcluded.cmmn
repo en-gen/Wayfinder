@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 5.4.9.2/8.7 DiscretionaryItem exclusion from auto-instantiation.
+  ~~~~~
+  8.7 Planning: "Users (Case workers) are said to 'plan' (in run-time), when they select
+  DiscretionaryItems from a PlanningTable." A DiscretionaryItem is planned at a Case worker's
+  discretion, at run-time - it MUST NOT be auto-instantiated alongside the fixed plan just because
+  the CasePlanModel becomes Active. DiscretionaryTaskA is declared ONLY inside the planningTable,
+  never in Stage.PlanItems, so it must never appear as an instantiated child.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/discretionary-item-excluded"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_DiscretionaryItemExcluded"
+             name="DiscretionaryItemExcludedSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="DiscretionaryItemExcludedCase" name="DiscretionaryItemExcludedCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA"/>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+      <humanTask id="DiscretionaryTaskA" name="DiscretionaryTaskA" isBlocking="false"/>
+      <planningTable>
+        <discretionaryItem id="DiscItem_1" name="DiscretionaryTaskA" definitionRef="DiscretionaryTaskA"/>
+      </planningTable>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

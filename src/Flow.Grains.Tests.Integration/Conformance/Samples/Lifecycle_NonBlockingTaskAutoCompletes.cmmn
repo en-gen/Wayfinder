@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 5.39 Task attributes.
+  ~~~~~
+  "If isBlocking is set to FALSE, the Task is not waiting for the work to complete and completes
+  immediately, upon instantiation." TaskA is non-blocking with an explicit FALSE
+  ManualActivationRule (so it auto-starts straight to Active with no manual step) - this scenario
+  asserts TaskA completes on its own the instant it becomes Active, with no explicit Complete
+  trigger from the scenario itself.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/lifecycle-non-blocking-task"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleNonBlockingTask"
+             name="LifecycleNonBlockingTaskSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleNonBlockingTaskCase" name="LifecycleNonBlockingTaskCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA"/>
+      <humanTask id="TaskA" name="TaskA" isBlocking="false">
+        <defaultControl id="Control_1">
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

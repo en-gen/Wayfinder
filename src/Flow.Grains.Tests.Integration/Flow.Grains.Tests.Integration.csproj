@@ -51,6 +51,9 @@
     <!-- ADO #20 - the flagship .cmmn file; embedded so the test never depends on the test
          assembly's output directory layout. -->
     <EmbeddedResource Include="Interchange\Samples\*.cmmn" />
+    <!-- ADO #21 - the conformance suite's scenario corpus: every scenario is a real .cmmn file,
+         embedded for the same reason as the #20 flagship above. -->
+    <EmbeddedResource Include="Conformance\Samples\*.cmmn" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.6/8.7 model-driven instantiation.
+  ~~~~~
+  8.7 Planning: "If a Stage instance is in Active state, then the planned PlanItems are
+  instantiated immediately after planning completes." The CasePlanModel's own entry to Active
+  (Table 8.6's create transition) must instantiate EVERY PlanItem in its plan, not just the
+  first - MilestoneA and TaskA are both declared directly under Stage.PlanItems.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/instantiation-multiple-plan-items"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_InstantiationMultiplePlanItems"
+             name="InstantiationMultiplePlanItemsSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="InstantiationMultiplePlanItemsCase" name="InstantiationMultiplePlanItemsCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemMilestone" name="PlanItemMilestone" definitionRef="MilestoneA"/>
+      <planItem id="PlanItemTask" name="PlanItemTask" definitionRef="TaskA"/>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

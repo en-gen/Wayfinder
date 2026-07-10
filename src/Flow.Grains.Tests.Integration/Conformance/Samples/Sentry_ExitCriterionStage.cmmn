@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.8 exit row for a STAGE + Table 8.9 exit propagation.
+  ~~~~~
+  Table 8.8 (exit): a Stage terminates when its exit criteria become TRUE - 8.5: "Exit criterion
+  sentries are considered ready for evaluation while the CasePlanModel, State [sic], or Task is
+  in Active state." Pins deviation D6's fix (stage exit criteria subscribed on the create path).
+  Table 8.7/8.9 additionally require the terminating Stage to propagate Terminated to its
+  children (Table 8.9's exit rows) - that half is quarantined (KnownGapScenarios: parent-to-child
+  propagation is stream-dead today), so SentryScenarios pins the Stage's own exit and the
+  quarantined probe owns the cascade.
+
+  MODELING NOTES: StageA declares no manualActivationRule (Table 5.51 default TRUE) and is
+  manual-started by the scenario - the auto-start route is itself broken today (see
+  KnownGap_NestedStageAutoStart.cmmn). TaskA's definition is hoisted to the casePlanModel level
+  (5.4.3) - see KnownGap_NestedDefinitionDeclaration.cmmn.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-exit-criterion-stage"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryExitCriterionStage"
+             name="SentryExitCriterionStageSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryExitCriterionStageCase" name="SentryExitCriterionStageCase">
+    <caseFileModel>
+      <caseFileItem id="ExitItem" name="ExitItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageA" name="PlanItemStageA" definitionRef="StageA">
+        <exitCriterion id="ExitCriterion_1" sentryRef="ExitSentry"/>
+      </planItem>
+      <sentry id="ExitSentry" name="ExitSentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="ExitItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <stage id="StageA" name="StageA" autoComplete="false">
+        <planItem id="PlanItemTaskA" name="PlanItemTaskA" definitionRef="TaskA"/>
+      </stage>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_Task">
+          <manualActivationRule id="MAR_Task">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

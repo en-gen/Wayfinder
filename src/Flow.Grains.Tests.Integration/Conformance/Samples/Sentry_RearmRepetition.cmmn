@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.6.4 RepetitionRule + 8.5 per-OnPart re-arm (Figure 8.5's B/B'
+  shape).
+  ~~~~~
+  8.6.4: "Stage and Task instances with a RepetitionRule will try to create a new instance every
+  time an entry criterion with an OnPart is satisfied" - which presupposes (8.5, Figure 8.5) that
+  the SAME Sentry instance satisfies once per distinct occurrence of its OnPart's source, not
+  once ever. RepeatingMilestone repeats on RepeatSentry, whose PlanItemOnPart watches
+  SourcePlanItem's complete transition. The scenario completes the model-instantiated
+  SourcePlanItem instance (B), then a second, physically distinct instance sharing the same
+  PlanItem identity (B', driven directly - exactly how StageBehavior.CreateChild reuses one
+  PlanItem model object across repetitions, and the established precedent of
+  SentryRepetitionResetIntegrationTests) and asserts the sentry fires BOTH times.
+
+  SourceTask deliberately has no manualActivationRule (Table 5.51 default TRUE): each source
+  instance is walked Enabled -> ManualStart -> Active -> Complete by the scenario, so completions
+  happen exactly when the scenario says so.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-rearm-repetition"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryRearmRepetition"
+             name="SentryRearmRepetitionSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <case id="SentryRearmRepetitionCase" name="SentryRearmRepetitionCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="SourcePlanItem" name="SourcePlanItem" definitionRef="SourceTask"/>
+      <planItem id="MilestonePlanItem" name="MilestonePlanItem" definitionRef="RepeatingMilestone">
+        <itemControl id="ItemControl_Milestone">
+          <repetitionRule id="RR_1">
+            <condition language="expression://lang/jint" body="true"/>
+          </repetitionRule>
+        </itemControl>
+        <entryCriterion id="EntryCriterion_1" sentryRef="RepeatSentry"/>
+      </planItem>
+      <sentry id="RepeatSentry" name="RepeatSentry">
+        <planItemOnPart id="OnPart_1" sourceRef="SourcePlanItem">
+          <standardEvent>complete</standardEvent>
+        </planItemOnPart>
+      </sentry>
+      <humanTask id="SourceTask" name="SourceTask" isBlocking="true"/>
+      <milestone id="RepeatingMilestone" name="RepeatingMilestone"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

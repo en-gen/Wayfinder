@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.5 standalone IfPart Sentry (D3), case-wide evaluation.
+  ~~~~~
+  8.5 (last sentence): "Sentries with no OnPart must have an IfPart, and that IfPart will be
+  evaluated for all CaseFileItem events because IfPart expressions are based on CaseFileItem
+  properties." EntrySentry has ZERO OnParts - only an IfPart bound to ItemA. This scenario proves
+  the case-wide subscription: an event on a DIFFERENT CaseFileItem (ItemB, which the IfPart never
+  references) still triggers re-evaluation, and once ItemA's own value satisfies the condition,
+  that unrelated ItemB event is what actually fires the sentry.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-standalone-ifpart"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryStandaloneIfPart"
+             name="SentryStandaloneIfPartSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryStandaloneIfPartCase" name="SentryStandaloneIfPartCase">
+    <caseFileModel>
+      <caseFileItem id="ItemA" name="ItemA" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+      <caseFileItem id="ItemB" name="ItemB" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="EntrySentry"/>
+      </planItem>
+      <sentry id="EntrySentry" name="EntrySentry">
+        <ifPart id="IfPart_1" contextRef="ItemA">
+          <condition language="expression://lang/jint" body="value.amount &gt; 100"/>
+        </ifPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

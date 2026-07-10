@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - 8.3 Table 8.1/8.2 CaseFileItem state model: delete is terminal.
+  ~~~~~
+  Table 8.1: "delete (Available -> Discarded)... A CaseFileItem instance in this [Discarded] state
+  is considered deleted and is not available to Case workers or expressions" - Discarded has no
+  outgoing transitions. No plan items are needed for this scenario; it exercises the CaseFileItem
+  grain's own lifecycle directly.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/casefile-delete-terminal-state"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_CaseFileDeleteTerminalState"
+             name="CaseFileDeleteTerminalStateSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="CaseFileDeleteTerminalStateCase" name="CaseFileDeleteTerminalStateCase">
+    <caseFileModel>
+      <caseFileItem id="TheItem" name="TheItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true"/>
+    <caseRoles/>
+  </case>
+</definitions>
