@@ -300,6 +300,16 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
                 case PlanItemTransition.Resume:
                 case PlanItemTransition.ParentResume:
+                // Table 8.6 re-activate + Table 8.9 note (2) (#63 D8 carve-out): the Case leaves
+                // Suspended via Reactivate, not Resume (ConfigureForCasePlanModel permits
+                // Reactivate, not Resume/ParentResume, from Suspended) - so a cascaded-suspended
+                // direct child of the CasePlanModel would otherwise never see a transition its
+                // switch recognizes. Folded into the same arm as Resume/ParentResume: the
+                // ParentResume state-machine permit is already guarded by
+                // ParentSuspendState.HasValue (PlanItemStateMachine.ConfigureForStageOrTask), so
+                // StateMachine.CanFire below naturally no-ops for a child that wasn't cascaded
+                // into Suspended (e.g. the case reactivating from Completed/Terminated/Failed).
+                case PlanItemTransition.Reactivate:
                 {
                     Host.RaiseEvent(new ParentResumed());
                     transition = PlanItemTransition.ParentResume;
@@ -568,7 +578,11 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 Host.CaseInstanceId,
                 $"{Host.Address}.{childInstanceId}");
 
-            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition);
+            // Host.DefinitionId: this Stage's own definition id, i.e. the new child's PARENT
+            // definition id - threaded through so the child's BaseBehavior.Activate can key its
+            // parent-transition subscription on the same stream this Stage's transitions publish
+            // on (#63).
+            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId);
             await childGrain.Trigger(PlanItemTransition.Create);
 
             await Task.WhenAll(

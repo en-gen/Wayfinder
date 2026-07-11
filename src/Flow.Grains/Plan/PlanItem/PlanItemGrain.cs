@@ -32,6 +32,7 @@ namespace Flow.Grains.Plan.PlanItem
         string IBehaviorHost.Address => _address;
         string IBehaviorHost.Scope => _scope;
         string IBehaviorHost.ParentInstanceId => _parentId;
+        string IBehaviorHost.ParentDefinitionId => State.ParentDefinitionId;
         string IBehaviorHost.InstanceId => _instanceId;
         string IBehaviorHost.DefinitionId => Definition?.Id;
 
@@ -72,10 +73,15 @@ namespace Flow.Grains.Plan.PlanItem
             }
         }
 
+        // parentDefinitionId: null here (as opposed to StageBehavior.CreateChild's threaded
+        // Host.DefinitionId) - this bare 2-arg overload has no route to its caller's parent
+        // context. Its only production caller is this same override; anything invoking it
+        // directly (e.g. test scaffolding) accepts that the resulting instance's parent-cascade
+        // subscription is skipped (BaseBehavior.Activate's root guard, #63).
         public override Task Define(string caseDefinitionId, Interfaces.Model.PlanItem definition) =>
-            DefineRepetition(caseDefinitionId, definition, 0);
-        
-        public async Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition)
+            DefineRepetition(caseDefinitionId, definition, 0, null);
+
+        public async Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition, string parentDefinitionId)
         {
             var planItemDefinition = await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
                 .GetPlanItemDefinition(_scope, definition.DefinitionRef);
@@ -87,7 +93,8 @@ namespace Flow.Grains.Plan.PlanItem
                 CaseDefinitionId = caseDefinitionId,
                 Repetition = repetition,
                 Definition = definition,
-                PlanItemDefinition = planItemDefinition
+                PlanItemDefinition = planItemDefinition,
+                ParentDefinitionId = parentDefinitionId
             });
 
             await ConfirmEvents();

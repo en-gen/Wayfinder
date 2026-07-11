@@ -197,6 +197,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockGrainFactory.Setup(x => x.GetGrain<IPlanningTableGrain>(caseInstanceId, instanceId, null))
                 .Returns(mockPlanningTableGrain.Object);
 
+            var parentDefinitionId = ShortGuid.NewGuid();
+
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -204,6 +206,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.ParentInstanceId)
                 .Returns(parentInstanceId);
+            mockHost.Setup(x => x.ParentDefinitionId)
+                .Returns(parentDefinitionId);
             mockHost.Setup(x => x.InstanceId)
                 .Returns(instanceId);
             mockHost.Setup(x => x.Definition)
@@ -234,9 +238,11 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     Times.Once);
             }
 
-            // subscription to parent transitions (base behavior)
+            // subscription to parent transitions (base behavior) - keyed on the parent's
+            // DEFINITION id, not its instance id (#63): publish is always on Definition.Id, so
+            // the subscribe side must match that key or the cascade never arrives.
             mockHost.Verify(x => x.SubscribeTo(
-                parentInstanceId,
+                parentDefinitionId,
                 It.IsAny<Func<PlanItemTransitionedEvent, StreamSequenceToken, Task>>(),
                 StreamFlags.Create | StreamFlags.Resume),
                 Times.Once());
@@ -349,6 +355,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(parentInstanceId);
             mockHost.Setup(x => x.InstanceId)
                 .Returns(instanceId);
+            mockHost.Setup(x => x.DefinitionId)
+                .Returns(stage.Id);
             mockHost.Setup(x => x.Scope)
                 .Returns(scope);
             mockHost.Setup(x => x.State)
@@ -366,7 +374,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             foreach (var pi in stage.PlanItems)
             {
-                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0), Times.Once);
+                // parentDefinitionId (#63): CreateChild threads Host.DefinitionId (this Stage's
+                // own definition id) through so the child keys its parent-transition subscription
+                // on the same stream this Stage publishes its transitions on.
+                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id), Times.Once);
 
                 mockHost.Verify(x => x.SubscribeTo(
                         pi.Id,

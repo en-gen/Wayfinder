@@ -155,7 +155,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // instance's contained EventListener, Milestone, Stage, and Task instances" - the
         // strongest propagation MUST in 8.4. The Task must transition via Table 8.8's parent
         // suspend row; it never receives the event (FINDING-1).
-        [Fact(Skip = "KnownGap: FINDING-1 (#21 report, work item to be filed) - parent-to-child propagation is stream-dead: children subscribe on the parent's INSTANCE id, grains publish on their DEFINITION id, so Table 8.5's mandated suspend cascade never arrives. Observed on develop@f23a74b: case Suspended, child task still Active after 10s.")]
+        [Fact]
         [ConformanceCitation("Table 8.5 / Suspended propagation MUST")]
         [ConformanceCitation("Table 8.6 / suspend - downward propagation")]
         [ConformanceCitation("Table 8.8 / parent suspend")]
@@ -180,7 +180,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // which in turn propagates it down to all its internal EventListener, Milestone, Stage,
         // and Task instances" - the Milestone must transition via Table 8.11's parent terminate
         // row (Available -> Terminated). It never receives the event (FINDING-1).
-        [Fact(Skip = "KnownGap: FINDING-1 (#21 report, work item to be filed) - parent-to-child propagation is stream-dead (instance-id/definition-id stream-key mismatch), so Table 8.6's terminate cascade never arrives. Observed on develop@f23a74b: case Terminated, child milestone still Available after 10s.")]
+        [Fact]
         [ConformanceCitation("Table 8.6 / terminate - downward propagation")]
         [ConformanceCitation("Table 8.11 / parent terminate")]
         public async Task CaseTerminate__Given_AvailableChildMilestone__Then_TerminationPropagatesToMilestone()
@@ -215,7 +215,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // !26; owned by #63) - the task never observes Suspended in the first place, so the
         // reactivate-release half beneath it (children's HandleParentTransitioned recognizing only
         // resume/parentResume, never reactivate) stays unreachable and unexercised.
-        [Fact(Skip = "KnownGap: FINDING-1 (#21 report, work item to be filed; owned by #63) - re-verified post-!26 on develop@cbd66d7: still blocked at its precondition because the suspend cascade never reaches the task. PR !26's a13edd6 (D8 remainder) added only Closed-immutability and close/reactivate wiring to CaseGrain.cs/CasePlanModelBehavior.cs - no parent-to-child cascade - so FINDING-1 is untouched and this scenario's precondition fails identically to the original observation: task never Suspended, 10s timeout. The children's-HandleParentTransitioned-recognizes-only-resume/parentResume gap beneath it is consequently still unexercised. Unskip when FINDING-1/#63 lands.")]
+        [Fact]
         [ConformanceCitation("Table 8.6 / re-activate - child release (blocked by FINDING-1/#63; D8 case-level remainder resolved by !26)")]
         [ConformanceCitation("Table 8.9 / note (2) prior-state restoration")]
         public async Task CaseReactivate__Given_ChildrenSuspendedByCascade__Then_ChildrenReturnToPriorState()
@@ -246,7 +246,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // pre-suspend state (Table 8.9 note (2)). The child-side handlers exist and the stage
         // publishes its transitions - but on the definition-id stream, while TaskA listens on the
         // instance-id stream (FINDING-1), so nothing arrives.
-        [Fact(Skip = "KnownGap: FINDING-1 (#21 report, work item to be filed) - Table 8.8's parent suspend/parent resume cascade from a nested Stage never arrives (instance-id/definition-id stream-key mismatch). Observed on develop@f23a74b: StageA Suspended, TaskA still Active after the poll.")]
+        [Fact]
         [ConformanceCitation("Table 8.8 / parent suspend, parent resume")]
         [ConformanceCitation("Table 8.9 / suspend and resume propagation rows")]
         public async Task StageSuspend__Given_NestedActiveTask__Then_TaskFollowsByPropagationOnly()
@@ -286,7 +286,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // Table 8.9 (exit rows): when a Stage terminates via its exit criterion, its children
         // transition via "exit" from any non-terminal state to Terminated. The Stage's own exit
         // is pinned green (SentryScenarios); the cascade to TaskA never happens (FINDING-1).
-        [Fact(Skip = "KnownGap: FINDING-1 (#21 report, work item to be filed) - Table 8.9's exit propagation never arrives (instance-id/definition-id stream-key mismatch). Observed on develop@f23a74b: StageA Terminated by its exit criterion (that half is pinned green in SentryScenarios), TaskA still Active after 10s.")]
+        [Fact]
         [ConformanceCitation("Table 8.9 / exit, terminate propagation rows")]
         [ConformanceCitation("Table 8.7 / Terminated propagation MUST")]
         public async Task StageExit__Given_NestedActiveTask__Then_ExitCascadesTerminationToTask()

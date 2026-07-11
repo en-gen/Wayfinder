@@ -33,6 +33,9 @@ namespace Flow.Grains.Plan.Case
         string IBehaviorHost.Address => _address;
         string IBehaviorHost.Scope => _scope;
         string IBehaviorHost.ParentInstanceId => _parentId;
+        // The CasePlanModel root has no parent - BaseBehavior.Activate's root guard (#63) skips
+        // the parent-transition subscription entirely when this is null/empty.
+        string IBehaviorHost.ParentDefinitionId => null;
         string IBehaviorHost.InstanceId => _instanceId;
         string IBehaviorHost.DefinitionId => Definition?.Id;
 

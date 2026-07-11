@@ -53,11 +53,26 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
         protected virtual Task Define() => Task.CompletedTask;
 
+        // #63: publish is always keyed on the publisher's DEFINITION id (CmmnElementGrain.
+        // PublishEvent -> GetCaseEventStream<TEvent>(Definition.Id)), so the subscribe side must
+        // key on the parent's definition id too - Host.ParentInstanceId (a freshly-minted-per-
+        // child instance id) never matches what the parent actually publishes on, leaving every
+        // parent->child cascade (suspend/resume/exit/terminate) dead on the wire. The four
+        // HandleParentTransitioned implementations already guard on
+        // @event.SourceInstanceId != Host.ParentInstanceId, which only makes sense if this stream
+        // carries every instance of the parent DEFINITION and the handler narrows to just this
+        // child's actual parent instance by payload - that guard is unchanged by this fix.
+        //
+        // Root guard: the CasePlanModel root (Host.ParentDefinitionId null/empty, see CaseGrain)
+        // has no parent to subscribe to - subscribing on a null/empty key would either throw or
+        // create a bogus stream, so skip entirely.
         public virtual Task Activate() =>
             Task.WhenAll(
                 SubscribeToCriteria(x => x.EntryCriteria, StreamFlags.Resume),
                 SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Resume),
-                Host.SubscribeTo<PlanItemTransitionedEvent>(Host.ParentInstanceId, HandleParentTransitioned, StreamFlags.Create | StreamFlags.Resume),
+                string.IsNullOrEmpty(Host.ParentDefinitionId)
+                    ? Task.CompletedTask
+                    : Host.SubscribeTo<PlanItemTransitionedEvent>(Host.ParentDefinitionId, HandleParentTransitioned, StreamFlags.Create | StreamFlags.Resume),
                 Host.State.Defined
                     ? Define()
                     : Task.CompletedTask);
