@@ -36,7 +36,12 @@ namespace Flow.Grains.Scheduler
 
             using (_logger.BeginScope(context.JobDetail.JobDataMap))
             {
-                _logger.LogInformation("{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | timer tick occurred");
+                _logger.LogInformation(
+                    "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | timer tick occurred",
+                    context.JobDetail.JobDataMap.Get("ElementType"),
+                    context.JobDetail.JobDataMap.Get("PlanItemDefinition"),
+                    context.JobDetail.JobDataMap.Get("ElementScope"),
+                    elementInstanceId);
             }
 
             // Must build the stream identity exactly like StreamProviderExtensions.GetCaseEventStream
