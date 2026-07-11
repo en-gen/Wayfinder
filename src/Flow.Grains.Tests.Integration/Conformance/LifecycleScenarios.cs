@@ -292,7 +292,10 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // Table 8.6 (close): {Completed, Terminated, Failed, Suspended} -> Closed "when no
         // further work or modifications should be allowed"; Table 8.4/8.5: Closed is a TERMINAL
         // state - re-activate is defined from {Completed, Terminated, Failed, Suspended} only,
-        // never from Closed, so a reactivation attempt on a Closed Case must not move it.
+        // never from Closed. Per PR !26 (work item #19, D8 remainder, CaseGrain.cs): a reactivation
+        // attempt on a Closed Case is now rejected LOUDLY - CaseGrain.Trigger throws
+        // InvalidOperationException at the public surface - rather than the previous silent
+        // unhandled-trigger no-op, so the Case both throws and never leaves Closed.
         [Fact]
         [ConformanceCitation("Table 8.6 / close")]
         [ConformanceCitation("Table 8.5 / Closed is terminal")]
@@ -309,9 +312,14 @@ namespace Flow.Grains.Tests.Integration.Conformance
             closedCase.PlanItemState.Should().Be(PlanItemState.Closed,
                 "Table 8.6 (close): Completed -> Closed when no further work should be allowed");
 
-            var afterReactivateAttempt = await deployed.CaseGrain.Trigger(PlanItemTransition.Reactivate);
-            afterReactivateAttempt.PlanItemState.Should().Be(PlanItemState.Closed,
-                "Table 8.5/8.6: Closed is a terminal state and re-activate is not defined from it - the Case must not leave Closed");
+            await deployed.CaseGrain
+                .Awaiting(x => x.Trigger(PlanItemTransition.Reactivate))
+                .Should()
+                .ThrowAsync<InvalidOperationException>(
+                    "Table 8.5/8.6: Closed is a terminal state and re-activate is not defined from it - #19/D8 remainder makes the rejection loud instead of a silent no-op");
+
+            (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Closed,
+                "the rejected reactivation attempt must not move the Case off Closed");
         }
 
         // Table 8.6 (fault): Active -> Failed "when the outermost Stage instance reaches the
