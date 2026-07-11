@@ -12,6 +12,13 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
     {
         Guid CaseInstanceId { get; }
         string ParentInstanceId { get; }
+        // Definition id of the parent PlanItem/CasePlanModel that instantiated this one - not the
+        // freshly-minted-per-instance ParentInstanceId above. Publishing is always keyed on the
+        // publisher's definition id (CmmnElementGrain.PublishEvent), so the parent-transition
+        // subscription (BaseBehavior.Activate) must be keyed on this, not ParentInstanceId, to
+        // ever resolve to the same stream the parent actually publishes on (#63). Null/empty for
+        // the CasePlanModel root, which has no parent to subscribe to.
+        string ParentDefinitionId { get; }
         string Address { get; }
         string Scope { get; }
         string InstanceId { get; }

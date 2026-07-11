@@ -46,6 +46,10 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
                 case PlanItemTransition.Resume:
                 case PlanItemTransition.ParentResume:
+                // Table 8.6 re-activate + Table 8.9 note (2) (#63 D8 carve-out): see
+                // StageBehavior.HandleParentTransitioned's remarks - the Case leaves Suspended via
+                // Reactivate, not Resume. Mirrors MilestoneBehavior's unconditional Resume permit.
+                case PlanItemTransition.Reactivate:
                 {
                     Host.RaiseEvent(new ParentResumed());
                     transition = PlanItemTransition.Resume;

@@ -48,12 +48,20 @@ namespace Flow.Grains.Plan.PlanItem
 
         [Id(14)]
         public object BehaviorExtension { get; private set; }
-        
+
+        // #63: the parent's definition id at the moment this child was defined (StageBehavior.
+        // CreateChild's Host.DefinitionId) - persisted so a reactivated grain's Activate/Resume
+        // re-arms the parent-transition subscription on the correct stream key. Null for the
+        // CasePlanModel root and for items defined via the bare 2-arg Define overload.
+        [Id(15)]
+        public string ParentDefinitionId { get; private set; }
+
         public void Apply(Defined @event)
         {
             base.Apply(@event);
             PlanItemDefinition = @event.PlanItemDefinition;
             Repetition = @event.Repetition;
+            ParentDefinitionId = @event.ParentDefinitionId;
 
             switch (PlanItemDefinition)
             {

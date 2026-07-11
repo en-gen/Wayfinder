@@ -142,6 +142,12 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
                 case PlanItemTransition.Resume:
                 case PlanItemTransition.ParentResume:
+                // Table 8.6 re-activate + Table 8.9 note (2) (#63 D8 carve-out): see
+                // StageBehavior.HandleParentTransitioned's remarks - the Case leaves Suspended via
+                // Reactivate, not Resume, and the ParentResume permit is already guarded by
+                // ParentSuspendState.HasValue so this no-ops for a child not actually cascaded
+                // into Suspended.
+                case PlanItemTransition.Reactivate:
                 {
                     Host.RaiseEvent(new ParentResumed());
                     transition = PlanItemTransition.ParentResume;

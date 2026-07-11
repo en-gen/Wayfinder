@@ -121,6 +121,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.ParentInstanceId)
                 .Returns(parentInstanceId);
+            mockHost.Setup(x => x.DefinitionId)
+                .Returns(stage.Id);
             mockHost.Setup(x => x.InstanceId)
                 .Returns(instanceId);
             mockHost.Setup(x => x.Scope)
@@ -146,7 +148,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Once);
 
-            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 1), Times.Once);
+            // parentDefinitionId (#63): threaded from Host.DefinitionId (this Stage's own
+            // definition id) so the repeated child's parent-transition subscription resolves.
+            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 1, stage.Id), Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
 
             mockHost.Verify(x => x.SubscribeTo(
