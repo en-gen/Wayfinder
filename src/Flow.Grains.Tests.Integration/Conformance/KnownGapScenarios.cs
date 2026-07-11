@@ -66,11 +66,23 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // Table 8.12 (autoComplete=FALSE), Manual-Completion OR-branch, per the project's
         // adjudicated reading (deviation D4, docs/06 2.3): once all REQUIRED children are
         // terminal, manual completion must become available to the Case worker even while a
-        // non-required child is still Active. The engine's completion bookkeeping
-        // (UserCompletable) additionally demands NO Active children at all, conflating the two
-        // OR-branches - the non-required Active task wrongly blocks the option.
-        [Fact(Skip = "KnownGap: work item #19 (D4, Table 8.12) - the engine's manual-completion bookkeeping (UserCompletable) additionally requires zero Active children, conflating Table 8.12's autoComplete=FALSE OR-branches. Observed on develop@f23a74b: UserCompletable stays false after the required child completes while the non-required child is Active (10s poll timeout). Unskip when #19's rules-completion lands.")]
-        [ConformanceCitation("Table 8.12 / autoComplete=FALSE, Manual-Completion branch (D4)")]
+        // non-required child is still Active.
+        //
+        // PR !26 (work item #19, commit 39de993) fixed HALF of D4: an externally-invoked
+        // Trigger(Complete) is now correctly gated by StageBehavior.
+        // ManualCompletionCriteriaSatisfied, which for autoComplete=FALSE checks only "required
+        // children terminal" (no no-Active-children conjunct) - confirmed by direct probe in this
+        // exact scenario: calling stageGrain.Trigger(Complete) after the required child completes
+        // now SUCCEEDS without throwing. But this scenario polls the OBSERVABILITY half - the
+        // UserCompletable snapshot flag a Case worker's UI actually watches - and that half is
+        // UNCHANGED: StageBehavior.HandleChildTransitioned still gates
+        // Host.RaiseEvent(new UserCompletableCriteriaMet()) on
+        // "childSnapshots.All(x => x.PlanItemState != PlanItemState.Active)", the same conflated
+        // zero-Active-children condition the original gap named, so UserCompletable never flips
+        // true while the non-required child stays Active. !26's D4 fix is INCOMPLETE: it opened
+        // the gate but left the indicator that tells a caller the gate is open unlit.
+        [Fact(Skip = "KnownGap: work item #19 (D4, Table 8.12) remainder - PR !26/commit 39de993 fixed the Trigger(Complete) enforcement gate (StageBehavior.ManualCompletionCriteriaSatisfied), confirmed by direct probe that stageGrain.Trigger(Complete) now succeeds without throwing in this exact scenario, but did NOT update the UserCompletable flag-raising condition in StageBehavior.HandleChildTransitioned, which still requires childSnapshots.All(state != Active) before raising UserCompletableCriteriaMet - the same conflated OR-branch condition as before #19. Observed on develop@cbd66d7: UserCompletable stays false after the required child completes while the non-required child is Active (10s poll timeout), even though Trigger(Complete) itself no longer throws. Needs a follow-up fix to HandleChildTransitioned's flag-raise condition; unskip when that lands.")]
+        [ConformanceCitation("Table 8.12 / autoComplete=FALSE, Manual-Completion branch (D4 remainder)")]
         public async Task StageCompletion__Given_AutoCompleteFalseAndNonRequiredChildActive__Then_ManualCompletionBecomesAvailable()
         {
             var deployed = await _harness.DeployAndCreate("KnownGap_StageAutoCompleteFalseManualBlocked.cmmn");
@@ -108,9 +120,14 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // transitions into the Complete or Terminate state. Under that condition the
         // RepetitionRule is re-evaluated and if the Expression evaluates to TRUE, a new instance
         // is created." SourceTask has RepetitionRule=TRUE and no entry criteria: completing its
-        // only instance must spawn a second instance. The engine never re-evaluates the
-        // RepetitionRule on complete/terminate (deviation D7).
-        [Fact(Skip = "KnownGap: work item #19 (D7, 8.6.4) - the RepetitionRule is never re-evaluated on complete/terminate for no-entry-criteria items. Observed on develop@f23a74b: completing the only SourceTask instance never spawns a second (the stage's child count stays 1; 10s poll timeout). Unskip when #19's rules-completion lands.")]
+        // only instance must spawn a second instance.
+        //
+        // PINNED by PR !26 (work item #19, D7, commit d991861): Stage/Task instances with a
+        // RepetitionRule and no entry criteria now re-evaluate the rule on the complete/terminate
+        // transitions (BaseBehavior.TryRepeatOnCompleteOrTerminate) and publish
+        // PlanItemRepetitionCriteriaMetEvent when TRUE. Verified green on develop@cbd66d7 - no
+        // longer a known gap.
+        [Fact]
         [ConformanceCitation("8.6.4 / repeat-on-complete for no-entry-criteria items (D7)")]
         [ConformanceCitation("Table 8.8 / complete - RepetitionRule re-evaluation clause")]
         public async Task TaskRepetition__Given_RepetitionRuleAndNoEntryCriteria__Then_CompletionSpawnsNewInstance()
@@ -187,13 +204,19 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // return "to the state [they] had before the 'parent suspend'"): the case-level suspend
         // cascades Suspended down to the Task (Table 8.5 MUST), so leaving Suspended via
         // re-activate must release the children back to their pre-suspend states - otherwise the
-        // case is Active while its entire plan stays frozen. Doubly gapped today: the suspend
-        // cascade itself never reaches the child (FINDING-1), and even with events flowing the
-        // children's parent-transition handler recognizes only resume/parentResume - never
-        // reactivate, the CasePlanModel's only way out of Suspended (deviation D8,
-        // CasePlanModelBehavior has no case-specific reactivate handling; work item #19).
-        [Fact(Skip = "KnownGap: FINDING-1 + work item #19 (D8) - blocked at its precondition by FINDING-1 (the suspend cascade never reaches the task; observed on develop@f23a74b: task never Suspended, 10s timeout), and beneath that the children's HandleParentTransitioned recognizes only resume/parentResume - never reactivate, the CasePlanModel's only exit from Suspended (CasePlanModelBehavior has no case-specific reactivate handling). Unskip when both land.")]
-        [ConformanceCitation("Table 8.6 / re-activate - child release (D8 remainder)")]
+        // case is Active while its entire plan stays frozen.
+        //
+        // PR !26 (work item #19, commit a13edd6) landed the CASE-level D8 remainder - Closed-state
+        // immutability and CasePlanModelBehavior's own close/reactivate wiring - but, verified
+        // against that commit's diff, it touches only CaseGrain.cs and CasePlanModelBehavior.cs:
+        // no case-specific reactivate-to-children cascade was added, and per the commit's own
+        // remarks re-activation deliberately still has NO entry action of its own. So this
+        // scenario remains blocked at its very first precondition by FINDING-1 alone (untouched by
+        // !26; owned by #63) - the task never observes Suspended in the first place, so the
+        // reactivate-release half beneath it (children's HandleParentTransitioned recognizing only
+        // resume/parentResume, never reactivate) stays unreachable and unexercised.
+        [Fact(Skip = "KnownGap: FINDING-1 (#21 report, work item to be filed; owned by #63) - re-verified post-!26 on develop@cbd66d7: still blocked at its precondition because the suspend cascade never reaches the task. PR !26's a13edd6 (D8 remainder) added only Closed-immutability and close/reactivate wiring to CaseGrain.cs/CasePlanModelBehavior.cs - no parent-to-child cascade - so FINDING-1 is untouched and this scenario's precondition fails identically to the original observation: task never Suspended, 10s timeout. The children's-HandleParentTransitioned-recognizes-only-resume/parentResume gap beneath it is consequently still unexercised. Unskip when FINDING-1/#63 lands.")]
+        [ConformanceCitation("Table 8.6 / re-activate - child release (blocked by FINDING-1/#63; D8 case-level remainder resolved by !26)")]
         [ConformanceCitation("Table 8.9 / note (2) prior-state restoration")]
         public async Task CaseReactivate__Given_ChildrenSuspendedByCascade__Then_ChildrenReturnToPriorState()
         {
@@ -333,10 +356,16 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // job (8.7: instances live in their Stage). SentryScenarios proves the sentry re-arm and
         // the milestone's repetition DETECTION (Repeated=true) work; this scenario asserts the
         // spawn itself: the CasePlanModel's child bookkeeping must show a second Milestone
-        // instance (repetition 1). The stage's child-repetition subscription never delivers
-        // (Bug #62: the owning stage never learns of repeated instances), so no repetition
-        // instance is ever created.
-        [Fact(Skip = "KnownGap: Bug #62 - the owning stage never learns of repeated instances (StageBehavior.HandleChildRepeated's subscription never delivers), so the detected repetition (Repeated=true, pinned green in SentryScenarios) never materializes as a new instance. Observed on develop@f23a74b: MilestonePlanItem instance count stays 1 (10s poll timeout). Unskip when #62 lands.")]
+        // instance (repetition 1).
+        //
+        // PINNED by PR !26 (Bug #62, commit 86d7b50): root cause was StageBehavior.
+        // HandleChildRepeated's "instantiating repetition" log template declaring six
+        // placeholders but passing five arguments - MEL's eager message-template renderer threw
+        // FormatException inside a stream-delivery turn, and the streaming agent swallowed the
+        // fault as a silent retry-then-drop, so the handler looked "never reached" though the
+        // subscription wiring was correct the whole time. Verified green on develop@cbd66d7 - no
+        // longer a known gap.
+        [Fact]
         [ConformanceCitation("8.6.4 / repetition instance creation by the owning Stage (Bug #62)")]
         public async Task StageBookkeeping__Given_MilestoneRepetitionDetected__Then_StageSpawnsRepetitionInstance()
         {

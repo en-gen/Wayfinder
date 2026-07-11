@@ -79,7 +79,10 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                     PlanItemState.Available,
                     PlanItemState.Completed));
 
-            var handlerInvoked = tcs.Task.Wait(TimeSpan.FromMilliseconds(500));
+            // Async wait, generous window: the synchronous 500ms Wait() this replaces starved the
+            // thread pool under CI contention (builds 66/67 - passed locally, timed out in CI once
+            // the conformance suite joined the same collection). Matches this file's newer idiom.
+            var handlerInvoked = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(10))) == tcs.Task;
 
             handlerInvoked.Should().BeTrue();
         }
@@ -129,7 +132,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                     PlanItemState.Available,
                     PlanItemState.Completed));
 
-            var handlerInvoked = tcs.Task.Wait(TimeSpan.FromMilliseconds(500));
+            var handlerInvoked = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(10))) == tcs.Task;
 
             handlerInvoked.Should().BeTrue();
         }
@@ -239,7 +242,9 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
                     PlanItemState.Available,
                     PlanItemState.Completed));
 
-            var handlerInvoked = tcs.Task.Wait(TimeSpan.FromMilliseconds(500));
+            // Must-NOT-arrive assertion: async, bounded window (a longer wait only makes a false
+            // pass less likely, never more; 2s balances confidence against suite runtime).
+            var handlerInvoked = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(2))) == tcs.Task;
 
             handlerInvoked.Should().BeFalse();
         }
@@ -301,7 +306,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Sentry
             await transitionedStream.OnNextAsync(transitionEvent);
             await transitionedStream.OnNextAsync(transitionEvent);
 
-            var firstArrived = firstReceived.Task.Wait(TimeSpan.FromMilliseconds(500));
+            var firstArrived = await Task.WhenAny(firstReceived.Task, Task.Delay(TimeSpan.FromSeconds(10))) == firstReceived.Task;
             firstArrived.Should().BeTrue("the sentry should still be satisfied by the first delivery");
 
             // give any (incorrect) second publish a chance to arrive before asserting the count
