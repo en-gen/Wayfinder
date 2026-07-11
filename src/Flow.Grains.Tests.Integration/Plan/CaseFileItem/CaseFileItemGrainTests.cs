@@ -8,6 +8,7 @@ using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Plan.CaseFileItem;
 using Flow.Grains.Tests.Integration.SiloFixture;
+using Flow.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
 using Orleans.Streams;
@@ -15,6 +16,13 @@ using Xunit;
 using CaseFileItemModel = Flow.Grains.Interfaces.Model.CaseFileItem;
 using CaseFileItemState = Flow.Grains.Interfaces.Plan.CaseFileItem.CaseFileItemState;
 using CaseFileItemTransition = Flow.Grains.Interfaces.Model.CaseFileItemTransition;
+using CaseModel = Flow.Grains.Interfaces.Model.Case;
+using CaseRolesModel = Flow.Grains.Interfaces.Model.CaseRoles;
+using StageModel = Flow.Grains.Interfaces.Model.Stage;
+using ICaseDefinitionGrain = Flow.Grains.Interfaces.Plan.Case.ICaseDefinitionGrain;
+using ICaseGrain = Flow.Grains.Interfaces.Plan.Case.ICaseGrain;
+using PlanItemState = Flow.Grains.Interfaces.Model.PlanItemState;
+using PlanItemTransition = Flow.Grains.Interfaces.Model.PlanItemTransition;
 
 namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
 {
@@ -342,6 +350,93 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
 
             var @event = await tcs.Task;
             @event.StandardEvent.Should().Be(CaseFileItemTransition.Delete);
+        }
+
+        // ADO #69 - 8.4.1/Table 8.5 Closed: "Terminal state. In this state no new activity is
+        // allowed in the Case." That lockdown extends to the Case's CaseFile: once the owning
+        // Case reaches Closed, its CaseFileItem instances must become read-only. Mirrors
+        // CaseGrain.Trigger's own Closed guard (CaseLifecycleIntegrationTests) - same exception
+        // type, same "is Closed" wording convention, applied here at the CaseFileItem's own
+        // public surface.
+        [Fact]
+        public async Task Update__Given_OwningCaseClosed__Then_ThrowInvalidOperationException()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
+            const string caseScope = "CPM";
+
+            var @case = new CaseModel
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRolesModel(),
+                CasePlanModel = new StageModel { Id = caseScope }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, caseScope);
+            await caseGrain.Create(caseDefinitionId);
+            await caseGrain.Trigger(PlanItemTransition.Create);
+
+            // the CaseFileItem is created while the case is still Active - only the later
+            // mutation attempt, once the case has reached Closed, is under test here.
+            var definition = new CaseFileItemModel { Id = "itemA" };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, "itemA");
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("original"));
+
+            await caseGrain.Trigger(PlanItemTransition.Complete);
+            var closed = await caseGrain.Trigger(PlanItemTransition.Close);
+            closed.PlanItemState.Should().Be(PlanItemState.Closed,
+                "the case must actually be Closed before this test's guard assertion is meaningful");
+
+            await subject
+                .Awaiting(x => x.Update(JsonValue.Create("too late")))
+                .Should()
+                .ThrowAsync<InvalidOperationException>();
+
+            var snapshot = await subject.GetSnapshot();
+            snapshot.Value.ToJsonString().Should().Be(JsonValue.Create("original").ToJsonString(),
+                "a rejected mutation must leave the CaseFileItem's value exactly where it was");
+        }
+
+        // Table 8.2 lists create as a CaseFileItem transition like any other - the Closed
+        // lockdown must reject brand-new CaseFileItems too, not just mutations to existing ones.
+        [Fact]
+        public async Task Create__Given_OwningCaseClosed__Then_ThrowInvalidOperationException()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
+            const string caseScope = "CPM";
+
+            var @case = new CaseModel
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRolesModel(),
+                CasePlanModel = new StageModel { Id = caseScope }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, caseScope);
+            await caseGrain.Create(caseDefinitionId);
+            await caseGrain.Trigger(PlanItemTransition.Create);
+            await caseGrain.Trigger(PlanItemTransition.Complete);
+
+            var closed = await caseGrain.Trigger(PlanItemTransition.Close);
+            closed.PlanItemState.Should().Be(PlanItemState.Closed,
+                "the case must actually be Closed before this test's guard assertion is meaningful");
+
+            var definition = new CaseFileItemModel { Id = "itemB" };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, "itemB");
+
+            await subject
+                .Awaiting(x => x.Create(caseDefinitionId, definition, null))
+                .Should()
+                .ThrowAsync<InvalidOperationException>();
         }
     }
 }

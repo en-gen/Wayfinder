@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Mapping;
+using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Plan.CaseFileItem;
 using Flow.Grains.Plan.CaseFileItem.Events;
 using Flow.Grains.Plan.CmmnElement;
@@ -47,6 +48,14 @@ namespace Flow.Grains.Plan.CaseFileItem
         CmmnElementGrain<CaseFileItemStore, Interfaces.Model.CaseFileItem>,
         ICaseFileItemGrain
     {
+        // Resolved lazily (see EnsureCaseNotClosed) and cached for the lifetime of this
+        // activation: the scope needed to address this CaseFileItem's owning ICaseGrain (its
+        // CasePlanModel.Id, per the convention every existing caller of GetGrain<ICaseGrain>
+        // already follows - see e.g. CaseLifecycleIntegrationTests/ConformanceHarness) is not
+        // otherwise derivable from this grain's own compound key, but does not change once the
+        // owning case is defined.
+        private string _caseScope;
+
         public CaseFileItemGrain(ILogger<CaseFileItemGrain> logger) :
             base(logger)
         {
@@ -60,6 +69,11 @@ namespace Flow.Grains.Plan.CaseFileItem
         {
             if (definition == null) throw new ArgumentNullException(nameof(definition));
             if (State.Defined) throw new InvalidOperationException($"CaseFileItem {_address} has already been created");
+
+            // Table 8.2 lists create as a CaseFileItem transition like any other - 8.4.1/Table
+            // 8.5's Closed lockdown (see EnsureCaseNotClosed) therefore applies here too, not
+            // only to mutations of an already-existing CaseFileItem.
+            await EnsureCaseNotClosed(caseDefinitionId);
 
             await base.Define(caseDefinitionId, definition);
 
@@ -84,7 +98,7 @@ namespace Flow.Grains.Plan.CaseFileItem
 
         private async Task ChangeValue(JsonNode value, Interfaces.Model.CaseFileItemTransition standardEvent)
         {
-            EnsureAvailable();
+            await EnsureAvailable();
 
             RaiseEvent(new ValueChanged
             {
@@ -99,7 +113,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         public async Task AddChild(string childCaseFileItemId)
         {
             if (string.IsNullOrWhiteSpace(childCaseFileItemId)) throw new ArgumentException("must not be empty", nameof(childCaseFileItemId));
-            EnsureAvailable();
+            await EnsureAvailable();
 
             RaiseEvent(new ChildAdded
             {
@@ -114,7 +128,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         public async Task RemoveChild(string childCaseFileItemId)
         {
             if (string.IsNullOrWhiteSpace(childCaseFileItemId)) throw new ArgumentException("must not be empty", nameof(childCaseFileItemId));
-            EnsureAvailable();
+            await EnsureAvailable();
 
             RaiseEvent(new ChildRemoved
             {
@@ -129,7 +143,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         public async Task AddReference(string targetCaseFileItemId)
         {
             if (string.IsNullOrWhiteSpace(targetCaseFileItemId)) throw new ArgumentException("must not be empty", nameof(targetCaseFileItemId));
-            EnsureAvailable();
+            await EnsureAvailable();
 
             RaiseEvent(new ReferenceAdded
             {
@@ -144,7 +158,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         public async Task RemoveReference(string targetCaseFileItemId)
         {
             if (string.IsNullOrWhiteSpace(targetCaseFileItemId)) throw new ArgumentException("must not be empty", nameof(targetCaseFileItemId));
-            EnsureAvailable();
+            await EnsureAvailable();
 
             RaiseEvent(new ReferenceRemoved
             {
@@ -159,7 +173,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         // Table 8.2: delete (Available -> Discarded). Terminal.
         public async Task Delete()
         {
-            EnsureAvailable();
+            await EnsureAvailable();
 
             RaiseEvent(new Discarded());
 
@@ -173,7 +187,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         // Table 8.1/8.2: every mutating operation other than create is only defined From Available;
         // Discarded is a terminal state with no outgoing transitions ("A CaseFileItem instance in
         // this state is considered deleted and is not available to Case workers or expressions").
-        private void EnsureAvailable()
+        private async Task EnsureAvailable()
         {
             if (!State.Defined) throw new InvalidOperationException($"CaseFileItem {_address} has not been created");
 
@@ -181,6 +195,53 @@ namespace Flow.Grains.Plan.CaseFileItem
             {
                 throw new InvalidOperationException($"CaseFileItem {_address} is Discarded and accepts no further operations");
             }
+
+            await EnsureCaseNotClosed(State.CaseDefinitionId);
+        }
+
+        // ADO #69 - 8.4.1/Table 8.5 Closed: "Terminal state. In this state no new activity is
+        // allowed in the Case." Mirrors CaseGrain.Trigger's own Closed guard (same exception
+        // type, same "is Closed" wording) so the read-only lockdown holds at the CaseFileItem's
+        // own public surface too, not only at the Case's Trigger surface.
+        //
+        // Resolving the owning ICaseGrain is deliberately tolerant of an unresolvable/undefined
+        // case: per this grain's own class remarks (work item #16), a CaseFileItem is usable
+        // standalone, without a fully modeled/instantiated Case - a caller that has not (yet)
+        // defined or created the owning case has nothing to lock down against, so the guard is a
+        // no-op rather than a hard dependency on that modeling layer existing.
+        private async Task EnsureCaseNotClosed(string caseDefinitionId)
+        {
+            var caseScope = await ResolveCaseScope(caseDefinitionId);
+            if (caseScope == null) return;
+
+            var caseGrain = GrainFactory.GetGrain<Interfaces.Plan.Case.ICaseGrain>(_caseInstanceId, caseScope);
+            if (!await caseGrain.Defined()) return;
+
+            var caseSnapshot = await caseGrain.GetSnapshot();
+
+            if (caseSnapshot.PlanItemState == Interfaces.Model.PlanItemState.Closed)
+            {
+                throw new InvalidOperationException($"case {_caseInstanceId} is Closed; CaseFileItem {_address} cannot be mutated");
+            }
+        }
+
+        // The ICaseGrain compound key extension is the owning case's CasePlanModel.Id (the
+        // convention every existing caller already follows - see e.g.
+        // CaseLifecycleIntegrationTests.CreateEmptyCase/ConformanceHarness.DeployAndCreate), which
+        // this grain has no way to derive from its own compound key. Cached once resolved: it
+        // cannot change for a given caseDefinitionId, so later calls in this activation's
+        // lifetime skip the ICaseDefinitionGrain round trip.
+        private async Task<string> ResolveCaseScope(string caseDefinitionId)
+        {
+            if (_caseScope != null) return _caseScope;
+            if (string.IsNullOrEmpty(caseDefinitionId)) return null;
+
+            var caseDefinition = await GrainFactory
+                .GetGrain<Interfaces.Plan.Case.ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .GetDefinition();
+
+            _caseScope = caseDefinition?.CasePlanModel?.Id;
+            return _caseScope;
         }
 
         // D3 - see CaseFileItemAddress.CaseWideSentinel's remarks for why every transition is ALSO
