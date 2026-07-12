@@ -19,6 +19,18 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
     {
         private StageBehaviorStore StageStore => Host.State.BehaviorExtension as StageBehaviorStore ?? throw new InvalidOperationException();
 
+        // ADO #66 - override point for the CasePlanModel/ordinary-Stage-or-Task asymmetry
+        // ~~~~~
+        // Table 5.31's transition glossary scopes `exit` to "the Stage or Task" only (the
+        // casePlanModel is deliberately omitted) and `terminate` to "the casePlanModel, Stage, or
+        // Task". HandleSentrySatisfied below is shared verbatim by CasePlanModelBehavior, so this
+        // is the one seam that lets the CasePlanModel fire a different trigger for the exact same
+        // "my own exit criterion was satisfied" event, without duplicating the rest of the method.
+        // Ordinary Stage/Task instances keep the base Exit; CasePlanModelBehavior overrides this to
+        // Terminate (see PlanItemStateMachine.ConfigureForCasePlanModel's remarks for why Table 8.6
+        // has no `exit` row for the casePlanModel to permit in the first place).
+        protected virtual PlanItemTransition ExitCriterionTransition => PlanItemTransition.Exit;
+
         public StageBehavior(IBehaviorHost host, Stage planItemDefinition, IPlanItemStateMachine stateMachine) :
             base(host, planItemDefinition, stateMachine)
         {
@@ -270,7 +282,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 }
             }
             else if (criterion is ExitCriterion &&
-                     StateMachine.CanFire(PlanItemTransition.Exit))
+                     StateMachine.CanFire(ExitCriterionTransition))
             {
                 Host.RaiseEvent(new ExitCriterionSatisfied
                 {
@@ -279,7 +291,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                     OnPartOccurred = @event.OnPartOccurred
                 });
 
-                await StateMachine.FireAsync(PlanItemTransition.Exit);
+                await StateMachine.FireAsync(ExitCriterionTransition);
             }
         }
 

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #66 conformance scenario - Table 8.6 (terminate via exit criteria) / 8.4.1 for the
+  CasePlanModel ITSELF, as opposed to Sentry_ExitCriterionStage.cmmn's nested Stage.
+  ~~~~~
+  8.4.1: "The outermost Stage instance is special in two areas: (1) It MUST NOT contain entry
+  criteria." - exit criteria are NOT prohibited, and per the tStage XSD content model the
+  outermost Stage carries them directly as its own <exitCriterion> children (Spec.CMMN.MODEL.cs:
+  "if the Stage is the outermost Stage, zero or more references to exitCriterion"), not on a
+  wrapping <planItem> the way an ordinary nested Stage/Task's criteria are declared. Table 8.6's
+  terminate row covers both "Case worker decision" and the CasePlanModel's own exit criteria
+  becoming satisfied - this sample pins the latter, with no Case-worker trigger involved.
+
+  MODELING NOTES: the exitCriterion/sentry are declared directly under casePlanModel (sibling to
+  its planItem/humanTask), matching the exit-criterion-Stage sample's own ExitItem/abort pattern.
+  TaskA carries manualActivationRule=false so it stays Enabled (never Active), keeping the sole
+  child out of the way of the assertion.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-exit-criterion-caseplanmodel"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryExitCriterionCasePlanModel"
+             name="SentryExitCriterionCasePlanModelSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryExitCriterionCasePlanModelCase" name="SentryExitCriterionCasePlanModelCase">
+    <caseFileModel>
+      <caseFileItem id="ExitItem" name="ExitItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemTaskA" name="PlanItemTaskA" definitionRef="TaskA"/>
+      <sentry id="ExitSentry" name="ExitSentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="ExitItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_Task">
+          <manualActivationRule id="MAR_Task">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+      <exitCriterion id="ExitCriterion_1" sentryRef="ExitSentry"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

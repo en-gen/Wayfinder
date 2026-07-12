@@ -47,6 +47,33 @@ namespace Flow.Grains.Plan.Case
         
         public async Task Define(Interfaces.Model.Case definition)
         {
+            // ADO #66 - Case.ExitCriteria was disconnected from CasePlanModel.ExitCriteria
+            // ~~~~~
+            // Case.EntryCriteria/Case.ExitCriteria (Model/Case.cs) exist solely so the Case
+            // object itself satisfies IBehaviorDefinition for CaseGrain.IBehaviorHost.Definition
+            // (see CmmnXmlSerializer.cs's BuildOverrides remarks) - and that Host.Definition,
+            // not State.Definition.CasePlanModel, is exactly what BaseBehavior.SubscribeToCriteria
+            // / HandleSentrySatisfied read (Host.Definition.ExitCriteria) for the CasePlanModel's
+            // own behavior. tCase has no exitCriterion element of its own in the XSD - only the
+            // outermost tStage does ("if the Stage is the outermost Stage, zero or more references
+            // to exitCriterion", Spec.CMMN.MODEL.cs) - so a .cmmn file's (or a directly-constructed
+            // Case's) real CasePlanModel-level exit criteria land correctly on
+            // CasePlanModel.ExitCriteria, never on Case.ExitCriteria. Left unconnected, Case.
+            // ExitCriteria stayed permanently empty regardless of what was authored, so the
+            // CasePlanModel's own exit-criteria subscription (once armed - see
+            // CasePlanModelBehavior.HandleEnterActiveFromCreate) enumerated zero criteria and its
+            // HandleSentrySatisfied never matched a satisfied sentry to a criterion. Copied once
+            // here, at definition time (not per Case instance in CaseGrain.Create): exit criteria
+            // are definition-level data, identical for every instance of this case definition, and
+            // this is the one point where the definition object is still being assembled before it
+            // becomes the confirmed, canonical CaseDefinitionDefined payload below. Case.
+            // EntryCriteria is deliberately NOT mirrored the same way - it must stay the fixed
+            // empty list (8.4.1: the outermost Stage instance MUST NOT contain entry criteria).
+            foreach (var exitCriterion in definition.CasePlanModel.ExitCriteria)
+            {
+                definition.ExitCriteria.Add(exitCriterion);
+            }
+
             var casePlanModelNode = new DefinitionGraphNode(definition.CasePlanModel.Id);
             await CreateStageDefinitions(definition.CasePlanModel, casePlanModelNode);
 
