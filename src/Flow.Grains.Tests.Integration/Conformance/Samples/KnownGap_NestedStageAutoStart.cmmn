@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ADO #21 conformance scenario - Table 8.8 start (Stage) + 8.7 instantiation (KNOWN GAP,
-  discovered by this suite).
+  ADO #21 conformance scenario - Table 8.8 start (Stage) + 8.7 instantiation. Originally
+  authored as a KNOWN GAP (discovered by this suite); fixed by #64 - see below.
   ~~~~~
   Table 8.8 (start): with a FALSE ManualActivationRule a Stage moves Available -> Active with no
   Case-worker involvement, and 8.7 requires its planned PlanItems to instantiate on that entry to
-  Active. StageA below is exactly that shape - and its activation crashes the engine today: the
-  auto-start path (EnableOrStart firing Start while the Create trigger is still being processed)
-  reaches StageBehavior.HandleEnterActiveFromStart on a non-activation thread, and the first
-  Host.GrainFactory access throws "Activation access violation". The same model with a
-  default-TRUE ManualActivationRule (Enabled + an explicit ManualStart grain call) instantiates
-  its children fine - see Lifecycle_NestedStageManualStart.cmmn. TaskA's definition is hoisted to
-  the casePlanModel level, so definition resolution (the separate
-  KnownGap_NestedDefinitionDeclaration gap) plays no part in this failure. See
+  Active. StageA below is exactly that shape. Its activation used to crash the engine (FINDING-2):
+  the auto-start path (EnableOrStart firing Start while the Create trigger is still being
+  processed) reached StageBehavior.HandleEnterActiveFromStart on a non-activation thread, and the
+  first Host.GrainFactory access threw "Activation access violation" - fixed by #64
+  (PlanItemStateMachine.RetainSynchronizationContext = true). The same model with a default-TRUE
+  ManualActivationRule (Enabled + an explicit ManualStart grain call) instantiates its children
+  fine - see Lifecycle_NestedStageManualStart.cmmn. TaskA's definition is hoisted to the
+  casePlanModel level, so definition resolution (the separate
+  KnownGap_NestedDefinitionDeclaration gap) plays no part in this scenario. See
   KnownGapScenarios.cs for the observed stack and evidence.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
