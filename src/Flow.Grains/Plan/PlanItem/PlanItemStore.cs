@@ -56,12 +56,22 @@ namespace Flow.Grains.Plan.PlanItem
         [Id(15)]
         public string ParentDefinitionId { get; private set; }
 
+        // #65: the parent's full DEFINITION-scope path (StageBehavior.CreateChild's
+        // Host.DefinitionScope) at the moment this child was defined - persisted so
+        // CaseDefinitionGrain.GetPlanItemDefinition is searched with a definition-id path instead
+        // of the runtime instance-id Scope (which only coincidentally resolves root-level
+        // declarations). Null for the CasePlanModel root and for items defined via the bare 2-arg
+        // Define overload (PlanItemGrain.DefineRepetition falls back to the instance Scope then).
+        [Id(16)]
+        public string ParentDefinitionScope { get; private set; }
+
         public void Apply(Defined @event)
         {
             base.Apply(@event);
             PlanItemDefinition = @event.PlanItemDefinition;
             Repetition = @event.Repetition;
             ParentDefinitionId = @event.ParentDefinitionId;
+            ParentDefinitionScope = @event.ParentDefinitionScope;
 
             switch (PlanItemDefinition)
             {

@@ -45,7 +45,7 @@ Suite re-verified post-!26: **33 scenarios — 25 executed green, 8 quarantined 
 |---|---|---|
 | FINDING-1 | Parent→child lifecycle propagation is stream-dead: children subscribe on the parent's *instance* id (`BaseBehavior.Activate`), grains publish on their *definition* id (`CmmnElementGrain.PublishEvent`) — every downward cascade of Tables 8.5/8.6/8.9 never delivers | to be filed |
 | FINDING-2 | Auto-start Stages (FALSE ManualActivationRule) crash: the queued `Start` trigger runs `StageBehavior.HandleEnterActiveFromStart` on a non-activation thread — `Host.GrainFactory` throws "Activation access violation", no children instantiate | to be filed |
-| FINDING-3 | Definitions declared inside a nested `<stage>` are unresolvable at runtime: the definition index keys definition-id paths, runtime scopes are instance-id paths — only casePlanModel-root declarations resolve | to be filed |
+| FINDING-3 | Definitions declared inside a nested `<stage>` are unresolvable at runtime: the definition index keys definition-id paths, runtime scopes are instance-id paths — only casePlanModel-root declarations resolve | #65 (fixed) |
 
 ## §8.4.1 Case instance lifecycle (Tables 8.5, 8.6)
 
@@ -141,7 +141,7 @@ Suite re-verified post-!26: **33 scenarios — 25 executed green, 8 quarantined 
 |---|---|---|
 | Planned PlanItems instantiate when Stage becomes Active | `InstantiationScenarios.Instantiation__Given_MultiplePlanItems__…`; `LifecycleScenarios.StageLifecycle__…` (nested, manual start) | Pinned |
 | DiscretionaryItems NOT auto-instantiated (5.4.9.2) | `InstantiationScenarios.Instantiation__Given_PlanningTableDiscretionaryItem__…` | Pinned |
-| Nested-stage definitions (5.4.8 declaration inside `<stage>`) | `KnownGapScenarios.NestedDeclaration__…` | KnownGap:FINDING-3 |
+| Nested-stage definitions (5.4.8 declaration inside `<stage>`) | `KnownGapScenarios.NestedDeclaration__…` | Pinned (#65) |
 | Run-time planning operation (select discretionary item into the plan) | no public "plan this item into the case" surface exists (`PlanningTableGrain.GetPlannableItems` is query-only) | NotApplicable (no planning-apply surface; M2/M3 roadmap) |
 | Table 8.13 planning-allowed states | depends on the planning-apply surface above | NotApplicable (same) |
 

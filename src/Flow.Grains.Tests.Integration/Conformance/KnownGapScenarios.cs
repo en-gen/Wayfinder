@@ -416,7 +416,12 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // definitions declared at the casePlanModel root. Discovered by this suite; every other
         // nested-stage sample hoists definitions to the root (5.4.3 ancestor references) to route
         // around it.
-        [Fact(Skip = "KnownGap: FINDING-3 (#21 report, work item to be filed) - definitions declared INSIDE a nested <stage> are unresolvable at runtime: the definition index keys definition-id paths (CPM.StageA.TaskA) while runtime scopes are instance-id paths (CPM.<instanceGuid>), so CaseDefinitionGrain.GetPlanItemDefinition only finds casePlanModel-root declarations. Observed on develop@f23a74b: InvalidOperationException 'definition TaskA not registered' (PlanItemGrain.DefineRepetition, PlanItemGrain.cs:83) via StageBehavior.CreateChild on StageA's ManualStart.")]
+        // Un-quarantined (#65): CaseDefinitionGrain.GetPlanItemDefinition now searches with
+        // PlanItemGrain.DefineRepetition's parentDefinitionScope (threaded from
+        // StageBehavior.CreateChild's Host.DefinitionScope) - a DEFINITION-id path - instead of
+        // the runtime INSTANCE-id _scope, so nested-stage declarations resolve the same as
+        // casePlanModel-root ones.
+        [Fact]
         [ConformanceCitation("5.4.8 / nested planItemDefinitions + 8.7 instantiation (NEW discovery)")]
         public async Task NestedDeclaration__Given_DefinitionDeclaredInsideNestedStage__Then_NestedChildInstantiates()
         {
@@ -437,8 +442,14 @@ namespace Flow.Grains.Tests.Integration.Conformance
                 "PlanItemTaskA",
                 stageAddress);
 
-            (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
-                "the nested-declared TaskA definition must be resolvable and its PlanItem instantiated (5.4.8 + 8.7)");
+            // Enabled, not Active: TaskA declares no manualActivationRule, so Table 5.51's default
+            // (TRUE) applies and it waits for a Case worker's ManualStart - same reasoning
+            // LifecycleScenarios pins for StageA itself just above. The pre-#65 defect threw
+            // InvalidOperationException before this state was ever reachable at all; landing here
+            // (rather than stuck Uninitialized, or throwing) is what proves the nested-declared
+            // TaskA definition resolved and its PlanItem instantiated (5.4.8 + 8.7).
+            (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Enabled,
+                "Table 5.51: TaskA declares no ManualActivationRule, so 8.7's instantiation leaves it waiting Enabled for a Case worker - reaching this state at all proves the nested-declared definition resolved (5.4.8)");
         }
     }
 }

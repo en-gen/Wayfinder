@@ -23,6 +23,15 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         string Scope { get; }
         string InstanceId { get; }
         string DefinitionId { get; }
+        // The full dotted DEFINITION-id path from the casePlanModel root down to and including
+        // this host's own definition id (e.g. "CPM.StageA") - the definition-tree counterpart to
+        // Address/Scope above, which are runtime INSTANCE-id paths. CaseDefinitionGrain.
+        // DefinitionIndex is keyed on exactly this shape (CaseDefinitionGrain.CreateStageDefinitions
+        // builds it from PlanItemDefinition.Id, never from a runtime instance id), so a child
+        // created under this host must look up its own definition using THIS value as the search
+        // scope, not Address/Scope - the same instance-vs-definition confusion #63 fixed for the
+        // parent-transition subscription, here in the definition-index lookup (#65).
+        string DefinitionScope { get; }
         
         IBehaviorDefinition Definition { get; }
         IBehaviorStore State { get; }
