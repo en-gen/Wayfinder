@@ -378,9 +378,26 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
             var childSnapshots = await GetChildSnapshots();
 
-            if (!Host.State.UserCompletable &&
+            // Table 8.12 - UserCompletable (#68, D4 residual): the UI-facing observability twin
+            // of ManualCompletionCriteriaSatisfied's autoComplete=FALSE arm below, not of the
+            // autoComplete=TRUE column. The two columns are genuinely different completion
+            // branches: autoComplete=TRUE has NO Manual Completion branch in Table 8.12 at all -
+            // it auto-completes on its own with no human involvement (the AutoComplete branch
+            // further down) - while autoComplete=FALSE's Manual Completion OR-branch requires
+            // only that REQUIRED children be terminal, carrying no "no Active children" conjunct
+            // (a still-Active non-required child must not block it - the original D4 finding).
+            // The prior condition here conflated both: it ignored AutoComplete entirely (so an
+            // autoComplete=TRUE stage got latched "user-completable" even though a human cannot
+            // legitimately manually-complete it in that mode) and required ALL children
+            // non-Active - not just required ones - before flipping the flag (so an
+            // autoComplete=FALSE stage with a lingering non-required Active child never latched,
+            // even after !26/#19 fixed the actual Trigger(Complete) enforcement gate to permit
+            // exactly that). Gating on !PlanItemDefinition.AutoComplete and dropping the
+            // no-Active-children conjunct keeps this flag true only where the spec's Manual
+            // Completion branch actually is.
+            if (!PlanItemDefinition.AutoComplete &&
+                !Host.State.UserCompletable &&
                 StateMachine.CanFire(PlanItemTransition.Complete) &&
-                childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
                 childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal()))
             {
                 Host.RaiseEvent(new UserCompletableCriteriaMet());
