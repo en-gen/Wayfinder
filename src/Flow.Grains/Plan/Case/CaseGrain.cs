@@ -38,6 +38,14 @@ namespace Flow.Grains.Plan.Case
         string IBehaviorHost.ParentDefinitionId => null;
         string IBehaviorHost.InstanceId => _instanceId;
         string IBehaviorHost.DefinitionId => Definition?.Id;
+        // NOT Definition.Id - that is the CASE's own id (correct for DefinitionId/PublishEvent's
+        // stream key above, per #63, but a different id namespace entirely). The definition-scope
+        // path CaseDefinitionGrain.DefinitionIndex is keyed on is rooted at the casePlanModel's
+        // OWN id (CaseDefinitionGrain.Define: new DefinitionGraphNode(definition.CasePlanModel.Id)),
+        // which for the root has no ancestor, so this IS the full definition-scope path (matches
+        // DefinitionGraphNode.Address: Scope is empty for a node with no Parent, so Address == Id)
+        // (#65).
+        string IBehaviorHost.DefinitionScope => Definition?.CasePlanModel?.Id;
 
         IBehaviorDefinition IBehaviorHost.Definition => Definition;
         IBehaviorStore IBehaviorHost.State => TentativeState;

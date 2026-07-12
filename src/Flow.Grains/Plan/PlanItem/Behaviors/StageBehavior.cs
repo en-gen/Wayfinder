@@ -582,7 +582,11 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             // definition id - threaded through so the child's BaseBehavior.Activate can key its
             // parent-transition subscription on the same stream this Stage's transitions publish
             // on (#63).
-            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId);
+            // Host.DefinitionScope: this Stage's own full DEFINITION-scope path, threaded through
+            // so the child's CaseDefinitionGrain.GetPlanItemDefinition lookup searches from the
+            // correct definition-tree position instead of this Stage's runtime instance address
+            // (#65).
+            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId, Host.DefinitionScope);
             await childGrain.Trigger(PlanItemTransition.Create);
 
             await Task.WhenAll(

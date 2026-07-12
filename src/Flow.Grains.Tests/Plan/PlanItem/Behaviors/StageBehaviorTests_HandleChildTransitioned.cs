@@ -93,6 +93,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var scope = $"CPM.{parentInstanceId}";
             var address = $"{scope}.{instanceId}";
             var planItemDefinitionId = ShortGuid.NewGuid();
+            var definitionScope = $"CPM.{ShortGuid.NewGuid()}";
 
             var pi = new Interfaces.Model.PlanItem{ Id = planItemDefinitionId};
 
@@ -105,7 +106,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             };
 
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
-            
+
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
@@ -123,13 +124,15 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(parentInstanceId);
             mockHost.Setup(x => x.DefinitionId)
                 .Returns(stage.Id);
+            mockHost.Setup(x => x.DefinitionScope)
+                .Returns(definitionScope);
             mockHost.Setup(x => x.InstanceId)
                 .Returns(instanceId);
             mockHost.Setup(x => x.Scope)
                 .Returns(scope);
             mockHost.Setup(x => x.State)
                 .Returns(testStore);
-            
+
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
@@ -150,7 +153,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             // parentDefinitionId (#63): threaded from Host.DefinitionId (this Stage's own
             // definition id) so the repeated child's parent-transition subscription resolves.
-            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 1, stage.Id), Times.Once);
+            // parentDefinitionScope (#65): threaded from Host.DefinitionScope (this Stage's own
+            // full definition-scope path) so the repeated child's definition-index lookup resolves.
+            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 1, stage.Id, definitionScope), Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
 
             mockHost.Verify(x => x.SubscribeTo(

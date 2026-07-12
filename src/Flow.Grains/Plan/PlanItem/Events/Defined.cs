@@ -18,5 +18,14 @@ namespace Flow.Grains.Plan.PlanItem.Events
         // without a known parent (e.g. PlanItemGrain.Define's bare 2-arg overload).
         [Id(2)]
         public string ParentDefinitionId { get; set; }
+        // Parent's full DEFINITION-scope path (Host.DefinitionScope at the moment StageBehavior.
+        // CreateChild defines this child) - the definition-tree counterpart to ParentDefinitionId
+        // above. Used as the search scope for this item's OWN CaseDefinitionGrain.
+        // GetPlanItemDefinition lookup, and combined with this item's own Definition.Id to become
+        // ITS children's ParentDefinitionScope in turn. Null for items defined without a known
+        // parent (e.g. PlanItemGrain.Define's bare 2-arg overload) - PlanItemGrain.DefineRepetition
+        // falls back to the (pre-#65) instance-scope-derived lookup in that case (#65).
+        [Id(3)]
+        public string ParentDefinitionScope { get; set; }
     }
 }

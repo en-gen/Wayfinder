@@ -5,6 +5,6 @@ namespace Flow.Grains.Plan.PlanItem
 {
     public interface IPlanItemInternalGrain : IPlanItemGrain
     {
-        Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition, string parentDefinitionId);
+        Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition, string parentDefinitionId, string parentDefinitionScope);
     }
 }

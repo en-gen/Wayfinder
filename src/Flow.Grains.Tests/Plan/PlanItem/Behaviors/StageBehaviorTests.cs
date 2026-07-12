@@ -326,6 +326,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var parentInstanceId = ShortGuid.NewGuid();
             var instanceId = ShortGuid.NewGuid();
             var scope = ShortGuid.NewGuid();
+            var definitionScope = $"CPM.{ShortGuid.NewGuid()}";
 
             var stage = new Stage
             {
@@ -357,6 +358,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(instanceId);
             mockHost.Setup(x => x.DefinitionId)
                 .Returns(stage.Id);
+            mockHost.Setup(x => x.DefinitionScope)
+                .Returns(definitionScope);
             mockHost.Setup(x => x.Scope)
                 .Returns(scope);
             mockHost.Setup(x => x.State)
@@ -377,7 +380,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 // parentDefinitionId (#63): CreateChild threads Host.DefinitionId (this Stage's
                 // own definition id) through so the child keys its parent-transition subscription
                 // on the same stream this Stage publishes its transitions on.
-                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id), Times.Once);
+                // parentDefinitionScope (#65): CreateChild also threads Host.DefinitionScope (this
+                // Stage's own full definition-scope path) through so the child's definition-index
+                // lookup searches from the correct definition-tree position.
+                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id, definitionScope), Times.Once);
 
                 mockHost.Verify(x => x.SubscribeTo(
                         pi.Id,
