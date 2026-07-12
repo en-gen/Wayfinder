@@ -189,6 +189,63 @@ namespace Flow.Grains.Tests.Integration.Conformance
                 "Table 8.8 (exit): the Stage must transition Active -> Terminated when its exit criterion's sentry is satisfied");
         }
 
+        // Table 8.6 (terminate) / 8.4.1 for the CasePlanModel ITSELF, as opposed to the sample
+        // above's nested Stage: 8.4.1 prohibits only ENTRY criteria on the outermost Stage - its
+        // own exit criteria are legal (tStage's XSD content model carries them as the Stage's own
+        // <exitCriterion> children when it is the outermost Stage) and Table 8.6's terminate row
+        // covers both a Case worker's decision and the CasePlanModel's own exit criteria becoming
+        // satisfied - ONE trigger (`terminate`), two ways to reach it, not two triggers. No
+        // Case-worker trigger is sent here - the case-file update alone must terminate the Case.
+        // Pins ADO #66's fix, which had three independent facets: (1) CasePlanModelBehavior never
+        // armed an ExitCriteria subscription at all (Create skips Available, the state where
+        // StageBehavior normally arms it), (2) the satisfied-exit-criterion path had nothing wiring
+        // it to the Table 8.6 `terminate` transition StateMachine.CanFire needed (originally
+        // mis-fixed as a Permit(Exit) - Table 8.6 has NO `exit` row for the casePlanModel at all;
+        // corrected to route through StageBehavior.ExitCriterionTransition, overridden in
+        // CasePlanModelBehavior to Terminate, landing on the Permit(Terminate) edge that already
+        // existed for the Case-worker-decision route - see PlanItemStateMachine.
+        // ConfigureForCasePlanModel and CasePlanModelBehavior's remarks), and (3)
+        // Host.Definition.ExitCriteria for the CasePlanModel's behavior host (CaseGrain) reads
+        // Case.ExitCriteria - a fixed, always-empty collection wired in only to satisfy
+        // IBehaviorDefinition - never CasePlanModel.ExitCriteria where a .cmmn's real criteria
+        // land, so even an armed, permitted subscription would enumerate zero criteria without
+        // CaseDefinitionGrain.Define's copy.
+        [Fact]
+        [ConformanceCitation("Table 8.6 / terminate (exit criteria)")]
+        [ConformanceCitation("8.4.1 / CasePlanModel MAY declare exit criteria")]
+        public async Task Sentry__Given_CasePlanModelExitCriterion__Then_CaseFileEventTerminatesCase()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_ExitCriterionCasePlanModel.cmmn");
+
+            (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
+                "the Case must be executing before its own exit criterion fires - 8.5 gates exit evaluation on Active");
+
+            var taskAGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemTaskA", deployed.Scope);
+
+            var exitItem = _harness.CaseFileItem(deployed.CaseInstanceId, "ExitItem");
+            await exitItem.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "ExitItem" }, JsonNode.Parse("""{"abort": false}"""));
+            await exitItem.Update(JsonNode.Parse("""{"abort": true}"""));
+
+            var caseTerminated = await ConformanceHarness.PollUntil(
+                async () => (await deployed.CaseGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
+            caseTerminated.Should().BeTrue(
+                "Table 8.6 (terminate via exit criteria): the Case must transition Active -> Terminated when the " +
+                "CasePlanModel's own exit criterion's sentry is satisfied");
+
+            // Table 8.9's mandated termination cascade: the CasePlanModel now reaches Terminated
+            // via `terminate` rather than `exit` (see the class remarks above), and
+            // StageBehavior/TaskBehavior.HandleParentTransitioned already treats a parent's
+            // Terminate identically to a parent's Exit (both raise ParentTerminated and fire the
+            // child's own Exit) - so TaskA must still cascade to Terminated regardless of which
+            // trigger its parent fired. Locks that cascade instead of leaving it unasserted.
+            var taskATerminated = await ConformanceHarness.PollUntil(
+                async () => (await taskAGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
+            taskATerminated.Should().BeTrue(
+                "Table 8.9: the CasePlanModel's termination must cascade to its child TaskA, whether the " +
+                "CasePlanModel itself reached Terminated via `terminate` or `exit`");
+        }
+
         // 8.6.4: "Stage and Task instances with a RepetitionRule will try to create a new
         // instance every time an entry criterion with an OnPart is satisfied" - presupposing
         // (8.5, Figure 8.5's B/B') that the SAME sentry satisfies once per distinct occurrence of

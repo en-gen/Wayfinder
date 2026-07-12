@@ -31,7 +31,23 @@ namespace Flow.Grains.Plan.Case
 
         Guid IBehaviorHost.CaseInstanceId => _caseInstanceId;
         string IBehaviorHost.Address => _address;
-        string IBehaviorHost.Scope => _scope;
+        // ADO #66 - NOT the generic _scope (CmmnElementGrain.OnActivateAsync's "address minus its
+        // last dot-segment"). That generic split assumes every element sits at least one level
+        // below its own containing scope - true for every ordinary PlanItem/Sentry/CaseFileItem
+        // instance (Address = "CPM.<instanceId>", Scope = "CPM", the parent Stage's own address),
+        // but false for the Case root: its Address IS its scope-key with no instance-id suffix
+        // ("CPM", zero dots), so the generic split degenerates _scope to "". StageBehavior.
+        // HandleSentrySatisfied's "Host.Scope != @event.SourceScope" guard (5.4.5.1: a criterion's
+        // Sentry MUST be contained by the Stage/PlanFragment that contains the PlanItem) needs
+        // Host.Scope to mean "the scope my OWN criteria's sentries live in". For an ordinary
+        // PlanItem that scope is its immediate parent Stage's address; for the CasePlanModel's own
+        // criteria (Case.ExitCriteria, populated from CasePlanModel.ExitCriteria - see
+        // CaseDefinitionGrain.Define) the sentries they reference are ones the CasePlanModel
+        // defines itself (StageBehavior.Define, over PlanItemDefinition.Sentries), so the matching
+        // scope is the CasePlanModel's OWN address - _address, not the empty _scope its generic
+        // split produces. Fixed HERE, not in the shared split: every other CmmnElementGrain
+        // subtype's Scope already means the right thing for its own use.
+        string IBehaviorHost.Scope => _address;
         string IBehaviorHost.ParentInstanceId => _parentId;
         // The CasePlanModel root has no parent - BaseBehavior.Activate's root guard (#63) skips
         // the parent-transition subscription entirely when this is null/empty.

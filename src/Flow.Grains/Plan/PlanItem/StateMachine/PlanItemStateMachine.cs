@@ -110,6 +110,21 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
             // 8.5 - Case instance states
             // ~~~~~
             // In this state the Case instance is executing; meaning the outermost Stage instance is in the Active state
+            //
+            // ADO #66 - the CasePlanModel terminates via `terminate`, not `exit`
+            // ~~~~~
+            // Table 8.6 (Case instance transitions) has NO `exit` row at all - the casePlanModel's
+            // only Active->Terminated transition is `terminate`, which Table 8.6/8.4.1 says is
+            // "achieved by an exit criteria and also allows a Case worker to terminate": one
+            // trigger, two ways to reach it (a satisfied exit criterion OR a Case-worker decision),
+            // both already covered by the Permit(Terminate) below. The Table 5.31 transition
+            // glossary confirms this is deliberate: `exit` is scoped to "the Stage or Task" (the
+            // casePlanModel is conspicuously omitted), while `terminate` is scoped to "the
+            // casePlanModel, Stage, or Task". So there is no Permit(Exit) here - ordinary nested
+            // Stage/Task instances still fire Exit (see ConfigureForStageOrTask), but
+            // CasePlanModelBehavior overrides StageBehavior.ExitCriterionTransition to fire
+            // Terminate instead of Exit for its own satisfied exit criterion, landing on this same
+            // Permit(Terminate) edge rather than needing one of its own.
             Configure(PlanItemState.Active)
                 .Permit(PlanItemTransition.Complete, PlanItemState.Completed)
                 .Permit(PlanItemTransition.Terminate, PlanItemState.Terminated)
