@@ -36,15 +36,20 @@ namespace Flow.Grains.Tests.Integration.Conformance
     //  (HandleParentTransitioned) are correctly implemented and unit-tested with hand-delivered
     //  events.
     //
-    //  FINDING-2 (auto-start stage activation-context violation): an ordinary Stage reaching
-    //  Active via the AUTO-start path - FALSE ManualActivationRule, so EnableOrStart fires Start
-    //  while the Create trigger is still being processed and Stateless queues it - executes
-    //  HandleEnterActiveFromStart's continuation on a non-activation thread; the first
-    //  Host.GrainFactory access throws InvalidOperationException("Activation access violation. A
-    //  non-activation thread attempted to access activation services.") from
-    //  StageBehavior.CreateChild, the exception surfaces through the case's Trigger(Create), and
-    //  no child is instantiated. The manual-start route (Enabled + a separate ManualStart grain
-    //  call) is unaffected - LifecycleScenarios pins it green.
+    //  FINDING-2 (auto-start stage activation-context violation) - FIXED, #64: an ordinary Stage
+    //  reaching Active via the AUTO-start path - FALSE ManualActivationRule, so EnableOrStart
+    //  fired Start while the Create trigger was still being processed and Stateless queued it -
+    //  used to execute HandleEnterActiveFromStart's continuation on a non-activation thread; the
+    //  first Host.GrainFactory access threw InvalidOperationException("Activation access
+    //  violation. A non-activation thread attempted to access activation services.") from
+    //  StageBehavior.CreateChild, the exception surfacing through the case's Trigger(Create), and
+    //  no child instantiating. Root cause: PlanItemStateMachine never set Stateless's own
+    //  RetainSynchronizationContext flag (default false), so every internal await Stateless takes
+    //  between the reentrant queued FireAsync(Start) and later draining it used
+    //  ConfigureAwait(false), losing Orleans' TaskScheduler.Current capture across any real async
+    //  work in between. Fixed by PlanItemStateMachine setting RetainSynchronizationContext = true
+    //  (PlanItemStateMachine.cs). The manual-start route (Enabled + a separate ManualStart grain
+    //  call) was never affected - LifecycleScenarios pins it green.
     //
     //  FINDING-3 (nested definition declarations unresolvable): the definition index built by
     //  CaseDefinitionGrain.Define keys definition-id paths (CPM.StageA.TaskA) while runtime
@@ -323,11 +328,16 @@ namespace Flow.Grains.Tests.Integration.Conformance
         }
 
         // Table 8.8 (start) for a nested STAGE + 8.7: with a FALSE ManualActivationRule, StageA
-        // must auto-start to Active and instantiate TaskA - no Case-worker involvement. The
-        // auto-start path crashes instead (FINDING-2): the queued Start trigger's entry actions
-        // run on a non-activation thread and Host.GrainFactory throws, surfacing through the
-        // case's Trigger(Create) call.
-        [Fact(Skip = "KnownGap: FINDING-2 (#21 report, work item to be filed) - the auto-start path (FALSE ManualActivationRule -> queued Start trigger) executes StageBehavior.HandleEnterActiveFromStart on a non-activation thread. Observed on develop@f23a74b: InvalidOperationException 'Activation access violation. A non-activation thread attempted to access activation services.' from Host.GrainFactory in CreateChild (StageBehavior.cs:454), surfacing through ICaseGrain.Trigger(Create); no child instantiates. The manual-start route is pinned green in LifecycleScenarios.")]
+        // must auto-start to Active and instantiate TaskA - no Case-worker involvement.
+        //
+        // PINNED by #64 (PlanItemStateMachine.RetainSynchronizationContext = true): the
+        // auto-start path used to crash (FINDING-2) - the queued Start trigger's entry actions
+        // ran on a non-activation thread and Host.GrainFactory threw, surfacing through the
+        // case's Trigger(Create) call - because Stateless's queued-firing internals default to
+        // ConfigureAwait(false), losing Orleans' activation TaskScheduler capture across any real
+        // async work between the reentrant FireAsync(Start) and Stateless later draining it.
+        // Verified green on develop@0eae663+#64 - no longer a known gap.
+        [Fact]
         [ConformanceCitation("Table 8.8 / start (Stage) + 8.7 instantiation")]
         public async Task StageAutoStart__Given_ManualActivationRuleFalse__Then_StageActivatesAndInstantiatesChild()
         {

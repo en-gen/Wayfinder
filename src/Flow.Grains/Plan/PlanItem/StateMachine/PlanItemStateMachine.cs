@@ -18,6 +18,61 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
 
             ParentSuspendState = planItemStore.ParentSuspendState;
 
+            // #64 - Orleans activation-context safety for reentrant/queued Fire calls
+            // ~~~~~
+            // base(TState) constructs Stateless in FiringMode.Queued (its own default - see
+            // Stateless.StateMachine<TState,TTrigger>'s single-TState ctor), which is what lets
+            // StageBehavior/TaskBehavior.EnableOrStart call StateMachine.FireAsync(Start)
+            // REENTRANTLY from inside HandleEnterAvailableFromCreate (itself an OnEntryFromAsync
+            // callback of the in-flight Create transition): Stateless notices _firing is already
+            // true, enqueues Start, and drains it later in the SAME InternalFireQueuedAsync call
+            // once Create finishes - by design, not a new grain turn.
+            //
+            // The bug was WHERE that later draining resumes. Stateless's own
+            // RetainSynchronizationContext flag (XML doc: "For certain situations, it is
+            // essential that the SynchronizationContext is retained for all delegate calls.")
+            // defaults to false, and every internal await Stateless takes between firing Create
+            // and draining the queued Start - InternalFireQueuedAsync's own queue loop
+            // (StateMachine.Async.cs), plus every OnEntryFromAsync/OnTransitionedAsync dispatch
+            // in StateRepresentation.Async.cs/OnTransitionedEvent.cs - is wrapped in
+            // .ConfigureAwait(RetainSynchronizationContext), i.e. ConfigureAwait(false) at that
+            // default. Orleans grain code has no ambient SynchronizationContext; it relies on
+            // TaskScheduler.Current (the activation's single-threaded ActivationTaskScheduler,
+            // captured by the runtime for the duration of this grain turn) to bring every
+            // unconfigured `await` continuation back to the activation thread - the same
+            // mechanism that makes ordinary Case.Flow grain code (which never uses
+            // ConfigureAwait(false)) safe. ConfigureAwait(false) opts OUT of that capture:
+            // once ANY awaited step between the reentrant FireAsync(Start) call and the later
+            // dequeue-and-run of that Start trigger genuinely suspends (Host.ConfirmEvents,
+            // stream subscriptions, and the ManualActivationRule's IExpressionGrain call all do -
+            // see HandleEnterAvailableFromCreate/EnableOrStart), its continuation - including the
+            // eventual StageBehavior.HandleEnterActiveFromStart -> CreateChild ->
+            // Host.GrainFactory access - resumes on whatever ThreadPool thread completed that
+            // await, off the activation context entirely. Orleans then throws "Activation access
+            // violation" the moment GrainFactory is touched (confirmed RED: this exact stack, via
+            // the un-quarantined KnownGapScenarios.StageAutoStart__… scenario, before this fix).
+            // The manual-start route (LifecycleScenarios...ManualStartInstantiatesChildren) never
+            // hit this: ManualStart's entry action runs synchronously in the SAME outer FireAsync
+            // call that a Case worker/test invoked directly - nothing has suspended-and-resumed
+            // yet by the time CreateChild's GrainFactory access happens, so no context to lose,
+            // regardless of ConfigureAwait. Only a REENTRANT, QUEUED trigger - drained after
+            // real awaits have already come and gone through Stateless's own
+            // ConfigureAwait(false) hops - is exposed.
+            //
+            // Fix: opt in to Stateless's own escape hatch instead of restructuring the
+            // Create->Start cascade. RetainSynchronizationContext = true flips every one of those
+            // internal awaits to ConfigureAwait(true) - ordinary, un-configured await semantics -
+            // so Stateless's continuations behave exactly like the rest of this grain's code and
+            // correctly resume on TaskScheduler.Current (the activation scheduler). This changes
+            // WHERE continuations resume, not WHEN Start fires or WHAT fires it: the reentrant
+            // FireAsync(Start) is still enqueued and drained within the SAME FireAsync(Create)
+            // call, on the SAME grain turn, with no new grain-to-grain call, no
+            // RegisterTimer/reminder, no fire-and-forget, and no additional reentrancy - so it
+            // cannot deadlock (still pure async/await, nothing blocks on .Result/.Wait()) and
+            // cannot loop unboundedly (Stateless's queue is bounded by the finite triggers
+            // actually fired, unchanged by this flag).
+            RetainSynchronizationContext = true;
+
             ConfigureFor(planItemStore.PlanItemDefinition);
         }
 

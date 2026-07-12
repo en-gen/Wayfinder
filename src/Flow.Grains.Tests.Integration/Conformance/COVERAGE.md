@@ -39,12 +39,31 @@ were re-verified unchanged - identical failure signatures to the original author
 Suite re-verified post-!26: **33 scenarios — 25 executed green, 8 quarantined (skipped), 0 failing**
 (`develop@cbd66d7`, 2026-07-10, `test/21_unquarantine-post-19`).
 
+**FINDING-2/#64 fix (branch `bugfix/64_autostart-activation-context`, 2026-07-11).**
+`KnownGapScenarios.StageAutoStart__…` un-quarantined and re-probed against
+`develop@0eae663`: confirmed RED with the exact predicted stack
+(`InvalidOperationException: Activation access violation. A non-activation thread attempted to
+access activation services.` from `Host.GrainFactory` in `StageBehavior.CreateChild`, via
+`Stateless.StateMachine.InternalFireQueuedAsync` → `HandleEnterActiveFromStart`). Root cause:
+`PlanItemStateMachine` never set Stateless's own `RetainSynchronizationContext` flag, so every
+internal await Stateless takes between the reentrant `FireAsync(Start)` (queued mid-`Create` by
+`StageBehavior`/`TaskBehavior.EnableOrStart`) and later draining that queue used
+`ConfigureAwait(false)` at its default `false` value — losing Orleans' `TaskScheduler.Current`
+capture the moment any real async work (`Host.ConfirmEvents`, stream subscriptions, the
+`ManualActivationRule` `IExpressionGrain` call) came between them. Fixed by setting
+`PlanItemStateMachine.RetainSynchronizationContext = true` in its constructor (`StateMachine.cs`)
+— opts every one of those internal continuations back into ordinary captured-context `await`
+semantics, matching the rest of this grain's code, with no change to when/what fires. Re-run
+green; full suite (`Flow.Grains.Tests` 286/286, `Flow.Grains.Tests.Integration` 125 passed/4
+skipped/0 failed) shows no regressions, including the #63 cascade and #65 nested-declaration
+scenarios.
+
 ## Engine findings discovered by this suite (details in the #21 report)
 
 | Finding | One-line summary | Work item |
 |---|---|---|
 | FINDING-1 | Parent→child lifecycle propagation is stream-dead: children subscribe on the parent's *instance* id (`BaseBehavior.Activate`), grains publish on their *definition* id (`CmmnElementGrain.PublishEvent`) — every downward cascade of Tables 8.5/8.6/8.9 never delivers | to be filed |
-| FINDING-2 | Auto-start Stages (FALSE ManualActivationRule) crash: the queued `Start` trigger runs `StageBehavior.HandleEnterActiveFromStart` on a non-activation thread — `Host.GrainFactory` throws "Activation access violation", no children instantiate | to be filed |
+| FINDING-2 | Auto-start Stages (FALSE ManualActivationRule) crash: the queued `Start` trigger runs `StageBehavior.HandleEnterActiveFromStart` on a non-activation thread — `Host.GrainFactory` throws "Activation access violation", no children instantiate | #64 (fixed) |
 | FINDING-3 | Definitions declared inside a nested `<stage>` are unresolvable at runtime: the definition index keys definition-id paths, runtime scopes are instance-id paths — only casePlanModel-root declarations resolve | #65 (fixed) |
 
 ## §8.4.1 Case instance lifecycle (Tables 8.5, 8.6)
@@ -75,7 +94,7 @@ Suite re-verified post-!26: **33 scenarios — 25 executed green, 8 quarantined 
 | Table 8.8 create (Ø → Available; Repetition/Required rules evaluated) | `InstantiationScenarios.Instantiation__…TableMandatedStates`; `KnownGapScenarios.StageCompletion` precondition pins `Required=true` | Pinned |
 | Table 8.8 enable (Available → Enabled, MAR TRUE) | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…` (default TRUE per Table 5.51) | Pinned |
 | Table 8.8 start (Available → Active, MAR FALSE) — Task | `LifecycleScenarios.TaskLifecycle__…ManualActivationRuleFalse…` | Pinned |
-| Table 8.8 start — STAGE (auto-start + 8.7 instantiation) | `KnownGapScenarios.StageAutoStart__…` | KnownGap:FINDING-2 |
+| Table 8.8 start — STAGE (auto-start + 8.7 instantiation) | `KnownGapScenarios.StageAutoStart__…` | Pinned (#64 - `PlanItemStateMachine.RetainSynchronizationContext`) |
 | Table 8.8 manual start (Enabled → Active) — Task | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…` | Pinned |
 | Table 8.8 manual start — STAGE (+ 8.7 nested instantiation) | `LifecycleScenarios.StageLifecycle__…ManualStartInstantiatesChildren…` | Pinned |
 | Table 8.8 disabled (Enabled → Disabled) | `LifecycleScenarios.TaskLifecycle__…DisableAndReenableRoundTrips` | Pinned |
