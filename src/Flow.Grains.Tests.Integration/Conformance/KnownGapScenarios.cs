@@ -86,7 +86,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // zero-Active-children condition the original gap named, so UserCompletable never flips
         // true while the non-required child stays Active. !26's D4 fix is INCOMPLETE: it opened
         // the gate but left the indicator that tells a caller the gate is open unlit.
-        [Fact(Skip = "KnownGap: work item #19 (D4, Table 8.12) remainder - PR !26/commit 39de993 fixed the Trigger(Complete) enforcement gate (StageBehavior.ManualCompletionCriteriaSatisfied), confirmed by direct probe that stageGrain.Trigger(Complete) now succeeds without throwing in this exact scenario, but did NOT update the UserCompletable flag-raising condition in StageBehavior.HandleChildTransitioned, which still requires childSnapshots.All(state != Active) before raising UserCompletableCriteriaMet - the same conflated OR-branch condition as before #19. Observed on develop@cbd66d7: UserCompletable stays false after the required child completes while the non-required child is Active (10s poll timeout), even though Trigger(Complete) itself no longer throws. Needs a follow-up fix to HandleChildTransitioned's flag-raise condition; unskip when that lands.")]
+        [Fact]
         [ConformanceCitation("Table 8.12 / autoComplete=FALSE, Manual-Completion branch (D4 remainder)")]
         public async Task StageCompletion__Given_AutoCompleteFalseAndNonRequiredChildActive__Then_ManualCompletionBecomesAvailable()
         {

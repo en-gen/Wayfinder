@@ -58,6 +58,28 @@ green; full suite (`Flow.Grains.Tests` 286/286, `Flow.Grains.Tests.Integration` 
 skipped/0 failed) shows no regressions, including the #63 cascade and #65 nested-declaration
 scenarios.
 
+**D4/#68 fix (branch `bugfix/68_usercompletable-table812`, 2026-07-11).**
+`KnownGapScenarios.StageCompletion__…ManualCompletionBecomesAvailable` un-quarantined and
+re-probed against `develop@cc67626`: confirmed RED exactly as the skip reason predicted —
+`UserCompletable` stayed `false` after the required child completed while the non-required child
+stayed `Active`. Root cause confirmed at `StageBehavior.HandleChildTransitioned`'s flag-raise
+condition: it never checked `PlanItemDefinition.AutoComplete` at all (so an autoComplete=TRUE
+Stage — which has no Manual Completion branch in Table 8.12, it just auto-completes with no human
+involvement — got latched "user-completable" anyway) *and* it required
+`childSnapshots.All(state != Active)` before raising, which is the autoComplete=TRUE column's
+condition, not autoComplete=FALSE's Manual Completion OR-branch (that branch requires only that
+*required* children be terminal — the same `!26`/#19 already established for the
+`Trigger(Complete)` enforcement gate in `ManualCompletionCriteriaSatisfied`, just never carried
+over to this flag). Fixed by gating the raise on `!PlanItemDefinition.AutoComplete` and dropping
+the no-Active-children conjunct, so `UserCompletable` now mirrors
+`ManualCompletionCriteriaSatisfied`'s own autoComplete=FALSE arm. Re-run green; full suite
+(`Flow.Grains.Tests` 287/287, `Flow.Grains.Tests.Integration` conformance 33/33, full integration
+126 passed/3 skipped [pre-existing Azurite-emulator skips, unrelated]/0 failed) shows no
+regressions — the #63/#64/#65 scenarios and the `AutocompleteChildrenTerminal` unit test (updated
+to assert `UserCompletable` now stays unlatched for autoComplete=TRUE, per this fix) all stay
+green. This was the last quarantined conformance scenario: the suite is now 33/33 green, 0
+skipped.
+
 ## Engine findings discovered by this suite (details in the #21 report)
 
 | Finding | One-line summary | Work item |
@@ -144,7 +166,7 @@ scenarios.
 | Spec rule | Scenario(s) | Status |
 |---|---|---|
 | 8.6.1 Table 8.12 autoComplete=TRUE | `LifecycleScenarios.TaskLifecycle__…CompleteCompletesCase` (case completes when last child terminal) | Pinned |
-| 8.6.1 Table 8.12 autoComplete=FALSE — manual-completion OR-branch (D4) | `KnownGapScenarios.StageCompletion__…ManualCompletionBecomesAvailable` | KnownGap:#19 (D4 remainder — PR !26/`39de993` fixed the `Trigger(Complete)` enforcement gate, confirmed by direct probe that it now succeeds, but `StageBehavior.HandleChildTransitioned`'s `UserCompletable` flag-raise condition still conflates both OR-branches, so the observable flag a Case worker would poll never flips) |
+| 8.6.1 Table 8.12 autoComplete=FALSE — manual-completion OR-branch (D4) | `KnownGapScenarios.StageCompletion__…ManualCompletionBecomesAvailable` | Pinned (#68 — `StageBehavior.HandleChildTransitioned`'s `UserCompletable` flag-raise condition now gates on `!PlanItemDefinition.AutoComplete` and requires only required children terminal, matching `ManualCompletionCriteriaSatisfied`'s autoComplete=FALSE arm fixed by !26/#19; the observable flag now flips even while a non-required child stays Active) |
 | 8.6.2 ManualActivationRule TRUE → Enabled (incl. Table 5.51 default) | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…`, `…DisableAndReenable…`, `StageLifecycle__…` | Pinned |
 | 8.6.2 ManualActivationRule FALSE → Active | `LifecycleScenarios.TaskLifecycle__…ManualActivationRuleFalse…` | Pinned |
 | 8.6.3 RequiredRule evaluated on create; gates parent completion | evaluation-on-create asserted in `KnownGapScenarios.StageCompletion`'s precondition (`Required=true`; currently dormant with its skip) and by the existing behavior unit suites; the required-blocks-completion conformance matrix is deferred with D4 | KnownGap:#19 (completion-gating matrix; evaluation covered by unit suites) |

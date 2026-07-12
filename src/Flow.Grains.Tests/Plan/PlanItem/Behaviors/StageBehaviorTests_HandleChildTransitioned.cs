@@ -706,7 +706,10 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                     (StreamSequenceToken)null
                 });
 
-            mockHost.Verify(x => x.RaiseEvent(It.IsAny<UserCompletableCriteriaMet>()), Times.Once);
+            // #68 (Table 8.12, D4 residual): autoComplete=TRUE has no Manual Completion branch -
+            // it auto-completes with no human involvement, so UserCompletable must never latch
+            // true for this Stage, even though the AutoComplete column itself is satisfied here.
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<UserCompletableCriteriaMet>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<AutoCompleteCriteriaMet>()), Times.Once);
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Complete), Times.Once);
         }
@@ -1041,6 +1044,105 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                         ShortGuid.NewGuid(),
                         PlanItemTransition.Occur,
                         PlanItemState.Available,
+                        PlanItemState.Completed),
+                    (StreamSequenceToken)null
+                });
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<UserCompletableCriteriaMet>()), Times.Once);
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<FullyCompleteCriteriaMet>()), Times.Never);
+            mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Complete), Times.Never);
+        }
+
+        // #68 (Table 8.12, D4 residual) - the headline scenario the fix targets: autoComplete=
+        // FALSE's Manual Completion OR-branch carries no "no Active children" conjunct, so a
+        // still-Active NON-required child must not block UserCompletable once every REQUIRED
+        // child is terminal. Mirrors the integration-level KnownGapScenarios probe
+        // (StageCompletion__Given_AutoCompleteFalseAndNonRequiredChildActive__
+        // Then_ManualCompletionBecomesAvailable) at the fast unit-test layer.
+        [Fact]
+        public async Task HandleChildTransitioned__Given_NotAutocompleteAndRequiredTerminal__When_NonRequiredChildActive__Then_UserCompletable()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var address = ShortGuid.NewGuid();
+            var planItemADefinitionId = ShortGuid.NewGuid();
+            var planItemAInstanceId = ShortGuid.NewGuid();
+            var planItemBDefinitionId = ShortGuid.NewGuid();
+            var planItemBInstanceId = ShortGuid.NewGuid();
+
+            var pi = new Interfaces.Model.PlanItem();
+
+            var stage = new Stage();
+
+            var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
+            testStore.Apply(new ChildCreated
+            {
+                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemInstanceId = planItemAInstanceId,
+                Repetition = 0
+            });
+            testStore.Apply(new ChildCreated
+            {
+                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemInstanceId = planItemBInstanceId,
+                Repetition = 0
+            });
+
+            // A: the only required child, now terminal.
+            var snapshotA = new PlanItemSnapshot
+            {
+                Required = true,
+                PlanItemState = PlanItemState.Completed
+            };
+            // B: non-required, deliberately still Active - must not block UserCompletable.
+            var snapshotB = new PlanItemSnapshot
+            {
+                Required = false,
+                PlanItemState = PlanItemState.Active
+            };
+
+            var mockPlanItemA = new Mock<IPlanItemInternalGrain>();
+            mockPlanItemA.Setup(x => x.GetSnapshot())
+                .Returns(Task.FromResult(snapshotA));
+            var mockPlanItemB = new Mock<IPlanItemInternalGrain>();
+            mockPlanItemB.Setup(x => x.GetSnapshot())
+                .Returns(Task.FromResult(snapshotB));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemAInstanceId}", null))
+                .Returns(mockPlanItemA.Object);
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{planItemBInstanceId}", null))
+                .Returns(mockPlanItemB.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost.Setup(x => x.Address)
+                .Returns(address);
+            mockHost.Setup(x => x.Definition)
+                .Returns(pi);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+            mockHost.Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+
+            // The required child A is the one transitioning to Completed; non-required B stays
+            // Active throughout.
+            await (Task)typeof(StageBehavior)
+                .GetMethod("HandleChildTransitioned", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[]
+                {
+                    new PlanItemTransitionedEvent(
+                        address,
+                        ShortGuid.NewGuid(),
+                        ShortGuid.NewGuid(),
+                        PlanItemTransition.Complete,
+                        PlanItemState.Active,
                         PlanItemState.Completed),
                     (StreamSequenceToken)null
                 });
