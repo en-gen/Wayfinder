@@ -33,6 +33,17 @@ namespace Flow.Silo.Infrastructure.Options
         //    properties exist here.
         public const string StorageSectionKey = "Azure:Storage";
 
+        // Same section-shape convention as Azure:Storage above (work item #30): a
+        // "connectionString" key selects the connection-string TableServiceClient (Azurite/local),
+        // "serviceUri" + "credential" the TokenCredential one (deployed) - see
+        // Program.cs ConfigureServices (AddTableServiceClient) and ConfigureDeployedOrleans
+        // (UseAzureStorageClustering / UseAzureTableReminderService), which both resolve the same
+        // DI TableServiceClient built from this section - real Orleans cluster membership AND
+        // durable reminders ride the same table endpoint. No bound options class for this section
+        // (unlike StorageOptions.CaseStateContainer): nothing app-level needs a typed read of it,
+        // only the SDK client factory (section-shape auth) and Orleans' own options.
+        public const string ClusteringSectionKey = "Azure:Clustering";
+
         public StorageOptions Storage { get; set; } = new();
 
         public class StorageOptions

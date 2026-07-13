@@ -1,6 +1,9 @@
 using System;
+using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
+using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
 using Flow.Grains.Infrastructure.Extensions;
@@ -25,6 +28,8 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using Orleans.Clustering.AzureStorage;
+using Orleans.Reminders.AzureStorage;
 using HostBuilderContext = Microsoft.Extensions.Hosting.HostBuilderContext;
 
 namespace Flow.Silo
@@ -85,15 +90,6 @@ namespace Flow.Silo
                     options.ClusterId = context.HostingEnvironment.EnvironmentName;
                     options.ServiceId = context.HostingEnvironment.ApplicationName;
                 });
-
-            // Fallback serializer for types Orleans's [GenerateSerializer] codegen can't reasonably
-            // cover: the XSD-generated CMMN model (Flow.Grains.Interfaces.Model). Everything else in
-            // the solution is swept with [GenerateSerializer] + [Id(n)] and uses the native serializer.
-            // See OrleansFallbackJsonSerializer for the shared isSupported predicate/options - the
-            // TestCluster silo and client configurators in ClusterFixture must register identically.
-            silo.Services.AddSerializer(s => s.AddJsonSerializer(
-                isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
-                jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
         }
 
         private static void ConfigureDevelopmentOrleans(HostBuilderContext context, ISiloBuilder silo)
@@ -103,6 +99,21 @@ namespace Flow.Silo
 
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
 
+                .UseInMemoryReminderService();
+
+            ConfigureSharedOrleansProviders(silo);
+        }
+
+        // Orleans wiring shared by BOTH environments (work item #30): journaled-grain storage,
+        // stream/pub-sub storage and the memory stream provider, and the fallback JSON serializer.
+        // ConfigureDevelopmentOrleans and ConfigureDeployedOrleans differ only in clustering,
+        // reminders, and endpoint configuration - see those methods. Behavior-preserving hoist:
+        // Development must remain byte-for-byte equivalent to what it registered before this
+        // method existed (same providers, same options) - see Flow.Grains.Tests.Integration's
+        // Azurite/journal/stream suites, which pin exactly that.
+        private static void ConfigureSharedOrleansProviders(ISiloBuilder silo)
+        {
+            silo
                 // Journaled-grain (event-sourced) storage backend, Azure Blob via Azurite locally.
                 //
                 // CmmnElementGrain carries [LogConsistencyProvider(ProviderName = "LogStorage")] and
@@ -138,8 +149,16 @@ namespace Flow.Silo
                 .AddAzureBlobGrainStorageAsDefault(ConfigureBlobStorage)
                 .AddLogStorageBasedLogConsistencyProvider() // journaled grain: selects the LogStorage log-view adaptor: chooses HOW the view is replicated, not WHERE it is stored (see comment above)
                 .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
-                .AddMemoryStreams("Default") // cluster stream provider (replaces removed AddSimpleMessageStreamProvider)
-                .UseInMemoryReminderService();
+                .AddMemoryStreams("Default"); // cluster stream provider (replaces removed AddSimpleMessageStreamProvider)
+
+            // Fallback serializer for types Orleans's [GenerateSerializer] codegen can't reasonably
+            // cover: the XSD-generated CMMN model (Flow.Grains.Interfaces.Model). Everything else in
+            // the solution is swept with [GenerateSerializer] + [Id(n)] and uses the native serializer.
+            // See OrleansFallbackJsonSerializer for the shared isSupported predicate/options - the
+            // TestCluster silo and client configurators in ClusterFixture must register identically.
+            silo.Services.AddSerializer(s => s.AddJsonSerializer(
+                isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
+                jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
         }
 
         // Everything here resolves from DI - no hand-constructed clients:
@@ -223,9 +242,101 @@ namespace Flow.Silo
             options.Configure<Serializer>((storageOptions, serializer) =>
                 storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer));
 
+        // Real Orleans cluster membership via Azure Table Storage (work item #30) - validated
+        // against Azurite's table endpoint in CI/locally (see the clustering integration test in
+        // Flow.Grains.Tests.Integration), a real Azure Storage account table endpoint when
+        // deployed. Durable reminders ride the same table endpoint (same DI-resolved
+        // TableServiceClient, see ConfigureServices' AddTableServiceClient) rather than
+        // Development's UseInMemoryReminderService, so scheduled reminders survive a silo
+        // restart. Endpoints are container-aware (see ConfigureDeployedEndpoints) rather than
+        // pinned to Loopback, since a deployed silo must be reachable by OTHER silos/containers,
+        // not just itself.
         private static void ConfigureDeployedOrleans(HostBuilderContext context, ISiloBuilder silo)
         {
-            throw new NotImplementedException();
+            silo
+                .UseAzureStorageClustering(ConfigureClustering)
+                .UseAzureTableReminderService(ConfigureReminders);
+
+            ConfigureDeployedEndpoints(context, silo);
+
+            ConfigureSharedOrleansProviders(silo);
+        }
+
+        // OptionsBuilder overload (verified against the shipped
+        // Microsoft.Orleans.Clustering.AzureStorage 10.2.1, decompiled
+        // AzureTableClusteringExtensions/AzureStorageClusteringOptions) lets the options be filled
+        // from DI exactly like AzureBlobStorageOptions is above: the TableServiceClient comes from
+        // the AddTableServiceClient registration in ConfigureServices, which already picked its
+        // auth mode from the Azure:Clustering section shape. TableName is left at Orleans' own
+        // default (AzureStorageClusteringOptions.DEFAULT_TABLE_NAME = "OrleansSiloInstances") - a
+        // separate table from reminders' below, within the same storage account/table endpoint.
+        private static void ConfigureClustering(OptionsBuilder<AzureStorageClusteringOptions> options) =>
+            options.Configure<TableServiceClient>((clusteringOptions, tableServiceClient) =>
+                clusteringOptions.TableServiceClient = tableServiceClient);
+
+        // Same DI-resolved TableServiceClient as clustering above - one storage account/table
+        // endpoint backs both cluster membership and durable reminders. TableName again left at
+        // Orleans' own default (AzureTableReminderStorageOptions.DEFAULT_TABLE_NAME =
+        // "OrleansReminders" - verified against the shipped
+        // Microsoft.Orleans.Reminders.AzureStorage 10.2.1, decompiled
+        // AzureStorageReminderSiloBuilderExtensions/AzureTableReminderStorageOptions).
+        private static void ConfigureReminders(OptionsBuilder<AzureTableReminderStorageOptions> options) =>
+            options.Configure<TableServiceClient>((reminderOptions, tableServiceClient) =>
+                reminderOptions.TableServiceClient = tableServiceClient);
+
+        // Container-aware endpoints for deployed silos (work item #30). Development pins
+        // AdvertisedIPAddress to Loopback - correct for a single-process dev box, but unreachable
+        // from another silo's container/host, so a deployed silo must advertise an address the
+        // REST of the cluster can actually dial. Preference order:
+        //
+        //   1. An explicit "Orleans:AdvertisedIPAddress" config value - also settable via the
+        //      ORLEANS__ADVERTISEDIPADDRESS environment variable (Host.CreateDefaultBuilder wires
+        //      up the environment-variable configuration provider, whose "__" separator maps to
+        //      ":" section nesting), so an orchestrator can inject the container's own reachable
+        //      address without an appsettings change - the container/compose/orchestration
+        //      surface itself is out of scope for this work item (see #31/Docker), but the hook
+        //      it needs is not.
+        //   2. Otherwise, the first non-loopback IPv4 address the container's own hostname
+        //      resolves to - the container-native default (Docker and most orchestrators resolve
+        //      a container's hostname to its own network address), so a deployed silo has a
+        //      reasonable default without requiring the env var in every environment.
+        //
+        // Ports are likewise config/env overridable, defaulting to Orleans' own
+        // EndpointOptions.DEFAULT_SILO_PORT / DEFAULT_GATEWAY_PORT (11111 / 30000 - verified
+        // against the shipped Orleans.Runtime 10.2.1, decompiled
+        // EndpointOptions/EndpointOptionsExtensions.ConfigureEndpoints).
+        // listenOnAnyHostAddress: true binds the actual listening socket to 0.0.0.0 rather than
+        // the advertised IP - the advertised address is often not literally bindable inside a
+        // container's own network namespace (NAT'd/overlay-network IPs), so silos must listen
+        // broadly while still advertising a specific, externally-reachable address.
+        private static void ConfigureDeployedEndpoints(HostBuilderContext context, ISiloBuilder silo)
+        {
+            var configuration = context.Configuration;
+
+            var advertisedIPAddress = ResolveAdvertisedIPAddress(configuration);
+            var siloPort = configuration.GetValue("Orleans:SiloPort", EndpointOptions.DEFAULT_SILO_PORT);
+            var gatewayPort = configuration.GetValue("Orleans:GatewayPort", EndpointOptions.DEFAULT_GATEWAY_PORT);
+
+            silo.ConfigureEndpoints(advertisedIPAddress, siloPort, gatewayPort, listenOnAnyHostAddress: true);
+        }
+
+        private static IPAddress ResolveAdvertisedIPAddress(IConfiguration configuration)
+        {
+            var configured = configuration["Orleans:AdvertisedIPAddress"];
+
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                return IPAddress.Parse(configured);
+            }
+
+            var hostAddresses = Dns.GetHostAddresses(Dns.GetHostName());
+            var reachable = hostAddresses.FirstOrDefault(ip =>
+                ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip));
+
+            return reachable ?? throw new InvalidOperationException(
+                "Unable to resolve a non-loopback IPv4 address to advertise for Orleans " +
+                "clustering. Set 'Orleans:AdvertisedIPAddress' (or the " +
+                "ORLEANS__ADVERTISEDIPADDRESS environment variable) explicitly.");
         }
 
         private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
@@ -267,6 +378,17 @@ namespace Flow.Silo
                         provider.GetRequiredService<BlobServiceClient>().GetBlobContainerClient(
                             provider.GetRequiredService<IOptionsMonitor<AzureOptions>>().CurrentValue.Storage.CaseStateContainer))
                     .WithName(nameof(AzureOptions.StorageOptions.CaseStateContainer));
+
+                // TableServiceClient for the deployed clustering/reminders path (work item #30) -
+                // registered host-level like BlobServiceClient above, same reasoning: the
+                // Azure:Clustering section SHAPE picks connection-string (Azurite/local) vs
+                // serviceUri+credential (deployed) auth, so ConfigureDeployedOrleans just resolves
+                // the client from DI. Registered unconditionally (not only when deployed) so it
+                // stays environment-agnostic like the blob client; it is never actually resolved in
+                // Development (UseLocalhostClustering / UseInMemoryReminderService never touch it),
+                // so the empty "Azure:Clustering": {} placeholder in appsettings.json is harmless
+                // there - lazy client construction only fails if something actually resolves it.
+                azure.AddTableServiceClient(context.Configuration.GetRequiredSection(AzureOptions.ClusteringSectionKey));
             });
 
             services
