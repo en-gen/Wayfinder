@@ -1,0 +1,33 @@
+# Docker build context for src/Flow.Silo/Dockerfile - context root is the REPOSITORY ROOT
+# (see that Dockerfile's header comment for why). This trims the context to what a Flow.Silo
+# image build actually needs: no git metadata, no local build output that could shadow a
+# clean in-container restore/build, no unrelated tooling/docs/test trees.
+
+# Local build output - never wanted inside the build context; the Dockerfile always does its
+# own restore/build/publish, so a stale host bin/obj would only risk contaminating that.
+**/bin/
+**/obj/
+**/TestResults/
+coverage/
+artifacts/
+
+# VCS / IDE / editor / local tooling state
+.git/
+.gitnexus/
+.vs/
+.vscode/
+.claude/
+.editorconfig
+
+# Docs, scripts, and tooling not needed to build or run the image
+docs/
+scripts/
+*.md
+
+# Test projects - never referenced by Flow.Silo, no reason to enter the build context
+src/Flow.Grains.Tests/
+src/Flow.Grains.Tests.Integration/
+src/Flow.Grains.Tests.Utils/
+
+# devops pipeline/compose definitions aren't part of the application image
+devops/
