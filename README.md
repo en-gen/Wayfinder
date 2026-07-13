@@ -83,6 +83,11 @@ docker compose -f devops/infrastructure/docker-compose.yml up -d
 ```
 
 Then run the silo as usual — `Flow.Silo`'s Development configuration already points at
-Azurite's well-known dev connection string. The Azurite-dependent test suite
-(`Flow.Grains.Tests.Integration`'s `Storage` tests) skips itself automatically when Azurite
-isn't running, so `dotnet test` works with or without the compose stack up.
+Azurite's well-known dev connection string.
+
+The Azurite-dependent test suite (`Flow.Grains.Tests.Integration`'s `Storage` tests) is
+unrelated to the compose stack above: it self-provisions its own throwaway Azurite container
+per run via [Testcontainers](https://dotnet.testcontainers.org/), so it only needs Docker
+running — no `docker compose up` and no fixed port to collide with a developer's own Azurite.
+It skips itself automatically when Docker isn't reachable, so `dotnet test` works with or
+without Docker running.

@@ -17,6 +17,16 @@
          fallback to memory. -->
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <!-- Testcontainers-provisioned Azurite (work item #60, replacing the manual/compose-managed
+         probe from #54/#17): MIT-licensed, maintained by the Testcontainers org, actively
+         released (4.13.0, 2026-07). AzuriteClusterFixture owns the container lifecycle; see
+         that file for the AzuriteBuilder/AzuriteContainer wiring. -->
+    <PackageReference Include="Testcontainers.Azurite" Version="4.13.0" />
+    <!-- Docker-availability gate (DockerAvailability/RequiresDockerFact): the same client
+         library Testcontainers itself uses to talk to the daemon (pinned to the exact version
+         Testcontainers.Azurite 4.13.0 pulls transitively), so the discovery-time probe and the
+         real container start resolve the Docker endpoint identically and can never disagree. -->
+    <PackageReference Include="Docker.DotNet.Enhanced" Version="4.3.3" />
     <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
     <PackageReference Include="coverlet.msbuild" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>

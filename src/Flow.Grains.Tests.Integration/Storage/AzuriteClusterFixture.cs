@@ -20,22 +20,30 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Exceptions;
+using Testcontainers.Azurite;
 using Xunit;
 
 namespace Flow.Grains.Tests.Integration.Storage
 {
-    // Self-contained fixture for the Azurite restart-survival suite (work item #54). Deliberately
-    // does not touch SiloFixture.ClusterFixture: everything here mirrors that fixture's memory
-    // registrations for PubSubStore/streams/serializer (ClusterFixture's own comment explains why
-    // the silo AND client configurators both need OrleansFallbackJsonSerializer) EXCEPT the
-    // journaled-grain storage slot, which points at Azure Blob/Azurite instead of memory.
+    // Self-contained fixture for the Azurite restart-survival suite (work item #54, Testcontainers-
+    // provisioned per work item #60). Deliberately does not touch SiloFixture.ClusterFixture:
+    // everything here mirrors that fixture's memory registrations for PubSubStore/streams/serializer
+    // (ClusterFixture's own comment explains why the silo AND client configurators both need
+    // OrleansFallbackJsonSerializer) EXCEPT the journaled-grain storage slot, which points at Azure
+    // Blob/Azurite instead of memory.
     //
-    // Azurite connection: 127.0.0.1:10000 (blob), well-known devstoreaccount1 dev credentials.
-    // Container name is suffixed with a fresh guid per fixture instance so parallel/repeated test
-    // runs never collide over the same container; DisposeAsync deletes it.
+    // Azurite is a throwaway Docker container this fixture owns (see AzuriteImage below), started
+    // fresh per run - no fixed host port, no clash with a developer's own Azurite, no manual
+    // docker compose step. Container name is suffixed with a fresh guid per fixture instance so
+    // parallel/repeated test runs never collide over the same blob container either; DisposeAsync
+    // deletes it before tearing down the Azurite container itself.
     public class AzuriteClusterFixture : IDisposable, IAsyncLifetime
     {
-        private const string AzuriteConnectionString = "UseDevelopmentStorage=true";
+        // Same pinned tag CI used for the old manually-started container - recent enough that
+        // Azure.Storage.Blobs's x-ms-version header is accepted once --skipApiVersionCheck (below)
+        // is also passed; Azurite's version gate otherwise rejects newer SDK requests
+        // (Azure/Azurite#2562, #2564, #2626).
+        private const string AzuriteImage = "mcr.microsoft.com/azure-storage/azurite:3.35.0";
 
         // Parity with Flow.Silo by value: the test assembly has no reference to the silo
         // project, so these mirror AzureOptions.StorageSectionKey and
@@ -47,15 +55,19 @@ namespace Flow.Grains.Tests.Integration.Storage
 
         // Defense-in-depth against fail-open (PR !16 build 47: the discovery-time gate said
         // reachable, the fixture-init probe said unreachable, and tests dereferenced a
-        // silently-null ClusterClient - a bare NullReferenceException). With the probe decision
-        // now process-cached the gate and this fixture cannot disagree, but if anything ever
-        // reaches these accessors without the cluster started (e.g. a test in this collection
-        // not gated by [AzuriteFact]), fail LOUD with the reason instead of returning null.
+        // silently-null ClusterClient - a bare NullReferenceException). With the availability
+        // decision process-cached (DockerAvailability) the gate and this fixture cannot disagree,
+        // but if anything ever reaches these accessors without the cluster started (e.g. a test in
+        // this collection not gated by [RequiresDockerFact]), fail LOUD with the reason instead of
+        // returning null.
         private const string NotStartedMessage =
-            "Azurite TestCluster was not started: AzuriteProbe.IsAvailable was false at fixture " +
-            "initialization. Tests using this fixture must be gated with [AzuriteFact], which " +
-            "consults the same process-cached probe decision.";
+            "Azurite TestCluster was not started: DockerAvailability.IsAvailable was false at " +
+            "fixture initialization. Tests using this fixture must be gated with " +
+            "[RequiresDockerFact], which consults the same process-cached availability decision.";
 
+        private AzuriteContainer _azurite;
+        private string _connectionString;
+        private BlobServiceClient _blobServiceClient;
         private TestCluster _cluster;
         private IClusterClient _clusterClient;
         private bool _disposed;
@@ -64,24 +76,43 @@ namespace Flow.Grains.Tests.Integration.Storage
         public IClusterClient ClusterClient => _clusterClient ?? throw new InvalidOperationException(NotStartedMessage);
         public string ContainerName { get; }
 
+        // The live connection string / blob client for the Azurite container this fixture just
+        // started - dynamic (random host port per run), unlike the old fixed-:10000 const, so
+        // tests must read it from here rather than hardcoding "UseDevelopmentStorage=true".
+        public string ConnectionString => _connectionString ?? throw new InvalidOperationException(NotStartedMessage);
+        public BlobServiceClient BlobServiceClient => _blobServiceClient ?? throw new InvalidOperationException(NotStartedMessage);
+
         public AzuriteClusterFixture()
         {
             ContainerName = $"azurite-journal-test-{Guid.NewGuid():N}";
         }
 
         // A collection fixture is constructed/disposed once per collection regardless of
-        // whether any member test actually executes - AzuriteFact.Skip only stops individual
-        // [AzuriteFact] test methods from running, it does not stop xunit from still calling
-        // this. Consults the SAME process-cached decision as AzuriteFact (see AzuriteProbe):
-        // cached-false means every [AzuriteFact] test is skipped, so no-op here; cached-true
-        // means the cluster MUST come up - if Deploy() throws against a reachable-then-broken
-        // Azurite, that is a real failure deliberately left to propagate loudly.
-        public Task InitializeAsync()
+        // whether any member test actually executes - RequiresDockerFact.Skip only stops
+        // individual [RequiresDockerFact] test methods from running, it does not stop xunit from
+        // still calling this. Consults the SAME process-cached decision as RequiresDockerFact
+        // (see DockerAvailability): cached-false means every [RequiresDockerFact] test is
+        // skipped, so no-op here; cached-true means the Azurite container and cluster MUST come
+        // up - if StartAsync/Deploy() throws against a Docker daemon that answered the
+        // availability ping but then broke, that is a real failure deliberately left to
+        // propagate loudly.
+        public async Task InitializeAsync()
         {
-            if (!AzuriteProbe.IsAvailable)
+            if (!DockerAvailability.IsAvailable)
             {
-                return Task.CompletedTask;
+                return;
             }
+
+            // --skipApiVersionCheck mirrors the old CI-started container's flag (see AzuriteImage)
+            // - without it Azurite rejects the SDK's x-ms-version header outright.
+            _azurite = new AzuriteBuilder(AzuriteImage)
+                .WithCommand("--skipApiVersionCheck")
+                .Build();
+
+            await _azurite.StartAsync();
+
+            _connectionString = _azurite.GetConnectionString();
+            _blobServiceClient = new BlobServiceClient(_connectionString);
 
             var builder = new TestClusterBuilder();
 
@@ -91,7 +122,7 @@ namespace Flow.Grains.Tests.Integration.Storage
             // Hierarchical keys land in each silo's IConfiguration as the same Azure:Storage
             // section shape Flow.Silo reads from appsettings.Development.json, so the
             // configurator below can consume it through the identical registration path.
-            builder.Properties[StorageSectionKey + ":connectionString"] = AzuriteConnectionString;
+            builder.Properties[StorageSectionKey + ":connectionString"] = _connectionString;
             builder.Properties[CaseStateContainerKey] = ContainerName;
 
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
@@ -101,21 +132,21 @@ namespace Flow.Grains.Tests.Integration.Storage
             _cluster.Deploy();
 
             _clusterClient = _cluster.Client;
-
-            return Task.CompletedTask;
         }
 
         public async Task DisposeAsync()
         {
-            if (_cluster == null)
+            if (_cluster != null)
             {
-                return;
+                _cluster.StopAllSilos();
+
+                await _blobServiceClient.GetBlobContainerClient(ContainerName).DeleteIfExistsAsync();
             }
 
-            _cluster.StopAllSilos();
-
-            var blobServiceClient = new BlobServiceClient(AzuriteConnectionString);
-            await blobServiceClient.GetBlobContainerClient(ContainerName).DeleteIfExistsAsync();
+            if (_azurite != null)
+            {
+                await _azurite.DisposeAsync();
+            }
         }
 
         public void Dispose()

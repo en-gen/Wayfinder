@@ -164,33 +164,12 @@ jobs:
           /p:Exclude="[*.Tests*]*"
         displayName: Unit tests (+coverage)
 
-      # Azurite for the opt-in restart-survival suite (work item #54): same pinned image as
-      # devops/infrastructure/docker-compose.yml. --skipApiVersionCheck works around current
-      # Azure.Storage.Blobs SDK versions sending x-ms-version headers newer than Azurite
-      # recognizes (Azure/Azurite#2562, #2564, #2626) - without it, Azurite rejects every
-      # request from the test client. AzuriteFact (Flow.Grains.Tests.Integration/Storage)
-      # probes 127.0.0.1:10000 at test discovery - a TCP connect plus one blob service call -
-      # and skips (does not fail) if this step's container isn't reachable or rejects the
-      # SDK's API version, so a readiness wait here is what turns "skipped" into
-      # "executed" - not a correctness requirement for the step itself.
-      - script: >
-          docker run -d --name azurite -p 10000:10000
-          mcr.microsoft.com/azure-storage/azurite:3.35.0
-          azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck
-        displayName: Start Azurite
-
-      - bash: |
-          for i in $(seq 1 30); do
-            if curl -s -o /dev/null "http://127.0.0.1:10000/devstoreaccount1?comp=list"; then
-              echo "Azurite is up."
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "##vso[task.logissue type=error]Azurite did not become ready within 30s."
-          exit 1
-        displayName: Wait for Azurite
-
+      # Azurite for the opt-in restart-survival suite (work item #54) is Testcontainers-
+      # provisioned per run (work item #60): AzuriteClusterFixture starts and tears down its own
+      # container via Testcontainers.Azurite, so no separate start/readiness-wait step is needed
+      # here - ubuntu-latest already has Docker, which is all the suite requires.
+      # RequiresDockerFact (Flow.Grains.Tests.Integration/Storage) skips (does not fail) if
+      # Docker itself isn't reachable.
       - script: >
           dotnet test src/Flow.Grains.Tests.Integration/Flow.Grains.Tests.Integration.csproj
           -c Release --no-build --logger trx

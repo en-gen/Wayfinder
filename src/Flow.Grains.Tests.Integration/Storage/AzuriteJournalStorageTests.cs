@@ -14,24 +14,25 @@ namespace Flow.Grains.Tests.Integration.Storage
     // Orleans-source citation establishing which storage slot that grain shape actually
     // resolves, and AzuriteClusterFixture for the TestCluster wiring that mirrors it.
     //
-    // Opt-in via AzuriteFact: skipped (not failed) when Azurite isn't reachable at
-    // 127.0.0.1:10000, per the constraint that this suite must never fail a machine that
-    // simply isn't running docker compose -f devops/infrastructure/docker-compose.yml up -d.
+    // Opt-in via RequiresDockerFact: skipped (not failed) when Docker isn't reachable, per the
+    // constraint that this suite must never fail a machine with no Docker. Azurite itself is
+    // self-provisioned by AzuriteClusterFixture via Testcontainers (work item #60) - no manual
+    // docker compose step and no fixed port to collide with a developer's own Azurite.
     [Collection(AzuriteClusterCollection.Name)]
     public class AzuriteJournalStorageTests
     {
-        private const string AzuriteConnectionString = "UseDevelopmentStorage=true";
-
         private readonly IClusterClient _clusterClient;
         private readonly string _containerName;
+        private readonly BlobServiceClient _blobServiceClient;
 
         public AzuriteJournalStorageTests(AzuriteClusterFixture fixture)
         {
             _clusterClient = fixture.ClusterClient;
             _containerName = fixture.ContainerName;
+            _blobServiceClient = fixture.BlobServiceClient;
         }
 
-        [AzuriteFact]
+        [RequiresDockerFact]
         public async Task GetState__Given_EventsRaisedThenGrainDeactivated__When_CalledAgain__Then_StateRehydratesFromJournal()
         {
             var grain = _clusterClient.GetGrain<IAzuriteJournalTestGrain>(Guid.NewGuid());
@@ -64,7 +65,7 @@ namespace Flow.Grains.Tests.Integration.Storage
         // FAST with a diagnosis instead of hanging the run. JsonArray is the known-poisonous
         // shape per the #16 value-shape matrix; content equality via JsonNode.DeepEquals - never
         // assert on runtime JsonValue subtypes, which legitimately change across a round-trip.
-        [AzuriteFact]
+        [RequiresDockerFact]
         public async Task GetState__Given_JsonNodeDocumentWithNestedArrayJournaled__When_DeactivatedAndCalledAgain__Then_DocumentRehydratesFromBlob()
         {
             var grain = _clusterClient.GetGrain<IAzuriteJournalTestGrain>(Guid.NewGuid());
@@ -103,16 +104,17 @@ namespace Flow.Grains.Tests.Integration.Storage
         // silent fallback to memory grain storage (which would make the test above pass for
         // the wrong reason - state would simply never have left the still-running silo process
         // if AddAzureBlobGrainStorageAsDefault were, say, shadowed by a stray
-        // AddMemoryGrainStorageAsDefault registration).
-        [AzuriteFact]
+        // AddMemoryGrainStorageAsDefault registration). Uses the fixture's live BlobServiceClient
+        // (dynamic connection string) rather than a hardcoded const - the container's host port
+        // is assigned by Docker per run.
+        [RequiresDockerFact]
         public async Task Increment__Given_EventRaised__Then_ContainerHoldsGrainBlob()
         {
             var grain = _clusterClient.GetGrain<IAzuriteJournalTestGrain>(Guid.NewGuid());
 
             await grain.Increment(5, "belt-and-braces");
 
-            var blobServiceClient = new BlobServiceClient(AzuriteConnectionString);
-            var containerClient = blobServiceClient.GetBlobContainerClient(_containerName);
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
 
             var blobCount = 0;
             await foreach (var _ in containerClient.GetBlobsAsync())
