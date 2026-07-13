@@ -37,6 +37,10 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <!-- Azurite restart-survival suite (work item #54): journaled-grain storage backend under test. -->
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
+    <!-- Real Azure Table clustering suite (work item #30): validates Flow.Silo's
+         ConfigureDeployedOrleans clustering choice (UseAzureStorageClustering) actually forms a
+         multi-silo cluster against a real Azure Table membership store (Azurite locally/in CI). -->
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
