@@ -1,0 +1,128 @@
+# Case.Flow EVAL stack (work item #49): Azurite + a REAL multi-container Orleans cluster - 3
+# separate Flow.Silo CONTAINERS running the DEPLOYED clustering path (Program.cs
+# ConfigureDeployedOrleans - Azure Table clustering + reminders, container-aware endpoints)
+# against Azurite, instead of Orleans TestingHost's in-process TestCluster membership. This
+# turns work item #30's deployed clustering config into a real multi-PROCESS cluster.
+#
+# This is a NEW, separate stack. devops/infrastructure/docker-compose.yml (the F5 Azurite-ONLY
+# stack backing `dotnet run`'s Development configuration) is untouched by this work item and
+# can keep running independently - see the port-offset comment on the azurite service below.
+#
+# Bring up (builds the Flow.Silo image from src/Flow.Silo/Dockerfile first):
+#   docker compose -f devops/eval/docker-compose.yml up -d --build
+#
+# Once the 3 silo containers have started AND found each other in Azure Table membership
+# (Azurite), each one's cluster-status endpoint (src/Flow.Silo/Startup.cs) reports the full
+# cluster - curl any/all of them:
+#   curl http://localhost:8081/cluster
+#   curl http://localhost:8082/cluster
+#   curl http://localhost:8083/cluster
+# Each should report "activeSilos": 3 once membership has converged - see devops/eval/README.md
+# for the full walkthrough, timing notes, and troubleshooting.
+#
+# Tear down (drop the Azurite data volume too):
+#   docker compose -f devops/eval/docker-compose.yml down -v
+name: case-flow-eval
+
+x-silo-environment: &silo-environment
+  # Anything other than "Development" routes Program.cs's ConfigureOrleans into
+  # ConfigureDeployedOrleans (real Azure Table clustering/reminders + container-aware
+  # endpoints) instead of ConfigureDevelopmentOrleans (UseLocalhostClustering - loopback-only,
+  # useless across separate containers). Both DOTNET_ and ASPNETCORE_ prefixed variants are set
+  # so this is correct regardless of which one ends up populating
+  # HostBuilderContext.HostingEnvironment.EnvironmentName - belt and braces, not a guess either
+  # way is wrong.
+  DOTNET_ENVIRONMENT: Docker
+  ASPNETCORE_ENVIRONMENT: Docker
+
+  # THE container-networking gotcha this stack exists to prove out: Development's
+  # "UseDevelopmentStorage=true" shortcut resolves Azurite to 127.0.0.1, which is only correct
+  # for a single-process host talking to its own local Azurite - wrong for separate silo
+  # CONTAINERS, which must reach Azurite by its compose SERVICE HOSTNAME instead. So every silo
+  # gets an EXPLICIT connection string pointed at "azurite" (the compose service name, resolved
+  # via Docker's embedded DNS), not the shortcut. Account name/key are Azurite's fixed, publicly
+  # documented well-known development credentials - not a secret, safe to commit.
+  Azure__Clustering__connectionString: >-
+    DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+  Azure__Storage__connectionString: >-
+    DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+  Azure__Storage__CaseStateContainer: case-flow-casestate
+
+services:
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    container_name: case-flow-eval-azurite
+    # No host port bindings: the silos reach Azurite entirely over the internal Docker network
+    # via the "azurite" service hostname (container-internal ports 10000/10001/10002), so nothing
+    # is published to the host. This keeps the eval stack from colliding with any other Azurite a
+    # developer runs for other projects, and no host-side tool (e.g. Storage Explorer) is expected
+    # to connect.
+    volumes:
+      - azurite-eval-data:/data
+    # --skipApiVersionCheck: current Azure.Storage SDK versions send x-ms-version headers newer
+    # than Azurite has caught up to (Azure/Azurite#2562, #2564, #2626) - Azurite's own
+    # documented workaround, mirrors devops/infrastructure/docker-compose.yml.
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data --skipApiVersionCheck
+    healthcheck:
+      # Azurite's image is Node-based with no shell utility for a real HTTP probe; a bare TCP
+      # connect to the blob port is enough to confirm the process is up.
+      test: ["CMD", "node", "-e", "require('net').connect(10000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  silo1:
+    build:
+      context: ../..
+      dockerfile: src/Flow.Silo/Dockerfile
+    # Same image tag on all 3 silo services (identical build context/dockerfile) - Compose
+    # builds it once and reuses it for silo2/silo3 rather than rebuilding 3 times.
+    image: case-flow-silo:eval
+    container_name: case-flow-eval-silo1
+    # Explicit hostname (rather than Docker's default container-ID hostname) so
+    # Program.cs's ResolveAdvertisedIPAddress hostname fallback resolves to something readable
+    # in logs/curl output, and so the cluster-status endpoint's silo address list is legible.
+    hostname: silo1
+    environment:
+      <<: *silo-environment
+    depends_on:
+      azurite:
+        condition: service_healthy
+    # Distinct host port per silo so each is independently curl-able from the host - see the
+    # curl examples in the header comment and devops/eval/README.md.
+    ports:
+      - "8081:8080"
+
+  silo2:
+    build:
+      context: ../..
+      dockerfile: src/Flow.Silo/Dockerfile
+    image: case-flow-silo:eval
+    container_name: case-flow-eval-silo2
+    hostname: silo2
+    environment:
+      <<: *silo-environment
+    depends_on:
+      azurite:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+
+  silo3:
+    build:
+      context: ../..
+      dockerfile: src/Flow.Silo/Dockerfile
+    image: case-flow-silo:eval
+    container_name: case-flow-eval-silo3
+    hostname: silo3
+    environment:
+      <<: *silo-environment
+    depends_on:
+      azurite:
+        condition: service_healthy
+    ports:
+      - "8083:8080"
+
+volumes:
+  azurite-eval-data:
