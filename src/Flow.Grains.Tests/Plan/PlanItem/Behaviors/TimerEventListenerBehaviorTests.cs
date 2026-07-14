@@ -122,5 +122,79 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             callLog.Skip(raiseIndex + 1).Should()
                 .Contain("Confirm", "TimerExpressionEvaluated must be confirmed after it is raised, not just before it (in the Transitioned confirm) or never");
         }
+
+        // Regression test for #31 (findings B2/B3): HandleTerminated used to call
+        // GetGrain<ITimerEventSchedulerGrain>(Host.CaseInstanceId, Host.InstanceId). That second
+        // argument is NOT a key extension - ITimerEventSchedulerGrain is IGrainWithGuidKey, so the
+        // 2-Guid-arg-looking call actually resolves to IGrainFactory.GetGrain<T>(Guid primaryKey,
+        // string grainClassNamePrefix = null). Passing Host.InstanceId there doesn't scope
+        // anything by plan item; it's just the wrong parameter, and on a real IGrainFactory it
+        // fails to match TimerEventSchedulerGrain's type name and throws during grain-class
+        // resolution. Here a loose mock only has GetGrain<ITimerEventSchedulerGrain>(caseInstanceId,
+        // null) set up - the SAME (caseInstanceId, null) key ScheduleTimer's call site already used
+        // correctly - so under the old buggy code this call site would miss the setup, resolve to
+        // null, and CancelTimer would NullReferenceException. After the fix, both ScheduleTimer
+        // (on Create) and CancelTimer (on Terminate) route through the identical
+        // GrainFactory.GetScheduler(Host.CaseInstanceId) helper and hit the same mocked grain.
+        [Fact]
+        public async Task Trigger__Given_Available__When_Terminate__Then_CancelsCorrectlyKeyedSchedulerGrain()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var instanceId = ShortGuid.NewGuid();
+
+            var timerEventListener = new TimerEventListener
+            {
+                Id = "TimerA"
+                // TimerExpression and TimerStart both left null: Create takes the "schedule
+                // immediately" branch of HandleEnterAvailableFromCreate's switch directly, with no
+                // IExpressionGrain evaluation needed first.
+            };
+
+            var pi = new Interfaces.Model.PlanItem
+            {
+                Id = "PlanItemTimerA",
+                DefinitionRef = timerEventListener.Id
+            };
+
+            var testStore = new TestPlanItemStore(
+                def: pi,
+                piDef: timerEventListener,
+                initialState: PlanItemState.Uninitialized);
+
+            var mockTimerSchedulerGrain = new Mock<ITimerEventSchedulerGrain>();
+            mockTimerSchedulerGrain
+                .Setup(x => x.ScheduleTimer(instanceId, It.IsAny<Iso8601>(), It.IsAny<DateTime?>(), It.IsAny<IDictionary<string, object>>()))
+                .Returns(Task.CompletedTask);
+            mockTimerSchedulerGrain
+                .Setup(x => x.CancelTimer(instanceId))
+                .Returns(Task.CompletedTask);
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory
+                .Setup(x => x.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId, null))
+                .Returns(mockTimerSchedulerGrain.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
+            mockHost.Setup(x => x.InstanceId).Returns(instanceId);
+            mockHost.Setup(x => x.Definition).Returns(pi);
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.GrainFactory).Returns(mockGrainFactory.Object);
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new TimerEventListenerBehavior(mockHost.Object, timerEventListener, mockMachine.Object);
+
+            await subject.Trigger(PlanItemTransition.Create);
+            mockMachine.Object.State.Should().Be(PlanItemState.Available);
+
+            await subject.Trigger(PlanItemTransition.Terminate);
+
+            mockMachine.Object.State.Should().Be(PlanItemState.Terminated);
+            mockTimerSchedulerGrain.Verify(x => x.CancelTimer(instanceId), Times.Once,
+                "HandleTerminated must resolve ITimerEventSchedulerGrain via the case instance id " +
+                "key alone, matching the grain's actual IGrainWithGuidKey shape - not throw trying " +
+                "to match a bogus grainClassNamePrefix built from the plan item's instance id");
+        }
     }
 }

@@ -13,6 +13,7 @@ using FluentAssertions;
 using NodaTime;
 using NodaTime.Text;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
 
@@ -76,6 +77,95 @@ namespace Flow.Grains.Tests.Integration.Scheduler
             await Task.Delay(TimeSpan.FromSeconds(4));
 
             ticks.Should().HaveCount(expectedTicks);
+        }
+
+        // Regression test for #31 (findings B2/B3): ITimerEventSchedulerGrain is correctly
+        // Orleans-keyed per case (IGrainWithGuidKey, addressed by caseInstanceId), but the Quartz
+        // IScheduler each activation fetches from ISchedulerFactory.GetScheduler() underneath it
+        // was a process-wide DI singleton built from a FIXED quartz.scheduler.instanceName (see
+        // QuartzSchedulerConfig) - so every case's TimerEventSchedulerGrain shared the exact same
+        // Quartz IScheduler object despite having distinct Orleans identities. The grain's
+        // OnDeactivateAsync used to call _scheduler.Shutdown(false) on that shared instance, so
+        // ANY one case's grain deactivating (idle collection, forced collection, redeploy) tore
+        // down the shared scheduler out from under every OTHER case - and Quartz schedulers
+        // cannot be restarted once shut down, making it a permanent, cross-case outage.
+        //
+        // This schedules independent, still-repeating timers for two different cases, forces
+        // every grain activation in the cluster (including both scheduler grains) to deactivate -
+        // simulating Orleans idle collection - then asserts case B's timer keeps firing
+        // afterward, proving the shared scheduler survived case A's grain deactivating.
+        [Theory, AutoData]
+        public async Task SchedulerGrainDeactivation_ForOneCase_ShouldNotStopAnotherCasesTimer(
+            Guid caseInstanceIdA, Guid caseInstanceIdB)
+        {
+            var planItemA = ShortGuid.NewGuid();
+            var planItemB = ShortGuid.NewGuid();
+
+            var ticksA = new List<DateTimeOffset>();
+            var ticksB = new List<DateTimeOffset>();
+
+            await _clusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<TimerTickedEvent>(caseInstanceIdA, (string)planItemA)
+                .SubscribeAsync((@event, token) =>
+                {
+                    ticksA.Add(@event.FireTime);
+                    return Task.CompletedTask;
+                });
+            await _clusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<TimerTickedEvent>(caseInstanceIdB, (string)planItemB)
+                .SubscribeAsync((@event, token) =>
+                {
+                    ticksB.Add(@event.FireTime);
+                    return Task.CompletedTask;
+                });
+
+            var period = Period.FromSeconds(1).Normalize();
+            var isoPeriod = PeriodPattern.NormalizingIso.Format(period);
+            // 10 repetitions at a 1s cadence - long enough to still have pending fires left for
+            // case B after the forced collection below.
+            var schedule = new Iso8601($"R9/{isoPeriod}");
+
+            await _clusterClient.GetGrain<ITimerEventSchedulerGrain>(caseInstanceIdA)
+                .ScheduleTimer(planItemA, schedule, DateTime.UtcNow, ContextFor(caseInstanceIdA, planItemA));
+            await _clusterClient.GetGrain<ITimerEventSchedulerGrain>(caseInstanceIdB)
+                .ScheduleTimer(planItemB, schedule, DateTime.UtcNow, ContextFor(caseInstanceIdB, planItemB));
+
+            // both timers are independently keyed and alive before any deactivation happens
+            await WaitUntilAsync(() => ticksA.Count >= 1 && ticksB.Count >= 1, TimeSpan.FromSeconds(5));
+
+            var ticksBBeforeCollection = ticksB.Count;
+
+            await _clusterClient.GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.Zero);
+
+            // case B's schedule still has repetitions remaining; it must keep ticking after the
+            // forced collection above, proving its Quartz scheduler survived case A's scheduler
+            // grain (and its own) deactivating.
+            await WaitUntilAsync(() => ticksB.Count > ticksBBeforeCollection, TimeSpan.FromSeconds(8));
+
+            ticksB.Count.Should().BeGreaterThan(ticksBBeforeCollection,
+                "case B's timer must keep firing after case A's scheduler grain deactivates - a " +
+                "per-case grain deactivating must never tear down the shared Quartz scheduler other " +
+                "cases still depend on");
+        }
+
+        private static IDictionary<string, object> ContextFor(Guid caseInstanceId, string planItemInstanceId) =>
+            new Dictionary<string, object>
+            {
+                ["CaseInstanceId"] = caseInstanceId,
+                ["ElementType"] = typeof(PlanItem).Name,
+                ["PlanItemDefinition"] = typeof(TimerEventListener).Name,
+                ["ElementScope"] = "CPM.ParentStage",
+                ["ElementInstanceId"] = planItemInstanceId
+            };
+
+        private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (condition()) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+            }
         }
     }
 }
