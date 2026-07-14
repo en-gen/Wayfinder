@@ -31,9 +31,24 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // has no `exit` row for the casePlanModel to permit in the first place).
         protected virtual PlanItemTransition ExitCriterionTransition => PlanItemTransition.Exit;
 
-        public StageBehavior(IBehaviorHost host, Stage planItemDefinition, IPlanItemStateMachine stateMachine) :
+        // ADO #67 - RepetitionGuardOptions.MaxRepetitionsPerPlanItem, threaded through from
+        // PlanItemBehaviorConfiguratorService (IOptions<RepetitionGuardOptions>). Defaulted here
+        // (rather than required) so every existing direct `new StageBehavior(...)` in the unit
+        // test suite keeps compiling against the generous default without modification - only
+        // production DI and tests specifically targeting the ceiling need to pass it explicitly.
+        // See HandleChildRepeated for enforcement and RepetitionGuardOptions for the full
+        // rationale (Case.Flow ENGINE EXTENSION, not CMMN spec surface).
+        private readonly int _repetitionCeiling;
+
+        public StageBehavior(
+            IBehaviorHost host,
+            Stage planItemDefinition,
+            IPlanItemStateMachine stateMachine,
+            int repetitionCeiling = RepetitionGuardOptions.DefaultMaxRepetitionsPerPlanItem) :
             base(host, planItemDefinition, stateMachine)
         {
+            _repetitionCeiling = repetitionCeiling;
+
             StateMachine.Configure(PlanItemState.Available)
                 .OnEntryFromAsync(PlanItemTransition.Create, HandleEnterAvailableFromCreate);
 
@@ -568,6 +583,62 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 return;
             }
 
+            var nextRepetition = @event.CurrentRepetition + 1;
+
+            // ADO #67 - Case.Flow ENGINE EXTENSION (RepetitionGuardOptions), NOT CMMN spec
+            // surface.
+            // ~~~~~
+            // 8.6.4 imposes no upper bound on how many times a repeating item may re-spawn - see
+            // RepetitionGuardOptions' remarks for the #19 foot-gun this closes. Faulting THIS
+            // container (Host) rather than the repeating child is deliberate: the child that
+            // published PlanItemRepetitionCriteriaMetEvent is either already terminal
+            // (Completed/Terminated, for the no-entry-criteria path - BaseBehavior.
+            // TryRepeatOnCompleteOrTerminate) or still legitimately running (the entry-criterion
+            // OnPart path - HandleSentrySatisfied), and PlanItemStateMachine.
+            // ConfigureForStageOrTask permits no outgoing transition at all from Completed/
+            // Terminated for an ordinary Stage/Task - neither is ever a legal Fault target. This
+            // Stage/CasePlanModel is the one actually issuing the runaway CreateChild calls and
+            // is still Active when the ceiling is hit (Active legally Permits(Fault, Failed) in
+            // both ConfigureForStageOrTask and ConfigureForCasePlanModel) - the only always-valid
+            // target, and the entity actually responsible for the spawn.
+            if (nextRepetition >= _repetitionCeiling)
+            {
+                Host.LogWithContext(logger => logger.LogError(
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | repetition ceiling {Ceiling} reached for child {ChildElementDefinitionId} (refusing repetition {NextRepetition}) - this is a Case.Flow engine safety extension (#67), not CMMN 1.1 spec behavior. Faulting this container instead of spawning further instances.",
+                    Host.Definition.GetType().Name,
+                    PlanItemDefinition.GetType().Name,
+                    Host.Scope,
+                    Host.InstanceId,
+                    _repetitionCeiling,
+                    child.Id,
+                    nextRepetition));
+
+                Host.RaiseEvent(new RepetitionCeilingExceeded
+                {
+                    RepeatingPlanItemDefinitionId = child.Id,
+                    AttemptedRepetition = nextRepetition,
+                    Ceiling = _repetitionCeiling
+                });
+
+                if (StateMachine.CanFire(PlanItemTransition.Fault))
+                {
+                    // HandleTransitioned (BaseBehavior) raises Transitioned and confirms - the
+                    // same ConfirmEvents() call commits the RepetitionCeilingExceeded event
+                    // raised just above, per the same Publish-before-Repeated/Bug #61 ordering
+                    // discipline used elsewhere in this class.
+                    await StateMachine.FireAsync(PlanItemTransition.Fault);
+                }
+                else
+                {
+                    // Host cannot Fault from its current state (unexpected, but not this
+                    // method's call to force) - confirm explicitly so the ceiling event is not
+                    // left sitting unconfirmed in TentativeState indefinitely (Bug #61).
+                    await Host.ConfirmEvents();
+                }
+
+                return;
+            }
+
             // Bug #62 root cause (fixed, #19): this template previously declared SIX placeholders
             // but passed FIVE arguments (the long-standing CA2017 warning). Message-template
             // renderers that format eagerly (MEL's FormattedLogValues via String.Format - e.g.
@@ -582,12 +653,12 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 PlanItemDefinition.GetType().Name,
                 Host.Scope,
                 Host.InstanceId,
-                @event.CurrentRepetition + 1,
+                nextRepetition,
                 child.Id));
 
             Host.RaiseEvent(new ChildRepeated());
 
-            await CreateChild(child, @event.CurrentRepetition + 1);
+            await CreateChild(child, nextRepetition);
         }
 
         private async Task CreateChild(Interfaces.Model.PlanItem child, int repetition = 0)

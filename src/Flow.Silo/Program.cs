@@ -12,6 +12,7 @@ using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
 using Flow.Grains.Interfaces.Identity;
 using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
 using Flow.Silo.Infrastructure.Options;
@@ -442,6 +443,13 @@ namespace Flow.Silo
         private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
             services.Configure<AzureOptions>(context.Configuration.GetSection(AzureOptions.ConfigKey));
+
+            // ADO #67 - Case.Flow ENGINE EXTENSION option, not CMMN spec surface. Bound from an
+            // optional config section (GetSection, not GetRequiredSection - an absent/empty
+            // section leaves RepetitionGuardOptions.MaxRepetitionsPerPlanItem at its generous
+            // built-in default) so operators can lower the ceiling without a code change, but
+            // nothing is required to run. See RepetitionGuardOptions for the full rationale.
+            services.Configure<RepetitionGuardOptions>(context.Configuration.GetSection(RepetitionGuardOptions.ConfigKey));
 
             // ADO #32/#33 (sub-unit 4, P1/First Light) - bound unconditionally (like AzureOptions
             // above), consumed only by SeedEvalIdentityRegistryAsync's Docker-environment gate in

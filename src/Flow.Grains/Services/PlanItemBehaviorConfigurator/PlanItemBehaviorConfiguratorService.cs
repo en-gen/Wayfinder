@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Behaviors;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Microsoft.Extensions.Options;
 
 namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
 {
@@ -10,9 +11,20 @@ namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
     {
         private readonly IPlanItemStateMachineConfigurator _planItemStateMachineConfigurator;
 
-        public PlanItemBehaviorConfiguratorService(IPlanItemStateMachineConfigurator planItemStateMachineConfigurator)
+        // ADO #67 - Case.Flow ENGINE EXTENSION option (RepetitionGuardOptions), not CMMN spec
+        // surface. IOptions<T> parameter defaulted to null (rather than required) so every
+        // existing direct `new PlanItemBehaviorConfiguratorService(...)` in the unit test suite
+        // keeps compiling unchanged and gets the generous default; production DI (Flow.Silo/
+        // Program.cs) and the low-ceiling integration fixture both register a real
+        // IOptions<RepetitionGuardOptions> and get that value instead.
+        private readonly int _repetitionCeiling;
+
+        public PlanItemBehaviorConfiguratorService(
+            IPlanItemStateMachineConfigurator planItemStateMachineConfigurator,
+            IOptions<RepetitionGuardOptions> repetitionGuardOptions = null)
         {
             _planItemStateMachineConfigurator = planItemStateMachineConfigurator ?? throw new ArgumentNullException(nameof(planItemStateMachineConfigurator));
+            _repetitionCeiling = (repetitionGuardOptions?.Value ?? new RepetitionGuardOptions()).MaxRepetitionsPerPlanItem;
         }
 
         public async Task<IPlanItemBehavior> Configure(IBehaviorHost host, PlanItemDefinition planItemDefinition)
@@ -22,13 +34,13 @@ namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
             {
                 case Stage stage when stage.IsCasePlanModel:
                 {
-                    var cpmb = new CasePlanModelBehavior(host, stage, stateMachine);
+                    var cpmb = new CasePlanModelBehavior(host, stage, stateMachine, _repetitionCeiling);
                     await cpmb.Activate();
                     return cpmb;
                 }
                 case Stage stage:
                 {
-                    var sb = new StageBehavior(host, stage, stateMachine);
+                    var sb = new StageBehavior(host, stage, stateMachine, _repetitionCeiling);
                     await sb.Activate();
                     return sb;
                 }

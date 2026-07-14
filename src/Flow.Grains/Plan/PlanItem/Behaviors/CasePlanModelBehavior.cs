@@ -59,8 +59,15 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         private Task HandleEnterActiveFromCreate() =>
             SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create);
 
-        public CasePlanModelBehavior(IBehaviorHost host, Stage planItemDefinition, IPlanItemStateMachine stateMachine) :
-            base(host, planItemDefinition, stateMachine)
+        // ADO #67 - see StageBehavior's own ctor remarks: threaded through to the base
+        // constructor unchanged (the CasePlanModel enforces the same ceiling in the inherited
+        // HandleChildRepeated), defaulted so existing direct construction keeps compiling.
+        public CasePlanModelBehavior(
+            IBehaviorHost host,
+            Stage planItemDefinition,
+            IPlanItemStateMachine stateMachine,
+            int repetitionCeiling = RepetitionGuardOptions.DefaultMaxRepetitionsPerPlanItem) :
+            base(host, planItemDefinition, stateMachine, repetitionCeiling)
         {
             // Table 8.6 - re-activate (Completed/Terminated/Failed/Suspended -> Active,
             // "Transition by a Case worker (human), or an administrator") deliberately has NO
