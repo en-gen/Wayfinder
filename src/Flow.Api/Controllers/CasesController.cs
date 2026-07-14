@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Asp.Versioning;
 using Flow.Api.Infrastructure;
+using Flow.Application.CaseFileItems;
 using Flow.Application.Cases;
 using Flow.Application.Mediator;
 using Flow.Contracts.V1;
@@ -82,6 +83,33 @@ namespace Flow.Api.Controllers
             var command = new TriggerCaseCommand(key, transition);
 
             return await _sender.Send(command, cancellationToken).ToActionResultAsync(view => Ok(view));
+        }
+
+        // ADO #58 - case-file item version history. Same "~/" absolute-template treatment as
+        // Get/Trigger above (and for the same reason - AttributeRouteModel.CombineTemplates would
+        // otherwise insert a stray slash before the parenthesis). itemId is the CaseFileItem
+        // definition id (CaseFileItemAddress.For's argument), not a Guid - case-file items are
+        // string-identified per the CMMN model, unlike the case root.
+        [HttpGet("~/api/v{version:apiVersion}/cases({caseId})/case-file-items({itemId})/history")]
+        public async Task<IActionResult> GetCaseFileItemHistory(
+            Guid caseId, string itemId, CancellationToken cancellationToken)
+        {
+            var query = new GetCaseFileItemHistoryQuery(caseId, itemId);
+
+            return await _sender.Send(query, cancellationToken).ToActionResultAsync(view => Ok(view));
+        }
+
+        // As-of read of one specific version's value. The route token is "itemVersion", not
+        // "version" - this controller's own "version" token already names the API version
+        // (ApiVersion route constraint on the controller-level [Route]), and ASP.NET Core route
+        // templates require every token name to be unique within the combined template.
+        [HttpGet("~/api/v{version:apiVersion}/cases({caseId})/case-file-items({itemId})/versions({itemVersion})")]
+        public async Task<IActionResult> GetCaseFileItemValueAt(
+            Guid caseId, string itemId, int itemVersion, CancellationToken cancellationToken)
+        {
+            var query = new GetCaseFileItemValueAtQuery(caseId, itemId, itemVersion);
+
+            return await _sender.Send(query, cancellationToken).ToActionResultAsync(view => Ok(view));
         }
     }
 }

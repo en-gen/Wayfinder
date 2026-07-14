@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Flow.Api.Controllers;
+using Flow.Application.CaseFileItems;
 using Flow.Application.Cases;
 using Flow.Application.Mediator;
 using Flow.Application.Results;
@@ -147,6 +150,101 @@ namespace Flow.Api.Tests.Controllers
 
             var result = await controller.Trigger(
                 Guid.NewGuid(), new TriggerCaseRequest { Transition = PlanItemTransition.Start }, CancellationToken.None);
+
+            result.Should().BeOfType<ObjectResult>()
+                .Which.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
+        }
+
+        // ADO #58 - case-file item version history/as-of read endpoints, same unit-level shape as
+        // the case-level tests above: a faked ISender proves the controller action builds the
+        // right query and maps the mediator's Result to the right IActionResult/status.
+        [Fact]
+        public async Task GetCaseFileItemHistory_Given_RouteKeys_Then_BuildsQueryAndReturns200WithHistory()
+        {
+            var caseId = Guid.NewGuid();
+            var history = new List<CaseFileItemVersionView>
+            {
+                new() { Version = 2, Transition = CaseFileItemTransition.Create }
+            };
+
+            GetCaseFileItemHistoryQuery captured = null;
+            var sender = new Mock<ISender>();
+            sender
+                .Setup(s => s.Send(It.IsAny<GetCaseFileItemHistoryQuery>(), It.IsAny<CancellationToken>()))
+                .Returns<IQuery<QueryResult<IReadOnlyList<CaseFileItemVersionView>>>, CancellationToken>((query, _) =>
+                {
+                    captured = (GetCaseFileItemHistoryQuery)query;
+                    return Task.FromResult(QueryResult<IReadOnlyList<CaseFileItemVersionView>>.Success(history));
+                });
+
+            var controller = new CasesController(sender.Object);
+
+            var result = await controller.GetCaseFileItemHistory(caseId, "item-1", CancellationToken.None);
+
+            captured.Should().NotBeNull();
+            captured!.CaseId.Should().Be(caseId);
+            captured.CaseFileItemId.Should().Be("item-1");
+
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().BeSameAs(history);
+        }
+
+        [Fact]
+        public async Task GetCaseFileItemHistory_Given_NeverCreatedItem_Then_Maps404()
+        {
+            var sender = new Mock<ISender>();
+            sender
+                .Setup(s => s.Send(It.IsAny<GetCaseFileItemHistoryQuery>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(QueryResult<IReadOnlyList<CaseFileItemVersionView>>.NotFound());
+
+            var controller = new CasesController(sender.Object);
+
+            var result = await controller.GetCaseFileItemHistory(Guid.NewGuid(), "item-1", CancellationToken.None);
+
+            result.Should().BeOfType<ObjectResult>()
+                .Which.StatusCode.Should().Be(StatusCodes.Status404NotFound);
+        }
+
+        [Fact]
+        public async Task GetCaseFileItemValueAt_Given_RouteKeys_Then_BuildsQueryAndReturns200WithValue()
+        {
+            var caseId = Guid.NewGuid();
+            var view = new CaseFileItemValueView { Version = 2, Value = JsonValue.Create("v1") };
+
+            GetCaseFileItemValueAtQuery captured = null;
+            var sender = new Mock<ISender>();
+            sender
+                .Setup(s => s.Send(It.IsAny<GetCaseFileItemValueAtQuery>(), It.IsAny<CancellationToken>()))
+                .Returns<IQuery<QueryResult<CaseFileItemValueView>>, CancellationToken>((query, _) =>
+                {
+                    captured = (GetCaseFileItemValueAtQuery)query;
+                    return Task.FromResult(QueryResult<CaseFileItemValueView>.Success(view));
+                });
+
+            var controller = new CasesController(sender.Object);
+
+            var result = await controller.GetCaseFileItemValueAt(caseId, "item-1", 2, CancellationToken.None);
+
+            captured.Should().NotBeNull();
+            captured!.CaseId.Should().Be(caseId);
+            captured.CaseFileItemId.Should().Be("item-1");
+            captured.Version.Should().Be(2);
+
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().BeSameAs(view);
+        }
+
+        [Fact]
+        public async Task GetCaseFileItemValueAt_Given_VersionOutOfRange_Then_Maps400()
+        {
+            var sender = new Mock<ISender>();
+            sender
+                .Setup(s => s.Send(It.IsAny<GetCaseFileItemValueAtQuery>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(QueryResult<CaseFileItemValueView>.BadRequest("version out of range"));
+
+            var controller = new CasesController(sender.Object);
+
+            var result = await controller.GetCaseFileItemValueAt(Guid.NewGuid(), "item-1", 999, CancellationToken.None);
 
             result.Should().BeOfType<ObjectResult>()
                 .Which.StatusCode.Should().Be(StatusCodes.Status400BadRequest);

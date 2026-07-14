@@ -1,13 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Flow.Application.Identity;
 using Flow.Contracts.V1;
+using Flow.Grains.Infrastructure.Extensions;
+using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Identity;
 using Flow.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
@@ -17,6 +21,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
+using CaseFileItemModel = Flow.Grains.Interfaces.Model.CaseFileItem;
 
 namespace Flow.Grains.Tests.Integration.Api
 {
@@ -186,6 +191,83 @@ namespace Flow.Grains.Tests.Integration.Api
             response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
                 "case definitions are tenant-scoped (ICaseDefinitionGrain is keyed (TenantId, defId)) - " +
                 "tenant B's own (TenantB, definitionId) grain was never Define()'d, so this is caller error, not found");
+        }
+
+        // ADO #58 - case-file item version history must honor tenant isolation identically to a
+        // current-value read (GetCaseQuery's own TenantB__Given_TenantAsCase__Then_GetReturns404
+        // above). The case-file item itself has no TenantId of its own (see CaseFileItemAccess's
+        // remarks) - it authorizes via its owning Case, so a foreign tenant's history read must be
+        // indistinguishable from not-found, exactly like a foreign tenant's case read.
+        [Fact]
+        public async Task TenantB__Given_TenantAsCaseFileItemHistory__Then_GetHistoryReturns404()
+        {
+            var definitionId = await DeployDefinitionAsync(_subjectA);
+            var (_, view) = await CreateCaseAsync(_subjectA, definitionId);
+            var itemId = await CreateCaseFileItemAsync(view.CaseId);
+
+            var getForeign = await SendAsSubjectAsync(
+                HttpMethod.Get, $"/api/v1/cases({view.CaseId})/case-file-items({itemId})/history", _subjectB);
+
+            getForeign.StatusCode.Should().Be(HttpStatusCode.NotFound,
+                "case-file item history must honor the same tenant isolation as a current-value read");
+
+            var foreignProblem = await getForeign.Content.ReadFromJsonAsync<ProblemDetails>();
+            foreignProblem.Should().NotBeNull();
+            foreignProblem!.Status.Should().Be(StatusCodes.Status404NotFound);
+        }
+
+        [Fact]
+        public async Task TenantB__Given_TenantAsCaseFileItemVersion__Then_GetValueAtReturns404()
+        {
+            var definitionId = await DeployDefinitionAsync(_subjectA);
+            var (_, view) = await CreateCaseAsync(_subjectA, definitionId);
+            var itemId = await CreateCaseFileItemAsync(view.CaseId);
+
+            var getForeign = await SendAsSubjectAsync(
+                HttpMethod.Get, $"/api/v1/cases({view.CaseId})/case-file-items({itemId})/versions(2)", _subjectB);
+
+            getForeign.StatusCode.Should().Be(HttpStatusCode.NotFound,
+                "case-file item as-of reads must honor the same tenant isolation as a current-value read");
+        }
+
+        [Fact]
+        public async Task TenantA__Given_OwnCaseFileItem__Then_GetHistorySucceeds()
+        {
+            var definitionId = await DeployDefinitionAsync(_subjectA);
+            var (_, view) = await CreateCaseAsync(_subjectA, definitionId);
+            var itemId = await CreateCaseFileItemAsync(view.CaseId);
+
+            var getOwn = await SendAsSubjectAsync(
+                HttpMethod.Get, $"/api/v1/cases({view.CaseId})/case-file-items({itemId})/history", _subjectA);
+
+            getOwn.StatusCode.Should().Be(HttpStatusCode.OK,
+                "the owning tenant must be able to read its own case-file item's history");
+
+            var history = await getOwn.Content.ReadFromJsonAsync<List<CaseFileItemVersionView>>();
+            history.Should().ContainSingle();
+            history![0].Transition.Should().Be(CaseFileItemTransition.Create);
+        }
+
+        // Creates a CaseFileItem directly against its own grain (CaseFileItem instances are not
+        // yet instantiated from a caseFileModel definition graph - see CaseFileItemAddress's
+        // remarks), exactly the way CaseFileItemGrainTests does. The item itself carries no
+        // tenant of its own (only its owning Case does - see CaseFileItemAccess), but
+        // CaseRequestContext.TenantId still needs SOME value here: CmmnElementGrain.
+        // OnActivateAsync reads it unconditionally for its log-context scope (throws if unset),
+        // regardless of whether the grain type itself enforces tenancy. This direct grain call
+        // runs on the test method's own AsyncLocal flow, not through IdentityContextMiddleware
+        // (which only primes CaseRequestContext for requests routed through the TestServer/
+        // HttpClient below), so it has to be primed here explicitly - matching every other
+        // grain-level integration test's constructor (e.g. CaseFileItemGrainTests).
+        private async Task<string> CreateCaseFileItemAsync(Guid caseId)
+        {
+            CaseRequestContext.TenantId = _tenantA;
+            CaseRequestContext.UserId = Guid.NewGuid();
+
+            var itemId = $"item-{Guid.NewGuid():N}";
+            var itemGrain = _fixture.ClusterClient.GetCaseFileItem(caseId, itemId);
+            await itemGrain.Create($"def-{Guid.NewGuid():N}", new CaseFileItemModel { Id = itemId }, JsonValue.Create("v1"));
+            return itemId;
         }
 
         private async Task<string> DeployDefinitionAsync(string subject)

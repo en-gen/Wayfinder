@@ -484,6 +484,11 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             snapshot.Value.Should().BeSameAs(store.Value)
                 .And.BeSameAs(value);
             snapshot.Value.ToString().Should().Contain("some content");
+            // ADO #58 - UpdatedUtc mirrors the store's own Updated (set by every Apply overload,
+            // including ChildAdded above); CurrentVersion is deliberately NOT set here - it is a
+            // JournaledGrain-level concept (confirmed event count) the pure store-level mapper has
+            // no access to, only CaseFileItemGrain.GetSnapshot sets it (see that method's remarks).
+            snapshot.UpdatedUtc.Should().Be(store.Updated);
         }
 
         // Table 8.2: delete (Available -> Discarded). Runs the full reflection-based
@@ -507,6 +512,13 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             var snapshot = store.ToSnapshot();
 
             snapshot.CaseFileItemState.Should().Be(CaseFileItemState.Discarded);
+
+            // ADO #58 - CurrentVersion is populated by CaseFileItemGrain.GetSnapshot (the grain's
+            // own JournaledGrain.Version), never by this pure store-level mapper - set it here to
+            // a legitimate non-zero stand-in purely so the generic sweep below (which treats an
+            // unset int as 0/unset - see AssertAllPropertiesPopulated) doesn't misreport it as a
+            // dropped mapping. Same treatment StageBehaviorSnapshot.Repetition already gets above.
+            snapshot.CurrentVersion = 1;
 
             AssertAllPropertiesPopulated(snapshot, nameof(CaseFileItemSnapshot));
         }
