@@ -1,5 +1,8 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
@@ -92,6 +95,15 @@ namespace Flow.Grains.Interchange
 
             try
             {
+                // ADO #72 - schema-valid writer: tExpression carries its text as mixed content
+                // (Expression.Text, [XmlText]-mapped), never as the non-schema "body" attribute
+                // Expression.ShouldSerializeBody() now suppresses on every Serialize(). Reconcile
+                // here, immediately before writing, so Text reflects Body regardless of whether
+                // this Definitions came from Import (which already reconciled both ways) or was
+                // built by hand with only Body set - see ReconcileExpressionText's remarks for why
+                // mutating the passed-in graph in place is the deliberate, low-risk choice here.
+                ReconcileExpressionText(definitions);
+
                 var namespaces = new XmlSerializerNamespaces();
                 // Empty prefix = default xmlns, matching how real .cmmn files are normally
                 // authored (compare formal-16-12-01.pdf's own examples, and the CasePlanModel
@@ -163,6 +175,17 @@ namespace Flow.Grains.Interchange
                 }
 
                 var definitions = (Definitions)Serializer.Deserialize(xmlReader);
+
+                // ADO #72 - tolerant reader (Postel's law): a source document may carry the
+                // expression text as the legacy "body" attribute (Expression.Body's own
+                // XmlAttribute mapping, untouched - handles this case with no help needed here) OR
+                // as OMG-schema-standard mixed content (Expression.Text, [XmlText]-mapped - also
+                // already populated by the untouched mapping). Either way, only one of the two
+                // properties comes back populated from Deserialize(); reconcile them into the same
+                // model so every existing caller of .Body (ExpressionGrain, CmmnCapabilityLint, ...)
+                // keeps working regardless of which form the source document used.
+                ReconcileExpressionText(definitions);
+
                 return ExecutableResult<Definitions>.Success(definitions);
             }
             catch (Exception ex) when (ex is XmlException or InvalidOperationException)
@@ -190,6 +213,87 @@ namespace Flow.Grains.Interchange
             }
 
             public override Encoding Encoding => Utf8NoBom;
+        }
+
+        // ADO #72 - Expression.Body/Expression.Text reconciliation (see Model/Expression.cs and
+        // the two call sites above for the full picture). Walks the object graph reachable from
+        // `root` looking for every Expression instance - there are 12 distinct Expression-typed
+        // properties scattered across the model (RepetitionRule.Condition, IfPart.Condition,
+        // TimerEventListener.TimerExpression, ProcessTask.ProcessRefExpression, ...), at arbitrary
+        // nesting depth (Stage.PlanItemDefinitions can itself contain Stages), so a hand-enumerated
+        // list would be one more place to forget to update whenever the model gains a new
+        // Expression-bearing element. Reflection-based instead, gated to this codebase's own model
+        // namespace so it never wanders into System.Xml DOM payloads (ExtensionElements.Any,
+        // AnyAttribute(s), Relationship.Source/Target - XmlElement/XmlAttribute/XmlQualifiedName)
+        // or reflects over primitives - and guarded against the model's own reference cycles
+        // (Stage.PlanItemDefinitionsNested deliberately yields the stage it's called on) via a
+        // reference-equality visited-set.
+        private static void ReconcileExpressionText(object root) => Walk(root, new HashSet<object>(ReferenceEqualityComparer.Instance));
+
+        private const string ModelNamespace = "Flow.Grains.Interfaces.Model";
+
+        private static void Walk(object node, HashSet<object> visited)
+        {
+            if (node is null || node is string) return;
+
+            var type = node.GetType();
+            var ns = type.Namespace ?? string.Empty;
+
+            // System.Xml DOM nodes are foreign to our model - and, for XmlElement/XmlNode
+            // specifically, self-enumerate their own child nodes, which would otherwise send this
+            // walk wandering through arbitrary extension-element payloads for no reason.
+            if (ns.StartsWith("System.Xml", StringComparison.Ordinal)) return;
+
+            if (node is IEnumerable enumerable)
+            {
+                foreach (var item in enumerable)
+                {
+                    Walk(item, visited);
+                }
+
+                return;
+            }
+
+            if (type.IsValueType) return; // bool/enum/DateTime/... - no graph identity to track
+
+            if (!(ns == ModelNamespace || ns.StartsWith(ModelNamespace + ".", StringComparison.Ordinal)))
+            {
+                return; // outside our model - nothing to reconcile, nothing to reflect into
+            }
+
+            if (!visited.Add(node)) return; // cycle guard
+
+            if (node is Expression expression)
+            {
+                if (!string.IsNullOrEmpty(expression.Body))
+                {
+                    if (string.IsNullOrEmpty(expression.Text))
+                    {
+                        expression.Text = expression.Body;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(expression.Text))
+                {
+                    expression.Body = expression.Text.Trim();
+                }
+            }
+
+            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.GetIndexParameters().Length > 0 || !property.CanRead) continue;
+
+                object value;
+                try
+                {
+                    value = property.GetValue(node);
+                }
+                catch
+                {
+                    continue; // defensive: a computed property throwing mid-walk shouldn't fail Import/Export
+                }
+
+                Walk(value, visited);
+            }
         }
 
         private static XmlAttributeOverrides BuildOverrides()

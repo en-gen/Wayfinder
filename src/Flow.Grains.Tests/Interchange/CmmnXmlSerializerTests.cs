@@ -186,6 +186,137 @@ namespace Flow.Grains.Tests.Interchange
             result.IsError.Should().BeFalse(result.Message);
         }
 
+        // ADO #72 - OMG CMMN 1.1's tExpression is mixed="true" with only a "language" attribute
+        // (CMMN11CaseModel.xsd); it has no "body" attribute. This engine's own Expression.Body has
+        // always been the in-memory canonical property (ExpressionGrain, CmmnCapabilityLint, every
+        // test in the codebase), pre-dating - and orthogonal to - the wire format, so the fix is
+        // entirely inside CmmnXmlSerializer: tolerant on read (both forms populate the same Body),
+        // schema-valid on write (only ever mixed content, never body="...").
+        [Fact]
+        public void Import__Given_LegacyBodyAttributeForm__Then_PopulatesBody()
+        {
+            const string xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-body-legacy">
+                  <case id="C1">
+                    <casePlanModel id="CPM1">
+                      <sentry id="S1">
+                        <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint" body="value.amount &gt; 0"/></ifPart>
+                      </sentry>
+                    </casePlanModel>
+                  </case>
+                </definitions>
+                """;
+
+            var result = CmmnXmlSerializer.Import(xml);
+
+            result.IsError.Should().BeFalse(result.Message);
+            var condition = result.Value.Cases.Single().CasePlanModel.Sentries.Single().IfPart.Condition;
+            condition.Body.Should().Be("value.amount > 0");
+        }
+
+        [Fact]
+        public void Import__Given_SchemaStandardMixedContentForm__Then_PopulatesBody()
+        {
+            const string xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-body-mixed">
+                  <case id="C1">
+                    <casePlanModel id="CPM1">
+                      <sentry id="S1">
+                        <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint">value.amount &gt; 0</condition></ifPart>
+                      </sentry>
+                    </casePlanModel>
+                  </case>
+                </definitions>
+                """;
+
+            var result = CmmnXmlSerializer.Import(xml);
+
+            result.IsError.Should().BeFalse(result.Message);
+            var condition = result.Value.Cases.Single().CasePlanModel.Sentries.Single().IfPart.Condition;
+            condition.Body.Should().Be("value.amount > 0");
+        }
+
+        [Fact]
+        public void Import__Given_BothFormsOfSameExpression__Then_ProduceEquivalentBody()
+        {
+            // The tolerant-reader acceptance bar in one assertion: legacy body="..." and
+            // schema-standard mixed content, imported separately, must resolve to the same Body.
+            const string legacy = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-legacy">
+                  <case id="C1"><casePlanModel id="CPM1"><sentry id="S1">
+                    <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint" body="value.status == 'approved'"/></ifPart>
+                  </sentry></casePlanModel></case>
+                </definitions>
+                """;
+            const string mixed = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-mixed">
+                  <case id="C1"><casePlanModel id="CPM1"><sentry id="S1">
+                    <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint">value.status == 'approved'</condition></ifPart>
+                  </sentry></casePlanModel></case>
+                </definitions>
+                """;
+
+            var legacyBody = CmmnXmlSerializer.Import(legacy).Value.Cases.Single().CasePlanModel.Sentries.Single().IfPart.Condition.Body;
+            var mixedBody = CmmnXmlSerializer.Import(mixed).Value.Cases.Single().CasePlanModel.Sentries.Single().IfPart.Condition.Body;
+
+            legacyBody.Should().Be(mixedBody);
+            legacyBody.Should().Be("value.status == 'approved'");
+        }
+
+        [Fact]
+        public void Export__Given_ExpressionWithBody__Then_EmitsMixedContentAndNoBodyAttribute()
+        {
+            const string xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-export">
+                  <case id="C1"><casePlanModel id="CPM1"><sentry id="S1">
+                    <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint" body="value.amount &gt; 100"/></ifPart>
+                  </sentry></casePlanModel></case>
+                </definitions>
+                """;
+            var imported = CmmnXmlSerializer.Import(xml);
+            imported.IsError.Should().BeFalse(imported.Message);
+
+            var exported = CmmnXmlSerializer.Export(imported.Value);
+
+            exported.IsError.Should().BeFalse(exported.Message);
+            exported.Value.Should().NotContain("body=", "tExpression has no \"body\" attribute in the OMG schema - the value must travel as element content");
+            exported.Value.Should().Contain(">value.amount &gt; 100</condition>");
+        }
+
+        [Fact]
+        public void Export__Given_HandBuiltExpressionNeverImported__Then_StillEmitsBodyAsElementContent()
+        {
+            // Export must be correct independent of Import - Body/Text reconciliation runs on the
+            // Export path too (ReconcileExpressionText), not only as a side effect of having gone
+            // through Import first. Built the same way CmmnCapabilityLintTests' MinimalCase does
+            // (direct object graph, no XML involved) precisely to prove that.
+            var sentry = new Sentry
+            {
+                Id = "S1",
+                IfPart = new IfPart
+                {
+                    ContextRef = "X",
+                    Condition = new Expression { Language = "expression://lang/jint", Body = "value.ready === true" }
+                }
+            };
+            var stage = new Stage { Id = "CPM1" };
+            stage.Sentries.Add(sentry);
+            var @case = new Case { Id = "C1", CasePlanModel = stage };
+            var definitions = new Definitions { TargetNamespace = "http://case.flow/samples/expr-handbuilt" };
+            definitions.Cases.Add(@case);
+
+            var exported = CmmnXmlSerializer.Export(definitions);
+
+            exported.IsError.Should().BeFalse(exported.Message);
+            exported.Value.Should().NotContain("body=");
+            exported.Value.Should().Contain(">value.ready === true</condition>");
+        }
+
         [Fact]
         public void RoundTrip__Given_RichSample__Then_ImportExportImport_IsStructurallyEquivalentToImport()
         {

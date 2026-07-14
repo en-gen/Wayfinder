@@ -29,7 +29,7 @@
           <standardEvent>update</standardEvent>
         </caseFileItemOnPart>
         <ifPart id="IfPart_1" contextRef="StatusItem">
-          <condition language="expression://lang/jint" body="value.status == 'approved'"/>
+          <condition language="expression://lang/jint">value.status == 'approved'</condition>
         </ifPart>
       </sentry>
       <milestone id="MilestoneA" name="MilestoneA"/>

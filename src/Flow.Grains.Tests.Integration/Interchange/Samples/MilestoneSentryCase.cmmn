@@ -35,7 +35,7 @@
           <standardEvent>update</standardEvent>
         </caseFileItemOnPart>
         <ifPart id="IfPart_1" contextRef="TheCaseFileItem">
-          <condition language="expression://lang/jint" body="value.amount &gt; 100"/>
+          <condition language="expression://lang/jint">value.amount &gt; 100</condition>
         </ifPart>
       </sentry>
       <milestone id="MilestoneA" name="MilestoneA"/>

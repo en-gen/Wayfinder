@@ -22,12 +22,12 @@
       <planItem id="PlanItemSource" name="PlanItemSource" definitionRef="SourceTask"/>
       <humanTask id="SourceTask" name="SourceTask" isBlocking="true">
         <defaultControl id="Control_1">
-          <manualActivationRule id="MAR_1">
-            <condition language="expression://lang/jint" body="false"/>
-          </manualActivationRule>
           <repetitionRule id="RR_1">
-            <condition language="expression://lang/jint" body="true"/>
+            <condition language="expression://lang/jint">true</condition>
           </repetitionRule>
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint">false</condition>
+          </manualActivationRule>
         </defaultControl>
       </humanTask>
     </casePlanModel>

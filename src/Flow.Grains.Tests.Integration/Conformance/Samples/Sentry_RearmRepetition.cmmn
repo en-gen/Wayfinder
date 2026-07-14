@@ -30,7 +30,7 @@
       <planItem id="MilestonePlanItem" name="MilestonePlanItem" definitionRef="RepeatingMilestone">
         <itemControl id="ItemControl_Milestone">
           <repetitionRule id="RR_1">
-            <condition language="expression://lang/jint" body="true"/>
+            <condition language="expression://lang/jint">true</condition>
           </repetitionRule>
         </itemControl>
         <entryCriterion id="EntryCriterion_1" sentryRef="RepeatSentry"/>
