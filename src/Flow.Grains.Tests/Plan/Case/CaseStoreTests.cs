@@ -28,6 +28,7 @@ namespace Flow.Grains.Tests.Plan.Case
 
             subject.CaseDefinitionId.Should().BeNull();
             subject.Definition.Should().BeNull();
+            subject.TenantId.Should().Be(Guid.Empty);
 
             subject.PlanItemDefinition.Should().BeNull();
             subject.Required.Should().BeFalse();
@@ -56,12 +57,14 @@ namespace Flow.Grains.Tests.Plan.Case
             {
                 CasePlanModel = casePlanModel
             };
+            var tenantId = Guid.NewGuid();
 
             var @event = new CaseCreated
             {
                 CaseDefinitionId = caseDefId,
                 Definition = @case,
-                Repetition = 0
+                Repetition = 0,
+                TenantId = tenantId
             };
 
             var subject = new CaseStore();
@@ -88,6 +91,11 @@ namespace Flow.Grains.Tests.Plan.Case
                 .And.BeOfType<StageBehaviorStore>();
 
             subject.PlanItemState.Should().Be(PlanItemState.Uninitialized);
+
+            // ADO #33 - CaseCreated.TenantId (stamped by CaseGrain.Create from
+            // CaseRequestContext.TenantId) must project onto CaseStore.TenantId, the value
+            // CaseGrain.Trigger/GetSnapshot compare against the caller's tenant.
+            subject.TenantId.Should().Be(tenantId);
         }
 
         [Fact]

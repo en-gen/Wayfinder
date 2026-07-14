@@ -18,6 +18,12 @@ namespace Flow.Application.DependencyInjection
             // root provider and gets one Sender for the life of that provider either way.
             services.AddScoped<ISender, Sender>();
 
+            // ADO #33 - the tenant-registry resolver/seeder, additive: nothing calls ITenantResolver
+            // yet (sub-unit 3 wires it into an HTTP auth middleware), so this only grows the DI
+            // container's service list - it does not change AddFlowApplication's existing behavior
+            // for any of today's callers (CaseCqrsIntegrationTests; a future Flow.Silo host).
+            services.AddFlowIdentity();
+
             var handlerInterfaceDefinitions = new[] { typeof(ICommandHandler<,>), typeof(IQueryHandler<,>) };
             var assembly = typeof(ServiceCollectionExtensions).Assembly;
 

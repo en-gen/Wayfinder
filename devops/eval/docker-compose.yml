@@ -1,8 +1,10 @@
-# Case.Flow EVAL stack (work item #49): Azurite + a REAL multi-container Orleans cluster - 3
-# separate Flow.Silo CONTAINERS running the DEPLOYED clustering path (Program.cs
-# ConfigureDeployedOrleans - Azure Table clustering + reminders, container-aware endpoints)
-# against Azurite, instead of Orleans TestingHost's in-process TestCluster membership. This
-# turns work item #30's deployed clustering config into a real multi-PROCESS cluster.
+# Case.Flow EVAL stack (work item #49, extended by #32/#33 sub-unit 4 "First Light"): Azurite +
+# a REAL multi-container Orleans cluster - 3 separate Flow.Silo CONTAINERS running the DEPLOYED
+# clustering path (Program.cs ConfigureDeployedOrleans - Azure Table clustering + reminders,
+# container-aware endpoints) against Azurite, instead of Orleans TestingHost's in-process
+# TestCluster membership - PLUS Postgres + Zitadel, so the same stack can also demonstrate the
+# REAL authenticated case-operation API (/api/v1/... - work item #32/#33) end to end, not just
+# cluster formation.
 #
 # This is a NEW, separate stack. devops/infrastructure/docker-compose.yml (the F5 Azurite-ONLY
 # stack backing `dotnet run`'s Development configuration) is untouched by this work item and
@@ -20,7 +22,15 @@
 # Each should report "activeSilos": 3 once membership has converged - see devops/eval/README.md
 # for the full walkthrough, timing notes, and troubleshooting.
 #
-# Tear down (drop the Azurite data volume too):
+# Zitadel + Postgres (work item #32/#33 sub-unit 4) bring up automatically too, but issuing a
+# CASE.FLOW-authenticated request needs a few MANUAL one-time bootstrap steps (creating the
+# Case.Flow project/API application to get an audience, creating a second org for tenant B, and
+# creating human/service users) - Zitadel's own FIRSTINSTANCE_* bootstrap only goes as far as one
+# org + one admin/service account automatically. See devops/eval/README.md's "Authenticated API
+# walkthrough (First Light)" section for the exact manual steps and why they are manual rather
+# than scripted here.
+#
+# Tear down (drop the Azurite + Zitadel/Postgres data volumes too):
 #   docker compose -f devops/eval/docker-compose.yml down -v
 name: case-flow-eval
 
@@ -31,7 +41,8 @@ x-silo-environment: &silo-environment
   # useless across separate containers). Both DOTNET_ and ASPNETCORE_ prefixed variants are set
   # so this is correct regardless of which one ends up populating
   # HostBuilderContext.HostingEnvironment.EnvironmentName - belt and braces, not a guess either
-  # way is wrong.
+  # way is wrong. The SAME "Docker" value also gates Program.cs's SeedEvalIdentityRegistryAsync
+  # (sub-unit 4) - never Development, never Production.
   DOTNET_ENVIRONMENT: Docker
   ASPNETCORE_ENVIRONMENT: Docker
 
@@ -47,6 +58,46 @@ x-silo-environment: &silo-environment
   Azure__Storage__connectionString: >-
     DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
   Azure__Storage__CaseStateContainer: case-flow-casestate
+
+  # ADO #32/#33 sub-unit 4 - the silo's ONE trusted token issuer (Flow.Api's AddFlowApi/
+  # ZitadelAuthOptions - see that file's remarks). "zitadel" is the compose SERVICE hostname
+  # (Docker's embedded DNS), reachable identically by the silo (server-side JWKS/discovery fetch)
+  # and by anything else running ON this compose network - deliberately NOT "localhost" or a
+  # published host port, because the token's own "iss" claim (set by Zitadel's
+  # ZITADEL_EXTERNALDOMAIN below) must byte-for-byte match ValidIssuer, and only the compose
+  # hostname resolves identically from every container on this network. See
+  # devops/eval/README.md's "Why the issuer is the compose hostname, not localhost" for the full
+  # reasoning and what that means for a HOST browser trying to log in interactively.
+  Auth__Zitadel__Authority: http://zitadel:8080
+  # Left BLANK until the manual "create the Case.Flow project + API application" bootstrap step
+  # (devops/eval/README.md) produces a real application/client id to use as the audience -
+  # JwtBearer's ValidateAudience would otherwise reject every real token outright. A silo with a
+  # blank Audience still boots fine (Flow.Api.Tests covers ZitadelAuthOptions validation
+  # separately); it simply cannot yet accept a real Zitadel-issued token.
+  Auth__Zitadel__Audience: ""
+
+  # ADO #32/#33 sub-unit 4 - EvalIdentityOptions (Flow.Silo/Infrastructure/Options), consumed only
+  # by Program.cs's Docker-gated SeedEvalIdentityRegistryAsync. Two placeholder tenant slots
+  # (tenant A / tenant B) ship with blank Subjects - SeedEvalIdentityRegistryAsync skips any entry
+  # with a blank Subject rather than seeding an unreachable registration, so the stack boots
+  # cleanly even before the manual Zitadel bootstrap is done. Fill in the real "sub" claims (and
+  # TenantId/UserId if you want stable values) once you have created the two org/human users - see
+  # devops/eval/README.md.
+  EvalIdentity__Tenants__0__TenantId: "10000000-0000-0000-0000-0000000000a1"
+  EvalIdentity__Tenants__0__Name: "Case.Flow Eval - Tenant A"
+  EvalIdentity__Tenants__0__Subject: ""
+  EvalIdentity__Tenants__0__UserId: "00000000-0000-0000-0000-0000000000a1"
+  EvalIdentity__Tenants__0__Issuer: http://zitadel:8080
+  EvalIdentity__Tenants__0__Audience: ""
+  EvalIdentity__Tenants__0__Roles__0: Member
+
+  EvalIdentity__Tenants__1__TenantId: "10000000-0000-0000-0000-0000000000b1"
+  EvalIdentity__Tenants__1__Name: "Case.Flow Eval - Tenant B"
+  EvalIdentity__Tenants__1__Subject: ""
+  EvalIdentity__Tenants__1__UserId: "00000000-0000-0000-0000-0000000000b1"
+  EvalIdentity__Tenants__1__Issuer: http://zitadel:8080
+  EvalIdentity__Tenants__1__Audience: ""
+  EvalIdentity__Tenants__1__Roles__0: Member
 
 services:
   azurite:
@@ -72,6 +123,85 @@ services:
       retries: 5
       start_period: 5s
 
+  # ADO #32/#33 sub-unit 4 - Zitadel's own backing store. Pinned to a specific patch release, not
+  # "latest" or a bare major tag (per the repo's stable-pins convention - see e.g. the Azurite
+  # image above). 16-alpine is the exact tag Zitadel's own official docker-compose examples pair
+  # with this Zitadel line (verified against zitadel/zitadel's docs/docs/self-hosting/deploy/
+  # docker-compose*.yaml at git tag v2.71.8 - the same tag pinned below).
+  zitadel-db:
+    image: postgres:16-alpine
+    container_name: case-flow-eval-zitadel-db
+    environment:
+      PGUSER: postgres
+      POSTGRES_PASSWORD: zitadel-eval-postgres
+    volumes:
+      - zitadel-eval-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "zitadel", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ADO #32/#33 sub-unit 4 (First Light demo infra) - a single-container Zitadel (API + Console UI
+  # in one process), the pre-v3 architecture (Zitadel v3+ splits the login UI into its own
+  # service behind a reverse proxy - unnecessary complexity for a local eval stack with no public
+  # HTTPS requirement). Pinned to v2.71.8 - the exact tag this file's Zitadel/Postgres
+  # configuration was verified against (ghcr.io/zitadel/zitadel's own docs/docs/self-hosting/
+  # deploy/docker-compose.yaml and docker-compose-sa.yaml at that tag), a genuinely stable
+  # (non-preview/non-rc) release, Apache-2.0 licensed.
+  #
+  # `start-from-init` runs Zitadel's database migrations AND the FIRSTINSTANCE bootstrap (below)
+  # on first boot, then serves normally on every restart after (idempotent - safe to leave as the
+  # command permanently rather than switching to plain `start` after first bring-up).
+  # --tlsMode disabled: this stack has no reverse-proxy/TLS termination in front of it (a local
+  # eval stack, not a production deployment) - matches ZITADEL_EXTERNALSECURE=false below.
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v2.71.8
+    container_name: case-flow-eval-zitadel
+    command: 'start-from-init --masterkeyFromEnv --tlsMode disabled'
+    environment:
+      ZITADEL_MASTERKEY: "CaseFlowEvalZitadelMasterkey32B!"
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel-eval-user
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: zitadel-eval-postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      # See the silo-environment anchor's Auth__Zitadel__Authority remarks above - EXTERNALDOMAIN
+      # must be the compose SERVICE hostname so the token's "iss" claim matches what every
+      # container on this network (the silos, and anything you run to complete the manual
+      # bootstrap - see README) resolves identically. EXTERNALSECURE=false + EXTERNALPORT=8080
+      # match --tlsMode disabled and the container's own listen port.
+      ZITADEL_EXTERNALDOMAIN: zitadel
+      ZITADEL_EXTERNALPORT: 8080
+      ZITADEL_EXTERNALSECURE: false
+      # FIRSTINSTANCE bootstrap (applied once, on the very first `start-from-init` run only): one
+      # org, one machine (service-account) user with a machine KEY (not a PAT - see README for
+      # why), written to the mounted ./zitadel/machinekey volume below. This does NOT create the
+      # Case.Flow project/API application or a second org - see README's manual bootstrap steps
+      # for those.
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: "Case.Flow Eval"
+      ZITADEL_FIRSTINSTANCE_MACHINEKEYPATH: /machinekey/zitadel-admin-sa.json
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: case-flow-eval-sa
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: "Case.Flow Eval Service Account"
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINEKEY_TYPE: 1
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    # Published to the host (unlike Azurite) - the manual bootstrap steps (README) and the Console
+    # UI both need host reachability. No healthcheck: the image ships no shell/curl (a minimal
+    # Go-binary container), so a CMD-SHELL HTTP probe is not viable here - matches Zitadel's own
+    # official compose examples, which likewise define no healthcheck on this service. The silos
+    # below depend on it only via service_started, not service_healthy.
+    ports:
+      - "8084:8080"
+    volumes:
+      - ./zitadel/machinekey:/machinekey
+
   silo1:
     build:
       context: ../..
@@ -89,6 +219,8 @@ services:
     depends_on:
       azurite:
         condition: service_healthy
+      zitadel:
+        condition: service_started
     # Distinct host port per silo so each is independently curl-able from the host - see the
     # curl examples in the header comment and devops/eval/README.md.
     ports:
@@ -106,6 +238,8 @@ services:
     depends_on:
       azurite:
         condition: service_healthy
+      zitadel:
+        condition: service_started
     ports:
       - "8082:8080"
 
@@ -121,8 +255,11 @@ services:
     depends_on:
       azurite:
         condition: service_healthy
+      zitadel:
+        condition: service_started
     ports:
       - "8083:8080"
 
 volumes:
   azurite-eval-data:
+  zitadel-eval-db-data:

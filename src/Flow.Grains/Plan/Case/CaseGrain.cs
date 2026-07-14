@@ -113,7 +113,8 @@ namespace Flow.Grains.Plan.Case
             RaiseEvent(new CaseCreated
             {
                 CaseDefinitionId = @case.Id,
-                Definition = @case
+                Definition = @case,
+                TenantId = CaseRequestContext.TenantId
             });
 
             // PostDefine() (below) reads State.CaseDefinitionId/State.Definition - the confirmed
@@ -140,11 +141,32 @@ namespace Flow.Grains.Plan.Case
             _casePlanModel = await _behaviorConfigurator.Configure(this, State.Definition.CasePlanModel);
         }
 
-        public Task<CaseSnapshot> GetSnapshot() => Task.FromResult(State.ToSnapshot());
+        public Task<CaseSnapshot> GetSnapshot()
+        {
+            // ADO #33 - defense in depth: a case is only cross-tenant-checkable once it exists
+            // (State.Defined - see CaseStore.Apply(CaseCreated)). A never-created case must keep
+            // returning the null-Definition snapshot untouched, under ANY tenant context, so that
+            // signal stays indistinguishable from a foreign-tenant existing case at the app layer
+            // (both become 404 upstream) - see CrossTenantAccessException's remarks.
+            if (State.Defined && State.TenantId != CaseRequestContext.TenantId)
+            {
+                throw new CrossTenantAccessException();
+            }
+
+            return Task.FromResult(State.ToSnapshot());
+        }
 
         public async Task<CaseSnapshot> Trigger(PlanItemTransition transition)
         {
             if (_casePlanModel == null) throw new InvalidOperationException("attempted Trigger on Uninitialized Case");
+
+            // ADO #33 - cross-tenant guard runs BEFORE the Closed-state guard below: a foreign
+            // caller must not be able to learn anything about the case's state (e.g. that it is
+            // Closed) - see CrossTenantAccessException's remarks and GetSnapshot above.
+            if (State.Defined && State.TenantId != CaseRequestContext.TenantId)
+            {
+                throw new CrossTenantAccessException();
+            }
 
             // 8.4.1/Table 8.5 - Closed: "Terminal state. In this state no new activity is allowed
             // in the Case." PlanItemStateMachine.ConfigureForCasePlanModel already has no outgoing

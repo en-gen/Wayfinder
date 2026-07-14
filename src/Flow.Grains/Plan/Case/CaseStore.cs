@@ -1,4 +1,5 @@
-﻿using Flow.Grains.Interfaces.Model;
+﻿using System;
+using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.Case.Events;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.PlanItem;
@@ -13,6 +14,15 @@ namespace Flow.Grains.Plan.Case
     {
         [Id(0)]
         public PlanItemDefinition PlanItemDefinition { get; private set; }
+
+        // ADO #33 - the owning tenant, projected from CaseCreated.TenantId. CaseGrain.Trigger/
+        // GetSnapshot compare this against CaseRequestContext.TenantId to enforce cross-tenant
+        // isolation at the case's public surface. Events persisted before this change replay with
+        // TenantId == Guid.Empty (a legacy/empty owning-tenant), which will not match any real
+        // tenant - such cases become inaccessible rather than cross-accessible (acceptable
+        // pre-production; no migration performed).
+        [Id(15)]
+        public Guid TenantId { get; private set; }
 
         [Id(1)]
         public bool UserCompletable { get; private set; }
@@ -54,7 +64,8 @@ namespace Flow.Grains.Plan.Case
             base.Apply(@event);
             PlanItemDefinition = @event.Definition.CasePlanModel;
             Repetition = @event.Repetition;
-            
+            TenantId = @event.TenantId;
+
             BehaviorExtension = new StageBehaviorStore();
         }
 

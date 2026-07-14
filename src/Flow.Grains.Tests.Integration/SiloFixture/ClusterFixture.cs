@@ -97,6 +97,15 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
                     jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
+
+                // ADO #33 - see Flow.Silo/Program.cs's ConfigureSharedOrleansProviders remarks:
+                // Orleans's built-in ExceptionCodec only allows exception types whose namespace
+                // matches ExceptionSerializationOptions.SupportedNamespacePrefixes (defaults:
+                // "System"/"Microsoft"/"Azure"), so custom exceptions like CrossTenantAccessException
+                // need "Flow" allow-listed here too - must match the production silo and the client
+                // configurator below identically.
+                silo.Services.Configure<ExceptionSerializationOptions>(
+                    options => options.SupportedNamespacePrefixes.Add("Flow"));
             }
 
             // MemoryGrainStorage's default IGrainStorageSerializer is JsonGrainStorageSerializer -
@@ -157,6 +166,13 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                 clientBuilder.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
                     jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
+
+                // ADO #33 - must match TestSiloConfigurator/Flow.Silo/Program.cs identically (see
+                // those remarks): without this, a foreign-tenant call throwing
+                // CrossTenantAccessException fails client-side with CodecNotFoundException instead
+                // of surfacing the exception the grain actually threw.
+                clientBuilder.Services.Configure<ExceptionSerializationOptions>(
+                    options => options.SupportedNamespacePrefixes.Add("Flow"));
             }
         }
     }

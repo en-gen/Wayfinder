@@ -6,6 +6,7 @@ using Flow.Application.Cases;
 using Flow.Application.DependencyInjection;
 using Flow.Application.Mediator;
 using Flow.Contracts.V1;
+using Flow.Grains.Interfaces;
 using Flow.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,12 +15,14 @@ using Xunit;
 
 namespace Flow.Grains.Tests.Integration.Application
 {
-    // ADO #32 - the CQRS-layer equivalent of #39's CaseOperationsIntegrationTests: exercises the
-    // exact commands/queries a future Flow.Api (and a future MCP server) will dispatch, but drives
-    // them through the REAL native mediator (ISender / AddFlowApplication) over the existing
-    // in-memory Orleans ClusterFixture - no web host, no Azurite/Docker (case ops need no durable
-    // storage). Proves a timer-free flagship .cmmn file (MilestoneSentryCase.cmmn) becomes a live
-    // case and a readable Flow.Contracts.V1.CaseView entirely through the Application seam.
+    // ADO #32/#33 - the CQRS-layer equivalent of #39's CaseOperationsIntegrationTests: exercises the
+    // exact commands/queries Flow.Api (and a future MCP server) dispatch, but drives them through
+    // the REAL native mediator (ISender / AddFlowApplication) over the existing in-memory Orleans
+    // ClusterFixture - no web host, no Azurite/Docker (case ops need no durable storage), and no
+    // JwtBearer/tenant-registry resolution either (that is Flow.Api's IdentityContextMiddleware,
+    // exercised in Flow.Api.Tests instead - see that project). Proves a timer-free flagship .cmmn
+    // file (MilestoneSentryCase.cmmn) becomes a live case and a readable Flow.Contracts.V1.CaseView
+    // entirely through the Application seam.
     [Collection(ClusterCollection.Name)]
     public class CaseCqrsIntegrationTests
     {
@@ -30,8 +33,17 @@ namespace Flow.Grains.Tests.Integration.Application
             // Compose the Application layer exactly as a host would: register the fixture's co-hosted
             // Orleans client (the only dependency the handlers inject) and let AddFlowApplication
             // wire ISender + every ICommandHandler<,>/IQueryHandler<,> by its own reflection scan.
-            // The handlers set the defaulted tenant/user on the RequestContext themselves (the #33
-            // seam), so nothing needs priming here.
+            //
+            // ADO #33 - the handlers no longer default CaseRequestContext themselves (that seam,
+            // CaseRequestContextDefaults, was deleted: Flow.Api's IdentityContextMiddleware is now
+            // the only place that happens, from an authenticated caller's resolved identity). This
+            // fixture has no HTTP pipeline, so it primes CaseRequestContext directly instead - the
+            // same values CaseRequestContextDefaults used, and the same pattern every grain-level
+            // integration fixture in this solution already uses (see e.g.
+            // CaseLifecycleIntegrationTests's constructor).
+            CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
+            CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
             _rootProvider = new ServiceCollection()
                 .AddSingleton<IClusterClient>(fixture.ClusterClient)
                 .AddFlowApplication()

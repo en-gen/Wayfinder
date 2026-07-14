@@ -1,0 +1,5 @@
+# ADO #32/#33 (sub-unit 4) - devops/eval/eval-authenticated.sh needs a real "#!/usr/bin/env bash"
+# shebang line ending to run correctly wherever it is actually executed (a Linux CI box, WSL, a
+# contributor's Linux dev machine) - CRLF line endings on a shebang line make the interpreter path
+# unresolvable ("bad interpreter"). Force LF regardless of the checkout OS's core.autocrlf setting.
+*.sh text eol=lf

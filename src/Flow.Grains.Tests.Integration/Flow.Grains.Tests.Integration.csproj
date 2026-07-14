@@ -9,6 +9,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ADO #32/#33 (sub-unit 4) - the full-pipeline multi-tenant isolation HTTP suite (Api/) wires
+         Flow.Api's real AddFlowApi()/MapFlowApi() composition onto a Microsoft.AspNetCore.TestHost
+         TestServer, so this project needs the ASP.NET Core shared framework directly (same reason
+         Flow.Api/Flow.Api.Tests declare it: HttpContext/IActionResult/routing/middleware types).
+         Same "class library depends on the shared framework directly" pattern as those projects. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="AutoFixture.Xunit2" Version="4.18.1" />
     <!-- Azurite restart-survival suite (work item #54): AzuriteClusterFixture mirrors Flow.Silo's
          AddAzureClients config-section registration path exactly (Microsoft.Extensions.Azure +
@@ -44,6 +53,12 @@
     <PackageReference Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
+    <!-- ADO #32/#33 (sub-unit 4) - Microsoft's own in-memory ASP.NET Core test server (Api/
+         ApiTestHostFactory): drives Flow.Api's real HTTP pipeline (auth -> IdentityContextMiddleware
+         -> controllers -> ISender) without a real socket. Pinned to the same stable 10.0.9 line as
+         Flow.Api's own JwtBearer/OpenApi packages (Flow.Api.csproj) - MIT licensed, part of the
+         ASP.NET Core repo/release train. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
@@ -56,6 +71,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ADO #32/#33 (sub-unit 4) - the full-pipeline isolation suite (Api/) composes the REAL
+         Flow.Api HTTP surface (AddFlowApi/MapFlowApi) over ClusterFixture's TestCluster - see that
+         folder's ApiTestHostFactory. -->
+    <ProjectReference Include="..\Flow.Api\Flow.Api.csproj" />
     <!-- ADO #32 - the CQRS core under test: the Application/ suite dispatches the case commands/
          queries through the real ISender (AddFlowApplication) over the in-memory ClusterFixture,
          asserting the Flow.Contracts.V1 projections come back correct. -->
