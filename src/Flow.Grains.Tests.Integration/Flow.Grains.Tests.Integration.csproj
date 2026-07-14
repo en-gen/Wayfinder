@@ -56,6 +56,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ADO #32 - the CQRS core under test: the Application/ suite dispatches the case commands/
+         queries through the real ISender (AddFlowApplication) over the in-memory ClusterFixture,
+         asserting the Flow.Contracts.V1 projections come back correct. -->
+    <ProjectReference Include="..\Flow.Application\Flow.Application.csproj" />
+    <ProjectReference Include="..\Flow.Contracts\Flow.Contracts.csproj" />
     <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
     <ProjectReference Include="..\Flow.Grains.Tests.Utils\Flow.Grains.Tests.Utils.csproj" />
     <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
