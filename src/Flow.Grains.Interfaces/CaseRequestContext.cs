@@ -16,6 +16,8 @@ namespace Flow.Grains.Interfaces
         private const string TenantIdKey = "TENANT_ID";
         private const string UserIdKey = "USER_ID";
         private const string UserRolesKey = "USER_ROLES";
+        private const string ActorPrincipalTypeKey = "ACTOR_PRINCIPAL_TYPE";
+        private const string ActorOnBehalfOfKey = "ACTOR_ON_BEHALF_OF";
 
         public static Guid TenantId
         {
@@ -33,6 +35,33 @@ namespace Flow.Grains.Interfaces
         {
             get => RequestContext.Get(UserRolesKey) as string[] ?? Array.Empty<string>();
             set => RequestContext.Set(UserRolesKey, value?.ToArray() ?? Array.Empty<string>());
+        }
+
+        // ADO #59 - what kind of principal UserId names for this call. Deliberately defaults to
+        // User (rather than throwing like TenantId/UserId above) - unlike those two, this is new
+        // plumbing with no #33-style enforcement yet, and every caller today IS a User
+        // (IdentityContextMiddleware only ever sets User/null - see its remarks), so an unset
+        // context defaulting to User is simply correct, not a masked bug.
+        public static ActorPrincipalType ActorPrincipalType
+        {
+            // Stored as its underlying int, not the boxed enum itself - RequestContext's
+            // client-to-silo propagation carries values through an object-typed dictionary, and an
+            // unregistered custom enum type boxed into that slot does not reliably survive the
+            // round trip the way a well-known BCL type (Guid, string) does; the int does.
+            get => RequestContext.Get(ActorPrincipalTypeKey) as int? is int raw ? (ActorPrincipalType)raw : ActorPrincipalType.User;
+            set => RequestContext.Set(ActorPrincipalTypeKey, (int)value);
+        }
+
+        // ADO #59 - an end-user identity ASSERTED by an S2S client (ActorPrincipalType.Client),
+        // recorded distinctly from the authenticated principal (UserId) rather than overwriting
+        // it - the audit trail this feeds (event actor stamping - see CmmnElementGrain.RaiseEvent/
+        // Events.ActorStamping) must be able to tell "client X, acting on behalf of user Y" apart
+        // from "user Y, acting directly". Null whenever no on-behalf-of identity is in play (every
+        // caller today - no S2S path exists yet; IdentityContextMiddleware leaves this unset).
+        public static string ActorOnBehalfOf
+        {
+            get => RequestContext.Get(ActorOnBehalfOfKey) as string;
+            set => RequestContext.Set(ActorOnBehalfOfKey, value);
         }
     }
 }

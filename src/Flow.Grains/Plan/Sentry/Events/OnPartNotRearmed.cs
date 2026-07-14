@@ -1,4 +1,6 @@
 using System;
+using Flow.Grains.Events;
+using Flow.Grains.Interfaces;
 using Orleans;
 
 namespace Flow.Grains.Plan.Sentry.Events
@@ -7,12 +9,20 @@ namespace Flow.Grains.Plan.Sentry.Events
     // just completed the AND-join (superseding PR !18's IfPartNotSatisfied, which cleared every
     // recorded OnPart and was scoped to single-OnPart sentries only).
     [GenerateSerializer]
-    public class OnPartNotRearmed
+    public class OnPartNotRearmed : IActorStampedEvent
     {
         [Id(0)]
         public DateTime Updated { get; } = DateTime.UtcNow;
 
         [Id(1)]
         public string OnPartId { get; set; }
+
+        // ADO #59 - see Faulted's remarks (same additive-field treatment).
+        [Id(2)]
+        public Guid ActorPrincipalId { get; set; }
+        [Id(3)]
+        public ActorPrincipalType ActorPrincipalType { get; set; }
+        [Id(4)]
+        public string ActorOnBehalfOf { get; set; }
     }
 }

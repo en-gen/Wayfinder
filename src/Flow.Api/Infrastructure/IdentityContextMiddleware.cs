@@ -72,6 +72,17 @@ namespace Flow.Api.Infrastructure
             CaseRequestContext.UserId = resolved.UserId;
             CaseRequestContext.UserRoles = resolved.Roles;
 
+            // ADO #59 - every request authenticated here is a human user token (see the "sub"
+            // claim resolution above) acting on its own authority, so the acting principal is
+            // always User/null. Documented future hook: an S2S client credential path would
+            // resolve to ActorPrincipalType.Client here, with ActorOnBehalfOf populated only when
+            // that client asserts an end-user identity of its own (e.g. a distinct claim/header
+            // this middleware doesn't examine today) - see CaseRequestContext.ActorOnBehalfOf's
+            // remarks. No such path is wired up yet; this assignment just makes today's User/null
+            // default explicit rather than relying on CaseRequestContext's own fallback.
+            CaseRequestContext.ActorPrincipalType = ActorPrincipalType.User;
+            CaseRequestContext.ActorOnBehalfOf = null;
+
             await _next(context);
         }
     }
