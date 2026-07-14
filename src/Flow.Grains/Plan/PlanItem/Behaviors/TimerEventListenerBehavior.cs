@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Executables;
 using Flow.Grains.Expressions;
+using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;
@@ -113,7 +114,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                         Host.InstanceId,
                         HandleTimerTickedEvent,
                         StreamFlags.Create);
-                    await Host.GrainFactory.GetGrain<ITimerEventSchedulerGrain>(Host.CaseInstanceId)
+                    await Host.GrainFactory.GetScheduler(Host.CaseInstanceId)
                         .ScheduleTimer(Host.InstanceId, TimerStore.TimerSchedule, null, Host.Context);
                     break;
                 }
@@ -136,8 +137,20 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             }
         }
 
+        // #31: this used to call GetGrain<ITimerEventSchedulerGrain>(Host.CaseInstanceId,
+        // Host.InstanceId) - a 2-Guid-arg-looking call that actually resolves to
+        // IGrainFactory.GetGrain<T>(Guid primaryKey, string grainClassNamePrefix = null), since
+        // ITimerEventSchedulerGrain is IGrainWithGuidKey (not IGrainWithGuidCompoundKey). The second
+        // argument is NOT a key extension - it's an optional grain-CLASS-name prefix used only to
+        // disambiguate between multiple implementations of the same interface. Passing
+        // Host.InstanceId (a plan-item short-guid) there doesn't scope anything by plan item; it
+        // just fails to match TimerEventSchedulerGrain's type name, so grain-class resolution throws
+        // and CancelTimer never actually ran - every TimerEventListener leaked its Quartz job/trigger
+        // on Terminated. The correct (and only needed) key is the case instance id, matching the
+        // other 2 call sites - CancelTimer's own planItemInstanceId parameter already gives it
+        // per-plan-item granularity inside the case-scoped scheduler grain.
         private Task HandleTerminated() => Host.GrainFactory
-            .GetGrain<ITimerEventSchedulerGrain>(Host.CaseInstanceId, Host.InstanceId)
+            .GetScheduler(Host.CaseInstanceId)
             .CancelTimer(Host.InstanceId);
 
         private Task HandleStartTriggerSourceTransitioned(PlanItemTransitionedEvent @event,
@@ -177,7 +190,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 Occurred = occurred
             });
 
-            await Host.GrainFactory.GetGrain<ITimerEventSchedulerGrain>(Host.CaseInstanceId)
+            await Host.GrainFactory.GetScheduler(Host.CaseInstanceId)
                 .ScheduleTimer(Host.InstanceId, TimerStore.TimerSchedule, occurred, Host.Context);
         }
 
