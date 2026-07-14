@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -437,6 +438,141 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
                 .Awaiting(x => x.Create(caseDefinitionId, definition, null))
                 .Should()
                 .ThrowAsync<InvalidOperationException>();
+        }
+
+        // ADO #58 - case-file item version history. GetHistory() surfaces one descriptor per
+        // journaled event that carries a Value change (Create/Update/Replace, all raised as
+        // ValueChanged - see CaseFileItemGrain.Create/ChangeValue), in journal order, each
+        // stamped with its raw 1-based journal sequence number (matching RetrieveConfirmedEvents'
+        // own indexing - see CmmnElementGrain.GetJournaledEvents), the acting identity (already
+        // stamped by ADO #59's ActorStamping), and which of the three value-carrying transitions
+        // produced it.
+        [Theory, AutoData]
+        public async Task GetHistory__Given_CreateThenUpdateThenReplace__Then_ReturnsOrderedVersionsWithActorAndTransition
+            (string caseDefinitionId, Guid caseInstanceId, string caseFileItemId)
+        {
+            var definition = new CaseFileItemModel { Id = caseFileItemId };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("v1"));
+            await subject.Update(JsonValue.Create("v2"));
+            await subject.Replace(new JsonObject { ["v"] = 3 });
+
+            var history = await subject.GetHistory();
+
+            history.Should().HaveCount(3);
+
+            // Create() raises CmmnElementDefined (journal index 1) then ValueChanged (index 2) -
+            // the first "version" of the item's value is always the 2nd journaled event.
+            history[0].Version.Should().Be(2);
+            history[0].Transition.Should().Be(CaseFileItemTransition.Create);
+            history[0].ActorPrincipalId.Should().Be(CaseRequestContext.UserId);
+            history[0].ActorPrincipalType.Should().Be(ActorPrincipalType.User);
+            history[0].ActorOnBehalfOf.Should().BeNull();
+            history[0].UpdatedUtc.Should().NotBe(default);
+
+            history[1].Version.Should().BeGreaterThan(history[0].Version);
+            history[1].Transition.Should().Be(CaseFileItemTransition.Update);
+
+            history[2].Version.Should().BeGreaterThan(history[1].Version);
+            history[2].Transition.Should().Be(CaseFileItemTransition.Replace);
+        }
+
+        // Only events that carry a Value change constitute a "version" of the item - ChildAdded/
+        // ChildRemoved/ReferenceAdded/ReferenceRemoved/Discarded all consume a journal sequence
+        // number (see GetValueAt's test below) but must NOT appear in GetHistory.
+        [Theory, AutoData]
+        public async Task GetHistory__Given_NonValueCarryingTransitionsInterleaved__Then_OnlyValueChangedEventsAppear
+            (string caseDefinitionId, Guid caseInstanceId, string caseFileItemId, string childId)
+        {
+            var definition = new CaseFileItemModel { Id = caseFileItemId };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("v1"));
+            await subject.AddChild(childId);
+            await subject.Update(JsonValue.Create("v2"));
+
+            var history = await subject.GetHistory();
+
+            history.Should().HaveCount(2, "AddChild does not carry a Value and must not be reported as a version");
+            history.Select(h => h.Transition).Should().Equal(CaseFileItemTransition.Create, CaseFileItemTransition.Update);
+        }
+
+        // GetValueAt(version) replays the journal up to (and including) that version and returns
+        // the resulting Value - an as-of read, not the item's current/live value.
+        [Theory, AutoData]
+        public async Task GetValueAt__Given_EarlierVersion__Then_ReturnsHistoricalValueNotLatest
+            (string caseDefinitionId, Guid caseInstanceId, string caseFileItemId)
+        {
+            var definition = new CaseFileItemModel { Id = caseFileItemId };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("v1"));
+            await subject.Update(JsonValue.Create("v2"));
+            await subject.Replace(JsonValue.Create("v3"));
+
+            var history = await subject.GetHistory();
+            var firstVersion = history[0].Version;
+
+            var valueAtFirst = await subject.GetValueAt(firstVersion);
+            valueAtFirst.ToJsonString().Should().Be(JsonValue.Create("v1").ToJsonString());
+
+            var snapshot = await subject.GetSnapshot();
+            snapshot.Value.ToJsonString().Should().Be(JsonValue.Create("v3").ToJsonString(),
+                "an as-of read of an earlier version must not disturb the item's current live value");
+        }
+
+        // A non-value-carrying event's own journal index is still a valid GetValueAt argument -
+        // it just returns whatever value was in effect at that point (unchanged by that event).
+        [Theory, AutoData]
+        public async Task GetValueAt__Given_NonValueCarryingEventVersion__Then_ReturnsValueInEffectAtThatPoint
+            (string caseDefinitionId, Guid caseInstanceId, string caseFileItemId, string childId)
+        {
+            var definition = new CaseFileItemModel { Id = caseFileItemId };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("v1"));
+            await subject.AddChild(childId);
+
+            var snapshotAfterAddChild = await subject.GetSnapshot();
+            var valueAtAddChild = await subject.GetValueAt(snapshotAfterAddChild.CurrentVersion);
+
+            valueAtAddChild.ToJsonString().Should().Be(JsonValue.Create("v1").ToJsonString());
+        }
+
+        [Theory, AutoData]
+        public async Task GetValueAt__Given_VersionOutOfRange__Then_ThrowArgumentOutOfRangeException
+            (string caseDefinitionId, Guid caseInstanceId, string caseFileItemId)
+        {
+            var definition = new CaseFileItemModel { Id = caseFileItemId };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("v1"));
+
+            await subject.Awaiting(x => x.GetValueAt(0)).Should().ThrowAsync<ArgumentOutOfRangeException>();
+            await subject.Awaiting(x => x.GetValueAt(999)).Should().ThrowAsync<ArgumentOutOfRangeException>();
+        }
+
+        // Snapshot enrichment (ADO #58): CurrentVersion/UpdatedUtc let a list view show "v7,
+        // changed 2h ago" without a separate GetHistory round trip.
+        [Theory, AutoData]
+        public async Task GetSnapshot__Given_SeriesOfMutations__Then_CurrentVersionIncrementsAndUpdatedUtcAdvances
+            (string caseDefinitionId, Guid caseInstanceId, string caseFileItemId)
+        {
+            var definition = new CaseFileItemModel { Id = caseFileItemId };
+            var subject = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
+
+            await subject.Create(caseDefinitionId, definition, JsonValue.Create("v1"));
+            var afterCreate = await subject.GetSnapshot();
+            afterCreate.CurrentVersion.Should().Be(2);
+            afterCreate.UpdatedUtc.Should().NotBeNull();
+
+            await subject.Update(JsonValue.Create("v2"));
+            var afterUpdate = await subject.GetSnapshot();
+
+            afterUpdate.CurrentVersion.Should().BeGreaterThan(afterCreate.CurrentVersion);
+            afterUpdate.UpdatedUtc.Should().NotBeNull()
+                .And.BeOnOrAfter(afterCreate.UpdatedUtc!.Value);
         }
     }
 }

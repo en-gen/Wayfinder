@@ -140,7 +140,11 @@ namespace Flow.Grains.Infrastructure.Mapping
             {
                 Definition = src.Definition,
                 CaseFileItemState = src.CaseFileItemState,
-                Value = src.Value
+                Value = src.Value,
+                // ADO #58 - CurrentVersion is deliberately NOT mapped here (a JournaledGrain-level
+                // concept this pure store-level mapper has no access to) - see
+                // CaseFileItemGrain.GetSnapshot, which stamps it on after calling this method.
+                UpdatedUtc = src.Updated
             };
         }
 

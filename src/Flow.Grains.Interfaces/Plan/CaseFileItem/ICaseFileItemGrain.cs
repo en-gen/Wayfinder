@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
@@ -42,5 +43,21 @@ namespace Flow.Grains.Interfaces.Plan.CaseFileItem
         Task Delete();
 
         Task<CaseFileItemSnapshot> GetSnapshot();
+
+        // ADO #58 - case-file item version history: the curated surface over this grain's
+        // journal, built on top of Orleans's own JournaledGrain.RetrieveConfirmedEvents (see
+        // ICmmnElementGrain.GetJournaledEvents's remarks - this is the "richer, curated
+        // equivalent" that seam's own remarks anticipated). One descriptor per journaled event
+        // that carries a Value change - see CaseFileItemVersionDescriptor's remarks for exactly
+        // which events those are and why the others are excluded.
+        Task<IReadOnlyList<CaseFileItemVersionDescriptor>> GetHistory();
+
+        // As-of read: the item's Value as it stood after journal event `version` (1-based,
+        // matching CaseFileItemVersionDescriptor.Version and RetrieveConfirmedEvents' own
+        // indexing). Valid for any version 1..the grain's current Version, not only the ones
+        // GetHistory reports - a version between two value-carrying events simply returns
+        // whatever value was already in effect. Throws ArgumentOutOfRangeException for a version
+        // outside that range.
+        Task<JsonNode> GetValueAt(int version);
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
@@ -79,7 +80,8 @@ namespace Flow.Grains.Plan.CaseFileItem
 
             RaiseEvent(new ValueChanged
             {
-                Value = value
+                Value = value,
+                Transition = Interfaces.Model.CaseFileItemTransition.Create
             });
 
             await ConfirmEvents();
@@ -102,7 +104,11 @@ namespace Flow.Grains.Plan.CaseFileItem
 
             RaiseEvent(new ValueChanged
             {
-                Value = value
+                Value = value,
+                // ADO #58 - Update and Replace both raise this exact same ValueChanged type (see
+                // that type's remarks); standardEvent is already exactly which of the two this
+                // call is for, so it is also this version's Transition - no separate derivation.
+                Transition = standardEvent
             });
 
             await ConfirmEvents();
@@ -182,7 +188,79 @@ namespace Flow.Grains.Plan.CaseFileItem
             await PublishTransition(Interfaces.Model.CaseFileItemTransition.Delete);
         }
 
-        public Task<CaseFileItemSnapshot> GetSnapshot() => Task.FromResult(State.ToSnapshot());
+        public Task<CaseFileItemSnapshot> GetSnapshot()
+        {
+            // ADO #58 - CurrentVersion is a JournaledGrain-level concept (Version: the confirmed
+            // event count) the pure store-level mapper (SnapshotMapper.ToSnapshot) has no access
+            // to - only this grain knows it, so it is stamped on here, after mapping, same as
+            // every other snapshot field the store itself already carries (Definition/
+            // CaseFileItemState/Value/UpdatedUtc, all mapped by ToSnapshot from State directly).
+            var snapshot = State.ToSnapshot();
+            snapshot.CurrentVersion = Version;
+            return Task.FromResult(snapshot);
+        }
+
+        // ADO #58 - the curated history surface (see ICaseFileItemGrain.GetHistory's remarks and
+        // CaseFileItemVersionDescriptor for exactly which events become a "version" and why).
+        // Built directly on RetrieveConfirmedEvents(0, Version) - the same primitive
+        // GetJournaledEvents (kept, unchanged, for the actor-stamping replay-safety tests it
+        // serves - see ICmmnElementGrain's remarks) already uses - rather than a new bespoke
+        // event-sourcing seam.
+        public async Task<IReadOnlyList<CaseFileItemVersionDescriptor>> GetHistory()
+        {
+            var events = await RetrieveConfirmedEvents(0, Version);
+
+            var history = new List<CaseFileItemVersionDescriptor>();
+
+            for (var i = 0; i < events.Count; i++)
+            {
+                if (events[i] is ValueChanged valueChanged)
+                {
+                    history.Add(new CaseFileItemVersionDescriptor
+                    {
+                        // 1-based: the Nth journaled event, matching RetrieveConfirmedEvents'
+                        // own (0-based) indexing offset by one - see GetValueAt below, which
+                        // accepts exactly this number back.
+                        Version = i + 1,
+                        UpdatedUtc = valueChanged.Updated,
+                        ActorPrincipalId = valueChanged.ActorPrincipalId,
+                        ActorPrincipalType = valueChanged.ActorPrincipalType,
+                        ActorOnBehalfOf = valueChanged.ActorOnBehalfOf,
+                        Transition = valueChanged.Transition
+                    });
+                }
+            }
+
+            return history;
+        }
+
+        // ADO #58 - as-of read: replays the journal up to (and including) `version` and returns
+        // whatever Value was in effect at that point - exactly what CaseFileItemStore.Apply
+        // (ValueChanged) does during ordinary replay, just stopped early and without mutating
+        // this activation's own State/TentativeState.
+        public async Task<JsonNode> GetValueAt(int version)
+        {
+            if (version < 1 || version > Version)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(version), version,
+                    $"CaseFileItem {_address} has no journal version {version}; valid range is 1..{Version}");
+            }
+
+            var events = await RetrieveConfirmedEvents(0, version);
+
+            JsonNode value = null;
+
+            foreach (var @event in events)
+            {
+                if (@event is ValueChanged valueChanged)
+                {
+                    value = valueChanged.Value;
+                }
+            }
+
+            return value;
+        }
 
         // Table 8.1/8.2: every mutating operation other than create is only defined From Available;
         // Discarded is a terminal state with no outgoing transitions ("A CaseFileItem instance in
