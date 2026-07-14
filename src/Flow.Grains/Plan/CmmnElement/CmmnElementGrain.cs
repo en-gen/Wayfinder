@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Flow.Grains.Events;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
@@ -76,6 +77,22 @@ namespace Flow.Grains.Plan.CmmnElement
 
         public Task<bool> Defined() => Task.FromResult(State.Defined);
 
+        // ADO #59 - shadows (does not override - JournaledGrain<TState>.RaiseEvent<TEvent> is a
+        // plain, non-virtual generic method) the Orleans base RaiseEvent for every unqualified
+        // RaiseEvent(...) call made from within this class or any subclass (CaseGrain,
+        // CaseFileItemGrain, PlanItemGrain, PlanningTableGrain, RoleGrain, SentryGrain, and every
+        // PlanItem Behavior via IBehaviorHost.RaiseEvent - see e.g. BaseBehavior/StageBehavior -
+        // which all delegate to this same unqualified call, resolved at compile time to whichever
+        // RaiseEvent is visible from the calling class's own hierarchy). This is the single append
+        // point for every journaled event this grain hierarchy raises, so stamping here covers all
+        // of them automatically - no per-event-type or per-call-site stamping code, and no future
+        // event type can forget it just by existing.
+        protected new void RaiseEvent<TEvent>(TEvent @event)
+        {
+            ActorStamping.Apply(@event);
+            base.RaiseEvent(@event);
+        }
+
         public virtual Task Define(string caseDefinitionId, TDefinition definition)
         {
             RaiseEvent(new CmmnElementDefined<TDefinition>
@@ -83,13 +100,22 @@ namespace Flow.Grains.Plan.CmmnElement
                 CaseDefinitionId = caseDefinitionId,
                 Definition = definition
             });
-            
+
             LogContext["CaseDefinitionId"] = caseDefinitionId;
             LogContext["ElementDefinitionId"] = definition.Id;
 
             return ConfirmEvents();
         }
-        
+
+        // ADO #59 - minimal read-back seam over Orleans's own JournaledGrain.RetrieveConfirmedEvents,
+        // added so this work item's replay-safety tests can prove actor stamping survives a real
+        // RaiseEvent/ConfirmEvents/serialize/persist round trip without reaching into grain
+        // internals via reflection (Orleans TestCluster only exposes a grain's PUBLIC interface to
+        // callers - there is no other way to observe the raw journal from a test). Deliberately raw
+        // (no paging/filtering) - #58 (case-file version history) is expected to want a richer,
+        // curated equivalent; this is not that design, just today's smallest working seam.
+        public Task<IReadOnlyList<object>> GetJournaledEvents() => RetrieveConfirmedEvents(0, Version);
+
         private IAsyncStream<TEvent> GetCaseEventStream<TEvent>(string eventSourceRef) =>
             this.GetStreamProvider("Default").GetCaseEventStream<TEvent>(_caseInstanceId, eventSourceRef);
 

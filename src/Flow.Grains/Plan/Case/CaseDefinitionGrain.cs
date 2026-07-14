@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Flow.Grains.Events;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.Case.Events;
 using Flow.Grains.Plan.PlanItem.Definitions;
@@ -77,11 +78,18 @@ namespace Flow.Grains.Plan.Case
             var casePlanModelNode = new DefinitionGraphNode(definition.CasePlanModel.Id);
             await CreateStageDefinitions(definition.CasePlanModel, casePlanModelNode);
 
-            RaiseEvent(new CaseDefinitionDefined
+            // ADO #59 - this grain is the one other JournaledGrain root in the codebase besides
+            // CmmnElementGrain<,> (it does not derive from it - see CaseDefinitionGrain's own type
+            // declaration), so it cannot pick up CmmnElementGrain.RaiseEvent's shadowed stamping.
+            // Same shared helper, called explicitly at this grain's one and only RaiseEvent call
+            // site instead - not a second, divergent stamping implementation.
+            var caseDefinitionDefined = new CaseDefinitionDefined
             {
                 Definition = definition,
                 DefinitionRoot = casePlanModelNode
-            });
+            };
+            ActorStamping.Apply(caseDefinitionDefined);
+            RaiseEvent(caseDefinitionDefined);
 
             _logContext["ElementDefinitionId"] = definition.Id;
 
