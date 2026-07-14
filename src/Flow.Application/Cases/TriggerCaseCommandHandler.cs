@@ -27,8 +27,6 @@ namespace Flow.Application.Cases
         public async Task<CommandResult<CaseView>> HandleAsync(
             TriggerCaseCommand command, CancellationToken cancellationToken)
         {
-            CaseRequestContextDefaults.EnsureRequestContext();
-
             var caseGrain = _clusterClient.GetGrain<ICaseGrain>(command.CaseId, CaseViewProjector.CaseScope);
 
             CaseSnapshot snapshot;

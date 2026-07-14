@@ -330,5 +330,12 @@ ASALocalRun/
 # NVidia Nsight GPU debugger configuration file
 *.nvuser
 
-# MFractors (Xamarin productivity tool) working folder 
+# MFractors (Xamarin productivity tool) working folder
 .mfractor/
+
+# ADO #32/#33 (sub-unit 4) - Zitadel's FIRSTINSTANCE machine key (devops/eval/docker-compose.yml's
+# zitadel service), generated at container first-boot into this bind-mounted host directory. A
+# real private key - never committed. The directory itself is tracked via a .gitkeep placeholder
+# so the bind mount always has a real target.
+devops/eval/zitadel/machinekey/*
+!devops/eval/zitadel/machinekey/.gitkeep

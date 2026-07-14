@@ -35,8 +35,6 @@ namespace Flow.Application.Cases
                 return CommandResult<CaseView>.BadRequest("definitionId is required");
             }
 
-            CaseRequestContextDefaults.EnsureRequestContext();
-
             var caseInstanceId = Guid.NewGuid();
             var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, CaseViewProjector.CaseScope);
 

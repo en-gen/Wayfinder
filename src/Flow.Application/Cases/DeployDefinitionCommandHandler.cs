@@ -35,8 +35,6 @@ namespace Flow.Application.Cases
                 return CommandResult<DeployResult>.BadRequest("request body is empty; expected CMMN 1.1 XML");
             }
 
-            CaseRequestContextDefaults.EnsureRequestContext();
-
             // Import failures (malformed XML, wrong root/namespace) are expected bad input, not
             // exceptions - surface them as a typed BadRequest.
             var import = CmmnXmlSerializer.Import(command.CmmnXml);

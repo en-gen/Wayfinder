@@ -42,6 +42,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth + the identity
+         middleware). Wired in via AddFlowApi()/MapFlowApi() (see Program.cs/Startup.cs) - Flow.Silo
+         stays the composition root, Flow.Api stays a plug-in with no knowledge of Orleans hosting. -->
+    <ProjectReference Include="..\Flow.Api\Flow.Api.csproj" />
     <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
     <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
   </ItemGroup>

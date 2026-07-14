@@ -6,8 +6,11 @@ using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using Flow.Api.DependencyInjection;
+using Flow.Application.Identity;
 using Flow.Grains.Infrastructure.Extensions;
 using Flow.Grains.Infrastructure.Quartz;
+using Flow.Grains.Interfaces.Identity;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Services.PlanItemBehaviorConfigurator;
 using Flow.Grains.Services.PlanItemStateMachineConfigurator;
@@ -38,7 +41,92 @@ namespace Flow.Silo
     {
         public static async Task Main(string[] args)
         {
-            await CreateHostBuilder(args).Build().RunAsync();
+            var host = CreateHostBuilder(args).Build();
+
+            await host.StartAsync();
+
+            // ADO #32/#33 (sub-unit 4, P1/First Light) - the tenant registry is seeded ONLY in the
+            // Docker/eval environment (devops/eval/docker-compose.yml sets
+            // DOTNET_ENVIRONMENT=Docker/ASPNETCORE_ENVIRONMENT=Docker, same env-name gate
+            // ConfigureOrleans already uses to pick ConfigureDeployedOrleans over
+            // ConfigureDevelopmentOrleans) - never Development (a local `dotnet run` has no Zitadel
+            // to issue real tokens for), never Production (real tenant provisioning is a
+            // deliberate, out-of-band operation, not something a silo does to itself on boot). Must
+            // run AFTER host.StartAsync() (silo activated, IClusterClient/grain factory available)
+            // and BEFORE the host starts serving requests to completion - WaitForShutdownAsync
+            // below blocks until that happens, so this seeding is guaranteed to complete before any
+            // real request could be authenticated against the freshly-seeded registry.
+            if (host.Services.GetRequiredService<IHostEnvironment>().EnvironmentName == "Docker")
+            {
+                await SeedEvalIdentityRegistryAsync(host.Services);
+            }
+
+            await host.WaitForShutdownAsync();
+        }
+
+        // See EvalIdentityOptions' remarks - reads the "EvalIdentity:Tenants" config section
+        // (devops/eval/docker-compose.yml's EvalIdentity__Tenants__<n>__* env vars) and seeds each
+        // entry through the SAME IIdentityRegistrySeeder seam sub-unit 4's isolation tests use.  A
+        // tenant entry with a blank Subject is skipped rather than seeded with an empty key - the
+        // compose file ships with placeholder/blank subjects until a developer completes the
+        // manual Zitadel bootstrap (org/human users - see devops/eval/README.md) and fills in the
+        // real ones; seeding a blank subject would otherwise silently register a
+        // IUserIdentityGrain no real token could ever match.
+        private static async Task SeedEvalIdentityRegistryAsync(IServiceProvider services)
+        {
+            using var scope = services.CreateScope();
+
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            var tenants = scope.ServiceProvider
+                .GetRequiredService<IOptions<EvalIdentityOptions>>().Value.Tenants;
+
+            if (tenants.Count == 0)
+            {
+                logger.LogWarning(
+                    "EvalIdentity:Tenants is empty - no tenant registry seeding performed. " +
+                    "See devops/eval/README.md for the manual Zitadel bootstrap steps.");
+                return;
+            }
+
+            var seeder = scope.ServiceProvider.GetRequiredService<IIdentityRegistrySeeder>();
+
+            foreach (var tenant in tenants)
+            {
+                if (string.IsNullOrWhiteSpace(tenant.Subject))
+                {
+                    logger.LogWarning(
+                        "EvalIdentity tenant {TenantName} ({TenantId}) has no Subject configured - " +
+                        "skipped. Complete the manual Zitadel bootstrap and set " +
+                        "EvalIdentity__Tenants__<n>__Subject to the real \"sub\" claim.",
+                        tenant.Name, tenant.TenantId);
+                    continue;
+                }
+
+                await seeder.SeedAsync(new TenantSeed
+                {
+                    TenantId = tenant.TenantId,
+                    Name = tenant.Name,
+                    Oidc = new TenantOidcConfig
+                    {
+                        Issuer = tenant.Issuer,
+                        Audience = tenant.Audience,
+                        MetadataAddress = tenant.MetadataAddress,
+                    },
+                    Users = new[]
+                    {
+                        new UserSeed
+                        {
+                            Subject = tenant.Subject,
+                            UserId = tenant.UserId,
+                            Roles = tenant.Roles ?? Array.Empty<string>(),
+                        },
+                    },
+                });
+
+                logger.LogInformation(
+                    "EvalIdentity: seeded tenant {TenantName} ({TenantId}) for subject {Subject}",
+                    tenant.Name, tenant.TenantId, tenant.Subject);
+            }
         }
 
         private static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -159,6 +247,18 @@ namespace Flow.Silo
             silo.Services.AddSerializer(s => s.AddJsonSerializer(
                 isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
                 jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
+
+            // ADO #33 - Orleans's built-in ExceptionCodec (the ISerializable-based codec that lets
+            // exception types cross the wire without their own [GenerateSerializer]/[Id(n)] sweep -
+            // see CrossTenantAccessException's remarks) only allows exception types whose namespace
+            // starts with one of ExceptionSerializationOptions.SupportedNamespacePrefixes
+            // (defaults: "System", "Microsoft", "Azure" - a deserialization-gadget safeguard). Every
+            // custom application exception in this solution lives under "Flow", so that prefix is
+            // allow-listed once here rather than per-exception-type. The TestCluster silo and client
+            // configurators in ClusterFixture must register this identically (same reason as the
+            // JSON fallback above).
+            silo.Services.Configure<ExceptionSerializationOptions>(
+                options => options.SupportedNamespacePrefixes.Add("Flow"));
         }
 
         // Everything here resolves from DI - no hand-constructed clients:
@@ -343,6 +443,13 @@ namespace Flow.Silo
         {
             services.Configure<AzureOptions>(context.Configuration.GetSection(AzureOptions.ConfigKey));
 
+            // ADO #32/#33 (sub-unit 4, P1/First Light) - bound unconditionally (like AzureOptions
+            // above), consumed only by SeedEvalIdentityRegistryAsync's Docker-environment gate in
+            // Main. An empty/missing "EvalIdentity" section (every environment other than Docker)
+            // binds to an empty Tenants list, which that gate never even reaches outside Docker.
+            services.Configure<EvalIdentityOptions>(
+                context.Configuration.GetSection(EvalIdentityOptions.ConfigKey));
+
             // Azure SDK clients from the Azure:Storage config SECTION - environment-agnostic by
             // construction, which is why this lives host-level rather than in the
             // environment-specific Orleans wiring: the section's SHAPE picks the auth mode
@@ -396,6 +503,12 @@ namespace Flow.Silo
                 .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
                 .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
                 .AddQuartz(QuartzSchedulerConfig.Volatile);
+
+            // ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth against our
+            // Zitadel + the identity middleware's services). See Flow.Api's AddFlowApi for the full
+            // composition; Startup.cs's Configure maps it (MapFlowApi) and wires the identity
+            // middleware into the pipeline.
+            services.AddFlowApi();
         }
     }
 }
