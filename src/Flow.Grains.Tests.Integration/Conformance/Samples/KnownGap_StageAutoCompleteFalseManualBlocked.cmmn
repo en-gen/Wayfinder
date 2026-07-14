@@ -33,12 +33,12 @@
       <stage id="StageA" name="StageA" autoComplete="false">
         <planItem id="PlanItemRequired" name="PlanItemRequired" definitionRef="RequiredTask">
           <itemControl id="ItemControl_Required">
-            <manualActivationRule id="MAR_Required">
-              <condition language="expression://lang/jint" body="false"/>
-            </manualActivationRule>
             <requiredRule id="ReqR_1">
-              <condition language="expression://lang/jint" body="true"/>
+              <condition language="expression://lang/jint">true</condition>
             </requiredRule>
+            <manualActivationRule id="MAR_Required">
+              <condition language="expression://lang/jint">false</condition>
+            </manualActivationRule>
           </itemControl>
         </planItem>
         <planItem id="PlanItemNonRequired" name="PlanItemNonRequired" definitionRef="NonRequiredTask"/>
@@ -47,7 +47,7 @@
       <humanTask id="NonRequiredTask" name="NonRequiredTask" isBlocking="true">
         <defaultControl id="Control_NonRequired">
           <manualActivationRule id="MAR_NonRequired">
-            <condition language="expression://lang/jint" body="false"/>
+            <condition language="expression://lang/jint">false</condition>
           </manualActivationRule>
         </defaultControl>
       </humanTask>

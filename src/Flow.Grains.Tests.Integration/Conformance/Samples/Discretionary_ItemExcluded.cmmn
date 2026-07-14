@@ -18,11 +18,11 @@
   <case id="DiscretionaryItemExcludedCase" name="DiscretionaryItemExcludedCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
       <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA"/>
-      <milestone id="MilestoneA" name="MilestoneA"/>
-      <humanTask id="DiscretionaryTaskA" name="DiscretionaryTaskA" isBlocking="false"/>
       <planningTable>
         <discretionaryItem id="DiscItem_1" name="DiscretionaryTaskA" definitionRef="DiscretionaryTaskA"/>
       </planningTable>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+      <humanTask id="DiscretionaryTaskA" name="DiscretionaryTaskA" isBlocking="false"/>
     </casePlanModel>
     <caseRoles/>
   </case>

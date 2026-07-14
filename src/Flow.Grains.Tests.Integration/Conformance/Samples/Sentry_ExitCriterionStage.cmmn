@@ -42,7 +42,7 @@
       <humanTask id="TaskA" name="TaskA" isBlocking="true">
         <defaultControl id="Control_Task">
           <manualActivationRule id="MAR_Task">
-            <condition language="expression://lang/jint" body="false"/>
+            <condition language="expression://lang/jint">false</condition>
           </manualActivationRule>
         </defaultControl>
       </humanTask>

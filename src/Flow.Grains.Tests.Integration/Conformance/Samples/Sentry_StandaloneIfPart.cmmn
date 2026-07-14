@@ -28,7 +28,7 @@
       </planItem>
       <sentry id="EntrySentry" name="EntrySentry">
         <ifPart id="IfPart_1" contextRef="ItemA">
-          <condition language="expression://lang/jint" body="value.amount &gt; 100"/>
+          <condition language="expression://lang/jint">value.amount &gt; 100</condition>
         </ifPart>
       </sentry>
       <milestone id="MilestoneA" name="MilestoneA"/>
