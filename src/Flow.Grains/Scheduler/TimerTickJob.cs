@@ -23,7 +23,7 @@ namespace Flow.Grains.Scheduler
 
         public Task Execute(IJobExecutionContext context)
         {
-            var caseInstanceId = (Guid)context.JobDetail.JobDataMap.Get("CaseInstanceId");
+            var caseInstanceId = (Guid)context.JobDetail.JobDataMap["CaseInstanceId"];
             // Read directly as string rather than casting through (ShortGuid): Host.Context (the
             // source of this JobDataMap - see TimerEventListenerBehavior/CmmnElementGrain) stores
             // IBehaviorHost.InstanceId, which is a plain string. A direct (ShortGuid) cast on a
@@ -32,15 +32,15 @@ namespace Flow.Grains.Scheduler
             // compile-time source type is string, not when unboxing from object - so this job would
             // fault before ever reaching the stream publish below, independent of the stream
             // identity mismatch fixed here.
-            var elementInstanceId = (string)context.JobDetail.JobDataMap.Get("ElementInstanceId");
+            var elementInstanceId = (string)context.JobDetail.JobDataMap["ElementInstanceId"];
 
             using (_logger.BeginScope(context.JobDetail.JobDataMap))
             {
                 _logger.LogInformation(
                     "{ElementType} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | timer tick occurred",
-                    context.JobDetail.JobDataMap.Get("ElementType"),
-                    context.JobDetail.JobDataMap.Get("PlanItemDefinition"),
-                    context.JobDetail.JobDataMap.Get("ElementScope"),
+                    context.JobDetail.JobDataMap["ElementType"],
+                    context.JobDetail.JobDataMap["PlanItemDefinition"],
+                    context.JobDetail.JobDataMap["ElementScope"],
                     elementInstanceId);
             }
 
