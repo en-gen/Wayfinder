@@ -31,6 +31,18 @@ namespace Flow.Grains.Interfaces
             set => RequestContext.Set(UserIdKey, value);
         }
 
+        // Non-throwing counterparts of TenantId/UserId above - for callers that only want the
+        // ambient identity for best-effort purposes (e.g. log-context enrichment) and must not
+        // fail when there is none, such as a grain reactivated by a background stream delivery or
+        // reminder rather than a caller-initiated request (no client call chain means no
+        // RequestContext to propagate). Deliberately NOT used anywhere the tenant-enforcement
+        // contract applies (CrossTenantAccessException checks, cross-tenant grain addressing,
+        // etc.) - those must keep throwing via TenantId/UserId above so an unset tenant is never
+        // silently treated as "no tenant" at an enforcement boundary.
+        public static Guid? TenantIdOrNull => RequestContext.Get(TenantIdKey) as Guid?;
+
+        public static Guid? UserIdOrNull => RequestContext.Get(UserIdKey) as Guid?;
+
         public static IEnumerable<string> UserRoles
         {
             get => RequestContext.Get(UserRolesKey) as string[] ?? Array.Empty<string>();

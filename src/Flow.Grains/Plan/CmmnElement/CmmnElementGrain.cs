@@ -55,8 +55,13 @@ namespace Flow.Grains.Plan.CmmnElement
                 ? chunks.Skip(chunks.Length - 2).FirstOrDefault()
                 : string.Empty;
 
-            LogContext["TenantId"] = CaseRequestContext.TenantId;
-            LogContext["UserId"] = CaseRequestContext.UserId;
+            // Log-context enrichment only - not the tenant-enforcement boundary (that lives at
+            // request-handling grain methods, e.g. CaseGrain.GetSnapshot, via
+            // CrossTenantAccessException). Activation can be triggered by a background stream
+            // delivery or reminder with no caller-initiated RequestContext propagated, so these
+            // must not throw the way CaseRequestContext.TenantId/UserId do.
+            LogContext["TenantId"] = CaseRequestContext.TenantIdOrNull;
+            LogContext["UserId"] = CaseRequestContext.UserIdOrNull;
             LogContext["@UserRoles"] = CaseRequestContext.UserRoles;
             LogContext["CorrelationId"] = System.Diagnostics.Activity.Current?.Id;
             LogContext["CaseInstanceId"] = _caseInstanceId;
