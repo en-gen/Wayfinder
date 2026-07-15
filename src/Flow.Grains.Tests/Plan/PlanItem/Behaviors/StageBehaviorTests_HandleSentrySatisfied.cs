@@ -329,6 +329,11 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var repetitionRule = Rules.IsRepeatableRule;
 
+            var exitCriterion = new ExitCriterion
+            {
+                SentryRef = sentryDefinitionId
+            };
+
             var pi = new Interfaces.Model.PlanItem
             {
                 DefinitionRef = stage.Id,
@@ -338,10 +343,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 },
                 ExitCriteria =
                 {
-                    new ExitCriterion
-                    {
-                        SentryRef = sentryDefinitionId
-                    }
+                    exitCriterion
                 }
             };
 
@@ -375,7 +377,9 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 });
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ExitCriterionSatisfied>()), Times.Once);
-            mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit), Times.Once);
+            // D10 (Bug #82) - the Exit trigger now carries the firing ExitCriterion's own Id so
+            // SentryGrain can match a PlanItemOnPart naming it - see SentryGrain's class remarks.
+            mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit, exitCriterion.Id), Times.Once);
         }
 
         [Fact]

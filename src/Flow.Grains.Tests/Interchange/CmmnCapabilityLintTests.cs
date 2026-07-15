@@ -94,8 +94,12 @@ namespace Flow.Grains.Tests.Interchange
                 f.ElementKind == nameof(Definitions));
         }
 
+        // Bug #82 (D10) closed this: PlanItemTransitionedEvent.ExitCriterionRef is now populated
+        // (PlanItemStateMachine's parameterized Exit trigger, threaded through BaseBehavior.
+        // HandleTransitioned), so a PlanItemOnPart naming an ExitCriterion is a live, runnable
+        // construct - the former Rule 4 "Unsupported" finding is gone.
         [Fact]
-        public void Lint__Given_PlanItemOnPartWithExitCriterionRef__Then_ReturnsUnsupportedFinding()
+        public void Lint__Given_PlanItemOnPartWithExitCriterionRef__Then_ReturnsNoFinding()
         {
             var sentry = new Sentry
             {
@@ -115,11 +119,7 @@ namespace Flow.Grains.Tests.Interchange
 
             var report = CmmnCapabilityLint.Lint(@case);
 
-            report.Findings.Should().ContainSingle(f =>
-                f.Severity == CmmnCapabilitySeverity.Unsupported &&
-                f.ElementId == "S1" &&
-                f.ElementKind == nameof(Sentry) &&
-                f.Message.Contains("exitCriterionRef"));
+            report.HasFindings.Should().BeFalse();
         }
 
         [Fact]

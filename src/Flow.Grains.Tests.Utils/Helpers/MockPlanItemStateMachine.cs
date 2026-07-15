@@ -35,6 +35,9 @@ namespace Flow.Grains.Tests.Utils.Helpers
             Setup(x => x.FireAsync(It.IsAny<PlanItemTransition>()))
                 .Returns<PlanItemTransition>(x => _stateMachine.FireAsync(x));
 
+            Setup(x => x.FireAsync(It.IsAny<PlanItemTransition>(), It.IsAny<string>()))
+                .Returns<PlanItemTransition, string>((x, exitCriterionRef) => _stateMachine.FireAsync(x, exitCriterionRef));
+
             Setup(x => x.GetPermittedTriggers(It.IsAny<object[]>()))
                 .Returns<object[]>(_stateMachine.GetPermittedTriggers);
 

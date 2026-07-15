@@ -61,27 +61,28 @@ namespace Flow.Grains.Plan.Sentry
     /// IfPart evaluated FALSE - both superseding PR !18's single-OnPart-only, whole-sentry-clearing
     /// IfPartNotSatisfied.
     ///
-    /// D10 - "its Sentry referred by sentryRef has occurred" (the first OnPart-satisfaction bullet
-    /// above) describes a PlanItemOnPart whose exitCriterionRef names an ExitCriterion, occurring
-    /// when THAT ExitCriterion's own Sentry is satisfied (Table 5.30: "the PlanItemOnPart of the
-    /// Sentry occurs when the PlanItem referenced by sourceRef transits by the specified
-    /// exitCriterion due to the Sentry that is refers being satisfied" / "When sentryRef is
-    /// specified, standardEvent MUST have value 'exit.'"). HandlePlanItemTransitioned below already
-    /// matches x.ExitCriterionRef against @event.ExitCriterionRef for exactly this case - but
-    /// PlanItemTransitionedEvent.ExitCriterionRef has exactly one construction site
-    /// (BaseBehavior.HandleTransitioned) and it never supplies a non-null value, so this match
-    /// branch is unreachable in practice: an OnPart configured with an ExitCriterionRef will never
-    /// see a live @event carrying one. Closing this requires threading "which ExitCriterion drove
-    /// this Exit" from StageBehavior/TaskBehavior/MilestoneBehavior.HandleSentrySatisfied's
-    /// ExitCriterion branch through Stateless's StateMachine.FireAsync(PlanItemTransition) into
-    /// BaseBehavior.HandleTransitioned's OnTransitionedAsync callback - IPlanItemStateMachine.
-    /// FireAsync has no parameterized-trigger overload today (see PlanItemStateMachine.cs's
-    /// Configure(...).Permit(...) wiring), so closing this is a StateMachine/BaseBehavior change,
-    /// not a SentryGrain/SentryStore change, and is out of this work item's scope (SentryGrain/
-    /// SentryStore/its Events, plus behaviors only where criteria wiring genuinely requires - this
-    /// is state-machine trigger parameterization, a materially larger change). Documented rather
-    /// than forced; the matching logic below is already correctly shaped to consume
-    /// ExitCriterionRef once it is actually populated.
+    /// D10 (Bug #82, closed) - "its Sentry referred by sentryRef has occurred" (the first
+    /// OnPart-satisfaction bullet above) describes a PlanItemOnPart whose exitCriterionRef names an
+    /// ExitCriterion, occurring when THAT ExitCriterion's own Sentry is satisfied (Table 5.30: "the
+    /// PlanItemOnPart of the Sentry occurs when the PlanItem referenced by sourceRef transits by
+    /// the specified exitCriterion due to the Sentry that is refers being satisfied" / "When
+    /// sentryRef is specified, standardEvent MUST have value 'exit.'"). HandlePlanItemTransitioned
+    /// below matches x.ExitCriterionRef against @event.ExitCriterionRef for exactly this case - this
+    /// was previously unreachable because PlanItemTransitionedEvent.ExitCriterionRef's one
+    /// construction site (BaseBehavior.HandleTransitioned) never supplied a non-null value. Closed
+    /// by threading "which ExitCriterion drove this Exit" from StageBehavior/TaskBehavior.
+    /// HandleSentrySatisfied's ExitCriterion branch through to HandleTransitioned: Stateless's own
+    /// parameterized-trigger mechanism (SetTriggerParameters&lt;string&gt;(PlanItemTransition.Exit)
+    /// in PlanItemStateMachine's constructor, fired via the new IPlanItemStateMachine.
+    /// FireAsync(PlanItemTransition, string) overload) carries the firing ExitCriterion's own Id as
+    /// the Exit trigger's payload, which Stateless surfaces on the OnTransitionedAsync callback's
+    /// Transition.Parameters - BaseBehavior.HandleTransitioned reads it from there and passes it
+    /// into the PlanItemTransitionedEvent it publishes. MilestoneBehavior/EventListenerBehavior
+    /// never fire Exit with a criterion (Milestones/EventListeners cannot have exitCriteriaRefs -
+    /// 5.24), and CasePlanModelBehavior's own exit criterion fires Terminate, not Exit (ADO #66) -
+    /// so only StageBehavior's/TaskBehavior's own-exit-criterion branches needed to change.
+    /// CmmnCapabilityLint's former Rule 4 (PlanItemOnPart.ExitCriterionRef populated => Unsupported)
+    /// is removed accordingly - see that class's remarks.
     ///
     /// D10 remainder - "ifPart errors swallowed without fault": closed. HandleOnPartOccurred and
     /// HandleCaseWideCaseFileItemTransitioned now raise Faulted/publish SentryFaultedEvent on an

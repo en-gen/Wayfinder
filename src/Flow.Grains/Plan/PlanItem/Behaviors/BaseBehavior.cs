@@ -154,13 +154,27 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             });
             await Host.ConfirmEvents();
 
+            // D10 - PlanItemStateMachine registers PlanItemTransition.Exit as a Stateless
+            // parameterized trigger (SetTriggerParameters<string>) so StageBehavior/TaskBehavior's
+            // ExitCriterion branch can carry "which ExitCriterion drove this Exit" alongside the
+            // trigger itself (see PlanItemStateMachine.FireAsync(PlanItemTransition, string)).
+            // Stateless surfaces that payload here via Transition.Parameters (never null - an empty
+            // array for a parameterless-fired trigger, e.g. an Exit cascaded from
+            // HandleParentTransitioned rather than driven by this PlanItem's own exit criterion) -
+            // exactly the piece SentryGrain.HandlePlanItemTransitioned's exitCriterionRef match has
+            // been unable to reach until now.
+            var exitCriterionRef = transition.Trigger == PlanItemTransition.Exit && transition.Parameters.Length > 0
+                ? transition.Parameters[0] as string
+                : null;
+
             await Host.Publish(new PlanItemTransitionedEvent(
                 Host.Scope,
                 Host.InstanceId,
                 Host.DefinitionId,
                 transition.Trigger,
                 transition.Source,
-                transition.Destination));
+                transition.Destination,
+                exitCriterionRef));
         }
 
         private Task HandleUnhandledTrigger(PlanItemState state, PlanItemTransition trigger)
