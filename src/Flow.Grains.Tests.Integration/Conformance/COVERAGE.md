@@ -80,11 +80,48 @@ to assert `UserCompletable` now stays unlatched for autoComplete=TRUE, per this 
 green. This was the last quarantined conformance scenario: the suite is now 33/33 green, 0
 skipped.
 
+**FINDING-1/#63 fix (branch `bugfix/63_definition-id-parent-subscription`, 2026-07-11).** Keyed
+`BaseBehavior.Activate`'s parent-transition subscription by the parent's DEFINITION id (matching
+`CmmnElementGrain.PublishEvent`'s publish key) instead of its instance id. Every FINDING-1-tagged
+scenario in `KnownGapScenarios.cs` — `CaseSuspend__…SuspensionPropagatesToTask`,
+`CaseTerminate__…TerminationPropagatesToMilestone`, `CaseReactivate__…ChildrenReturnToPriorState`,
+`StageSuspend__…TaskFollowsByPropagationOnly`, `StageExit__…ExitCascadesTerminationToTask` — is
+green: every downward Table 8.5/8.6/8.9 cascade this suite probes now delivers. FINDING-1 is
+retired; #63 closed it directly (no separate work item was ever filed for the finding itself).
+
+**#66 (CasePlanModel exit criteria) and #69 (Closed lockdown) fixes (2026-07-11/12).** #66 armed
+and routed the CasePlanModel's own `<exitCriterion>` through Table 8.6's `terminate` transition —
+`SentryScenarios.Sentry__Given_CasePlanModelExitCriterion__Then_CaseFileEventTerminatesCase`,
+green, including the Table 8.9 cascade to a child Task. #69 added
+`CaseFileItemGrain.EnsureCaseNotClosed`, guarding every CaseFileItem mutation
+(Create/Update/Replace/AddChild/RemoveChild/AddReference/RemoveReference/Delete) once the owning
+Case is Closed — covered by `CaseFileItemGrainTests`' `Update__Given_OwningCaseClosed__…`/
+`Create__Given_OwningCaseClosed__…` unit tests, not a `.cmmn` conformance scenario. Table 8.5's
+"case file becomes read-only" gap is closed.
+
+**#87 (multiple entry criteria / OR-of-sentries) (2026-07-14).** Added
+`Samples/Sentry_MultipleEntryCriteria.cmmn` and
+`SentryScenarios.Sentry__Given_TwoEntryCriteria__Then_EitherAloneSatisfiesEntry`: a PlanItem with
+two independent, single-OnPart entry criteria, satisfied by driving only the second criterion's
+source. Table 8.11's "when ONE of the achieving Sentries (entry criteria) is satisfied" row —
+previously untested — is now Pinned for the entry-criteria case (the equivalent exit-criteria-OR
+shape remains unscenario-ized; see §8.5 below).
+
+**Current state (develop HEAD, 2026-07-14).** 26 sample `.cmmn` files under `Conformance/Samples/`;
+35 scenarios (`CaseFileScenarios` 3, `InstantiationScenarios` 2, `KnownGapScenarios` 10,
+`LifecycleScenarios` 12, `SentryScenarios` 8) — **35 executed green, 0 quarantined/skipped, 0
+failing**. `KnownGapScenarios.cs` keeps its name and the quarantine machinery described in the
+honesty rule above for the next engine gap this suite finds, but every scenario inside it today is
+an ordinary green `[Fact]`, not a quarantined `[Fact(Skip = ...)]` — that file's own header remarks
+still narrate the ORIGINAL failure investigations (including FINDING-1) for historical context
+only. This COVERAGE.md file is the current-status source of truth; where its per-row Status column
+disagrees with prose elsewhere, the Status column wins.
+
 ## Engine findings discovered by this suite (details in the #21 report)
 
 | Finding | One-line summary | Work item |
 |---|---|---|
-| FINDING-1 | Parent→child lifecycle propagation is stream-dead: children subscribe on the parent's *instance* id (`BaseBehavior.Activate`), grains publish on their *definition* id (`CmmnElementGrain.PublishEvent`) — every downward cascade of Tables 8.5/8.6/8.9 never delivers | to be filed |
+| FINDING-1 | Parent→child lifecycle propagation is stream-dead: children subscribe on the parent's *instance* id (`BaseBehavior.Activate`), grains publish on their *definition* id (`CmmnElementGrain.PublishEvent`) — every downward cascade of Tables 8.5/8.6/8.9 never delivers | #63 (fixed) |
 | FINDING-2 | Auto-start Stages (FALSE ManualActivationRule) crash: the queued `Start` trigger runs `StageBehavior.HandleEnterActiveFromStart` on a non-activation thread — `Host.GrainFactory` throws "Activation access violation", no children instantiate | #64 (fixed) |
 | FINDING-3 | Definitions declared inside a nested `<stage>` are unresolvable at runtime: the definition index keys definition-id paths, runtime scopes are instance-id paths — only casePlanModel-root declarations resolve | #65 (fixed) |
 
@@ -94,20 +131,21 @@ skipped.
 |---|---|---|
 | Table 8.6 create (Ø → Active, skips Available) | `LifecycleScenarios.CaseCreate__…SkippingAvailable`; every `DeployAndCreate` asserts it implicitly | Pinned |
 | Table 8.6 suspend (Active → Suspended), case's own transition | `LifecycleScenarios.CaseLifecycle__…SuspendAndReactivateWalkTable86` | Pinned |
-| Table 8.6 suspend — downward propagation (Table 8.5 Suspended MUST) | `KnownGapScenarios.CaseSuspend__…SuspensionPropagatesToTask` | KnownGap:FINDING-1 |
+| Table 8.6 suspend — downward propagation (Table 8.5 Suspended MUST) | `KnownGapScenarios.CaseSuspend__…SuspensionPropagatesToTask` | Pinned (#63) |
 | Table 8.6 terminate (Active → Terminated), case's own transition | `LifecycleScenarios.CaseLifecycle__…TerminateAndReactivateWalkTable86` | Pinned |
-| Table 8.6 terminate — downward propagation | `KnownGapScenarios.CaseTerminate__…TerminationPropagatesToMilestone` | KnownGap:FINDING-1 |
+| Table 8.6 terminate — downward propagation | `KnownGapScenarios.CaseTerminate__…TerminationPropagatesToMilestone` | Pinned (#63) |
+| Table 8.6 terminate — via CasePlanModel's own exit criteria (8.4.1) | `SentryScenarios.Sentry__Given_CasePlanModelExitCriterion__…CaseFileEventTerminatesCase` (asserts both the Case's own terminate and the Table 8.9 cascade to a child Task) | Pinned (#66) |
 | Table 8.6 complete (Active → Completed, via Table 8.12) | `LifecycleScenarios.TaskLifecycle__…CompleteCompletesCase` | Pinned |
 | Table 8.6 fault (Active → Failed) | `LifecycleScenarios.CaseLifecycle__…FaultReachesFailedAndReactivateRecovers` | Pinned |
 | Table 8.6 re-activate from Failed | `LifecycleScenarios.CaseLifecycle__…FaultReachesFailedAndReactivateRecovers` | Pinned |
 | Table 8.6 re-activate from Terminated | `LifecycleScenarios.CaseLifecycle__…TerminateAndReactivateWalkTable86` | Pinned |
 | Table 8.6 re-activate from Suspended (case's own transition) | `LifecycleScenarios.CaseLifecycle__…SuspendAndReactivateWalkTable86` | Pinned |
-| Table 8.6 re-activate from Suspended — release of cascade-suspended children | `KnownGapScenarios.CaseReactivate__…ChildrenReturnToPriorState` | KnownGap:FINDING-1/#63 (D8's case-level remainder resolved by !26; re-verified post-!26 as blocked purely by FINDING-1 now - the scenario's precondition still can't reach Suspended) |
+| Table 8.6 re-activate from Suspended — release of cascade-suspended children | `KnownGapScenarios.CaseReactivate__…ChildrenReturnToPriorState` | Pinned (#63 — D8's case-level remainder was resolved by !26; the remaining FINDING-1 block on reaching Suspended at all is fixed by #63) |
 | Table 8.6 re-activate from Completed | — engine permits it (state machine); not scenario-pinned: reactivating a *completed* case is planning-driven (8.7) and planning-at-case-level has no runtime surface yet | NotApplicable (no planning surface) |
 | Table 8.6 close (→ Closed) from Completed | `LifecycleScenarios.CaseLifecycle__…ClosesAndStaysClosedAgainstReactivation` | Pinned |
 | Table 8.6 close from Terminated/Failed/Suspended | engine state machine permits all three (same `Permit(Close)` wiring pinned from Completed); only the Completed route is scenario-driven | Pinned (Completed route; other from-states covered by the same wiring) |
 | Table 8.5 Closed is terminal (no re-activate out of Closed) | `LifecycleScenarios.CaseLifecycle__…StaysClosedAgainstReactivation` | Pinned (PR !26/#19: the rejection is now a loud `InvalidOperationException` from `CaseGrain.Trigger`, not a silent no-op; scenario updated to match) |
-| Table 8.5 Closed — case file becomes read-only, no new planning | PR !26/#19 (`a13edd6`) added `CaseGrain.Trigger` throwing once Closed plus `CasePlanModelBehavior` reusing `HandleEnterTerminal` as a Closed entry action - "no new activity is allowed in the Case" (PlanItem transitions) is now enforced. Verified still NOT covered: `CaseFileItemGrain` (Create/Update/Delete) has no Closed-state check at all, so Table 8.5's "the Case instance caseFileModel and all its content becomes read only" clause specifically remains unenforced | KnownGap:#19 (case-file read-only remainder) — documented; no scenario (nothing observable to pin until a case-file lockdown surface exists) |
+| Table 8.5 Closed — case file becomes read-only, no new planning | PR !26/#19 (`a13edd6`) added `CaseGrain.Trigger` throwing once Closed plus `CasePlanModelBehavior` reusing `HandleEnterTerminal` as a Closed entry action - "no new activity is allowed in the Case" (PlanItem transitions) is enforced. #69 (`CaseFileItemGrain.EnsureCaseNotClosed`) closed the remainder: every CaseFileItem mutation (Create/Update/Replace/AddChild/RemoveChild/AddReference/RemoveReference/Delete) now throws once the owning Case is Closed | Pinned (#69 — covered by `CaseFileItemGrainTests`' `Update__Given_OwningCaseClosed__…`/`Create__Given_OwningCaseClosed__…` unit tests; not a `.cmmn` conformance scenario) |
 
 ## §8.4.2 Stage and Task lifecycle (Tables 8.7, 8.8, 8.9)
 
@@ -123,7 +161,7 @@ skipped.
 | Table 8.8 re-enable (Disabled → Enabled) | `LifecycleScenarios.TaskLifecycle__…DisableAndReenableRoundTrips` | Pinned |
 | Table 8.8 suspended (Active → Suspended, direct) | `LifecycleScenarios.StageLifecycle__…SuspendResumeWorks` (Stage); Task variant via parent-cascade only — see parent suspend row | Pinned (Stage direct) |
 | Table 8.8 resume (Suspended → Active, direct) | `LifecycleScenarios.StageLifecycle__…SuspendResumeWorks` | Pinned |
-| Table 8.8 parent suspend / parent resume (+ Table 8.9 note (2)) | `KnownGapScenarios.StageSuspend__…TaskFollowsByPropagationOnly` | KnownGap:FINDING-1 |
+| Table 8.8 parent suspend / parent resume (+ Table 8.9 note (2)) | `KnownGapScenarios.StageSuspend__…TaskFollowsByPropagationOnly` | Pinned (#63) |
 | Table 8.8 fault (Active → Failed; MUST NOT propagate) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` (incl. parent-still-Active assert) | Pinned |
 | Table 8.8 re-activated (Failed → Active) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` | Pinned |
 | Table 8.8 complete (Active → Completed) — Task | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…` | Pinned |
@@ -131,7 +169,7 @@ skipped.
 | Table 8.8 terminate (Active → Terminated, Case worker) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` | Pinned |
 | Table 8.8 exit — Task (exit criterion while Active) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…` | Pinned |
 | Table 8.8 exit — Stage (exit criterion while Active; D6 fix) | `SentryScenarios.Sentry__Given_StageExitCriterion__…` | Pinned |
-| Table 8.9 exit/terminate propagation to children | `KnownGapScenarios.StageExit__…ExitCascadesTerminationToTask` | KnownGap:FINDING-1 |
+| Table 8.9 exit/terminate propagation to children | `KnownGapScenarios.StageExit__…ExitCascadesTerminationToTask` | Pinned (#63) |
 | Table 8.9 fault rows (children keep state on parent fault) | fault non-propagation pinned at the Case level (`TaskLifecycle__…FaultReactivate…`'s parent-still-Active assert); per-child state matrix not separately scenario-ized | Pinned (non-propagation observable) |
 | Table 8.9 complete rows (`<impossible>` cells) | blocked behind Table 8.12's remaining gap (D4 remainder) — completing a stage with children in the listed states isn't reachable through the public surface today | KnownGap:#19 (D4 remainder) — via StageCompletion scenario (see below) |
 
@@ -145,7 +183,7 @@ skipped.
 | Table 8.11 terminate (Available → Terminated) | `LifecycleScenarios.MilestoneLifecycle__…WalkTable811` | Pinned |
 | Table 8.11 occur — Milestone (achieving sentry satisfied) | `SentryScenarios` (every milestone-completing scenario) | Pinned |
 | Table 8.11 occur — EventListener (timer/user event) | timer start-trigger runtime is pinned by the pre-existing `CaseFileItemSentryIntegrationTests` timer scenario and `Scheduler` suites; UserEventListener occurrence needs role setup outside this suite's `.cmmn`-driven scope today | NotApplicable (covered elsewhere / role surface out of scope) |
-| Table 8.11 parent terminate | `KnownGapScenarios.CaseTerminate__…PropagatesToMilestone` | KnownGap:FINDING-1 |
+| Table 8.11 parent terminate | `KnownGapScenarios.CaseTerminate__…PropagatesToMilestone` | Pinned (#63) |
 
 ## §8.5 Sentry
 
@@ -159,7 +197,7 @@ skipped.
 | Exit criteria ready while Active (Task and Stage) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…` / `…StageExitCriterion__…` | Pinned |
 | Per-OnPart re-arm across distinct source occurrences (Figure 8.5 B/B′; D5 fix) | `SentryScenarios.Sentry__Given_RepeatableMilestone__…RearmsAcrossDistinctSourceInstances` | Pinned |
 | PlanItemOnPart via `sentryRef`/`exitCriterionRef` (Table 5.30 exit mode) | unreachable: `PlanItemTransitionedEvent.ExitCriterionRef` is never populated (D10 remainder; `CmmnCapabilityLint` rule 4 flags it on import) | KnownGap:#19-adjacent (D10) — lint-guarded, no runnable scenario |
-| Multiple entry/exit criteria — only one needed | single-criterion scenarios only; multi-criteria OR is untested pending D4/D10 work | KnownGap:#19 — documented, scenario deferred until the D-item work lands |
+| Multiple entry/exit criteria — only one needed | `SentryScenarios.Sentry__Given_TwoEntryCriteria__Then_EitherAloneSatisfiesEntry` (#87): a PlanItem with two independent, single-OnPart entry criteria fires on satisfying only the second; the exit-criteria analog is untested — no sample declares a PlanItem with two `<exitCriterion>` elements | Pinned (entry criteria, #87) / KnownGap (exit criteria — no scenario yet, no work item filed) |
 
 ## §8.6 Behavior property rules
 
@@ -169,7 +207,7 @@ skipped.
 | 8.6.1 Table 8.12 autoComplete=FALSE — manual-completion OR-branch (D4) | `KnownGapScenarios.StageCompletion__…ManualCompletionBecomesAvailable` | Pinned (#68 — `StageBehavior.HandleChildTransitioned`'s `UserCompletable` flag-raise condition now gates on `!PlanItemDefinition.AutoComplete` and requires only required children terminal, matching `ManualCompletionCriteriaSatisfied`'s autoComplete=FALSE arm fixed by !26/#19; the observable flag now flips even while a non-required child stays Active) |
 | 8.6.2 ManualActivationRule TRUE → Enabled (incl. Table 5.51 default) | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…`, `…DisableAndReenable…`, `StageLifecycle__…` | Pinned |
 | 8.6.2 ManualActivationRule FALSE → Active | `LifecycleScenarios.TaskLifecycle__…ManualActivationRuleFalse…` | Pinned |
-| 8.6.3 RequiredRule evaluated on create; gates parent completion | evaluation-on-create asserted in `KnownGapScenarios.StageCompletion`'s precondition (`Required=true`; currently dormant with its skip) and by the existing behavior unit suites; the required-blocks-completion conformance matrix is deferred with D4 | KnownGap:#19 (completion-gating matrix; evaluation covered by unit suites) |
+| 8.6.3 RequiredRule evaluated on create; gates parent completion | evaluation-on-create asserted in `KnownGapScenarios.StageCompletion`'s precondition (`Required=true`, now an ordinary green `[Fact]`) and by the existing behavior unit suites; the FULL required-blocks-completion conformance matrix (every combination of required/non-required, autoComplete TRUE/FALSE, and child-state permutations) is not exhaustively scenario-ized beyond the one D4 branch `StageCompletion` pins | Pinned (the one scenario-ized branch, #68) — KnownGap:#19 (remaining matrix combinations; evaluation-on-create covered by unit suites) |
 | 8.6.4 RepetitionRule — first evaluation discarded (D7 half) | `SentryScenarios.…RearmsAcrossDistinctSourceInstances` pins `Repeated=false` after first occurrence | Pinned (observable half) |
 | 8.6.4 repetition on entry-criterion-with-OnPart satisfaction (detection) | `SentryScenarios.…RearmsAcrossDistinctSourceInstances` (`Repeated=true` on second occurrence) | Pinned |
 | 8.6.4 repetition instance creation by owning Stage (Figure 8.6) | `KnownGapScenarios.StageBookkeeping__…StageSpawnsRepetitionInstance` | Pinned (Bug #62, PR !26 `86d7b50`) |
@@ -200,7 +238,7 @@ skipped.
 
 ## Import / lint / deploy pipeline (the suite's own plumbing)
 
-Every scenario transitively pins: `CmmnXmlSerializer.Import` on 18 sample files,
+Every scenario transitively pins: `CmmnXmlSerializer.Import` on all 26 sample files,
 `CmmnCapabilityLint` clean-pass gating (`DeployAndCreate` throws on `HasUnsupported`),
 `ToDeployableCase`, and `Define`/`Create`/`Trigger` deployment. The importer/lint's own
 behavior matrix is pinned by the ADO #20 suites (`CmmnXmlSerializerTests`,

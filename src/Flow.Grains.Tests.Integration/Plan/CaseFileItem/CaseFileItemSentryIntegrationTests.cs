@@ -28,21 +28,16 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
     // activates - proof the wiring works beginning to end, not just that an event gets published
     // into the void.
     //
-    // These tests deliberately do NOT go through ICaseGrain.Create()/Trigger(): while writing this
-    // suite, that path was found to never actually instantiate the CasePlanModel's child PlanItems
-    // (CasePlanModelBehavior - src/Flow.Grains/Plan/PlanItem/Behaviors/CasePlanModelBehavior.cs -
-    // is an empty stub inheriting StageBehavior with only a `// TODO!` comment, and the
-    // CasePlanModel state machine transitions Uninitialized->Active directly via Create, which is
-    // not the trigger StageBehavior.HandleEnterActiveFromStart's child-creation logic is wired to
-    // - that only fires OnEntryFromAsync(Start/ManualStart, ...)). That gap is pre-existing (no
-    // test ever exercised ICaseGrain.Create() before this work item; PlanItemGrainTests.cs already
-    // establishes the precedent of driving PlanItemGrain instances directly instead) and is a
-    // separate, much larger architectural gap (the modeling/instantiation layer, not the
-    // event-driven CaseFileItem runtime this work item adds) - see this work item's report for
-    // what remains. These tests instead instantiate the Milestone and Sentry directly at the
-    // addresses StageBehavior.Define()/CreateChild would have used, so the actual thing under
-    // test - does a CaseFileItem transition reach an already-subscribed sentry and activate an
-    // already-waiting plan item - is exercised exactly as it would be in a fully working case.
+    // These tests deliberately do NOT go through ICaseGrain.Create()/Trigger(): at the time this
+    // work item was written, that path did not yet instantiate the CasePlanModel's child
+    // PlanItems, so these tests instead instantiate the Milestone and Sentry directly at the
+    // addresses StageBehavior.Define()/CreateChild would have used, following the precedent
+    // PlanItemGrainTests.cs already established of driving PlanItemGrain instances directly. That
+    // instantiation gap has since been closed (CasePlanModelBehavior now drives child creation on
+    // Create, and the Conformance suite under Flow.Grains.Tests.Integration/Conformance exercises
+    // the full ICaseGrain.Create()/Trigger() path end to end), but these tests are kept as a
+    // targeted, low-level check of one thing: does a CaseFileItem transition reach an
+    // already-subscribed sentry and activate an already-waiting plan item.
     [Collection(ClusterCollection.Name)]
     public class CaseFileItemSentryIntegrationTests
     {
