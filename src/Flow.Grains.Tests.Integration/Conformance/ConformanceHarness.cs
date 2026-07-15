@@ -173,8 +173,8 @@ namespace Flow.Grains.Tests.Integration.Conformance
         // The full grain-key address (e.g. "CPM.ab12cd") of a child PlanItem instantiated under a
         // Stage/CasePlanModel snapshot, addressed by the PlanItem's OWN model id
         // (StageBehaviorStore.Children's key - see StageBehaviorStore's remarks: keyed by
-        // ChildCreated.PlanItemDefinitionId, which despite the name is the PlanItem's Id, not its
-        // DefinitionRef). Selects a specific repetition (default 0 - the first/only instance).
+        // ChildCreated.PlanItemId, the PlanItem's Id, not its DefinitionRef). Selects a specific
+        // repetition (default 0 - the first/only instance).
         // Exposed separately from ResolveChild (below) so a caller can address a GRANDCHILD - a
         // nested Stage's own child - by passing this address back in as the next call's `scope`.
         public string ResolveChildAddress(StageBehaviorSnapshot behaviorExtension, string planItemId, string scope, int repetition = 0)

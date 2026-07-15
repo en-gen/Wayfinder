@@ -187,7 +187,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             var store = new StageBehaviorStore();
             store.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = definitionId,
+                PlanItemId = definitionId,
                 PlanItemInstanceId = instanceId,
                 Repetition = repetition + 1 // AssertAllPropertiesPopulated treats 0 as unset
             });
@@ -288,7 +288,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             });
             store.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = definitionId,
+                PlanItemId = definitionId,
                 PlanItemInstanceId = instanceId,
                 Repetition = childRepetition + 1
             });
@@ -408,7 +408,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             });
             store.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = definitionId,
+                PlanItemId = definitionId,
                 PlanItemInstanceId = instanceId,
                 Repetition = childRepetition + 1
             });

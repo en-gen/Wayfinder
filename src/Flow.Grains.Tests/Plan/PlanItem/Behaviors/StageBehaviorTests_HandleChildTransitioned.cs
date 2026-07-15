@@ -227,7 +227,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemDefinitionId,
+                PlanItemId = planItemDefinitionId,
                 PlanItemInstanceId = planItemInstanceId,
                 Repetition = 0
             });
@@ -307,7 +307,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemDefinitionId,
+                PlanItemId = planItemDefinitionId,
                 PlanItemInstanceId = planItemInstanceId,
                 Repetition = 0
             });
@@ -381,7 +381,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Disabled);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemDefinitionId,
+                PlanItemId = planItemDefinitionId,
                 PlanItemInstanceId = planItemInstanceId,
                 Repetition = 0
             });
@@ -457,13 +457,13 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
@@ -548,13 +548,13 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
@@ -639,13 +639,13 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
@@ -731,13 +731,13 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
@@ -837,19 +837,19 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = discretionaryItemCDefinitionId,
+                PlanItemId = discretionaryItemCDefinitionId,
                 PlanItemInstanceId = discretionaryItemCInstanceId,
                 Repetition = 0
             });
@@ -962,19 +962,19 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = discretionaryItemCDefinitionId,
+                PlanItemId = discretionaryItemCDefinitionId,
                 PlanItemInstanceId = discretionaryItemCInstanceId,
                 Repetition = 0
             });
@@ -1076,13 +1076,13 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemADefinitionId,
+                PlanItemId = planItemADefinitionId,
                 PlanItemInstanceId = planItemAInstanceId,
                 Repetition = 0
             });
             testStore.Apply(new ChildCreated
             {
-                PlanItemDefinitionId = planItemBDefinitionId,
+                PlanItemId = planItemBDefinitionId,
                 PlanItemInstanceId = planItemBInstanceId,
                 Repetition = 0
             });
