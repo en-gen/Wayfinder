@@ -257,7 +257,12 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                     OnPartOccurred = @event.OnPartOccurred
                 });
 
-                await StateMachine.FireAsync(PlanItemTransition.Exit);
+                // D10 - carries this ExitCriterion's own id alongside the Exit trigger (Stateless
+                // parameterized fire - see PlanItemStateMachine.FireAsync(PlanItemTransition,
+                // string) / BaseBehavior.HandleTransitioned) so a PlanItemOnPart naming THIS
+                // criterion via exitCriterionRef can finally match the resulting
+                // PlanItemTransitionedEvent - see SentryGrain's class remarks.
+                await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
             }
         }
     }

@@ -306,7 +306,19 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                     OnPartOccurred = @event.OnPartOccurred
                 });
 
-                await StateMachine.FireAsync(ExitCriterionTransition);
+                // D10 - only the Exit trigger carries a parameterized ExitCriterionRef (see
+                // PlanItemStateMachine.FireAsync(PlanItemTransition, string) / BaseBehavior.
+                // HandleTransitioned). ExitCriterionTransition is Terminate for the CasePlanModel
+                // (CasePlanModelBehavior's override - Table 8.6 has no `exit` row for it), which
+                // has no such registered trigger parameter, so that path keeps firing plain.
+                if (ExitCriterionTransition == PlanItemTransition.Exit)
+                {
+                    await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
+                }
+                else
+                {
+                    await StateMachine.FireAsync(ExitCriterionTransition);
+                }
             }
         }
 

@@ -302,6 +302,48 @@ namespace Flow.Grains.Tests.Integration.Conformance
                 "8.6.4/Figure 8.5: the second, distinct source occurrence must satisfy the SAME sentry again - it re-arms per occurrence rather than latching Satisfied forever - reaching the milestone's repetition branch");
         }
 
+        // Table 5.30 (exit mode) + Bug #82 (D10): "the PlanItemOnPart of the Sentry occurs when
+        // the PlanItem referenced by sourceRef transits by the specified exitCriterion due to the
+        // Sentry that it refers to being satisfied" / "When sentryRef is specified, standardEvent
+        // MUST have value 'exit.'" TaskA's own ExitCriterion_1 fires from a case-file event
+        // (exactly like Sentry_ExitCriterionTask.cmmn); ListenerSentry's planItemOnPart names
+        // TaskA + that same exitCriterionRef, so it must occur and complete ListenerMilestone.
+        // Before this fix, PlanItemTransitionedEvent never carried a non-null ExitCriterionRef
+        // (SentryGrain's D10 remarks), so this OnPart could never match - ListenerMilestone would
+        // have stayed Available forever.
+        [Fact]
+        [ConformanceCitation("Table 5.30 / PlanItemOnPart exit mode (sentryRef + exitCriterionRef)")]
+        public async Task Sentry__Given_PlanItemOnPartWithExitCriterionRef__Then_MatchesSpecificExitAndFiresListener()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_ExitCriterionRefOnPart.cmmn");
+
+            var taskGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemA", deployed.Scope);
+            var listenerGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemListener", deployed.Scope);
+
+            (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
+                "the Task must be executing before its exit criterion fires - 8.5 gates exit evaluation on Active");
+            (await listenerGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available,
+                "ListenerMilestone waits on ListenerSentry, which has not yet occurred");
+
+            var exitItem = _harness.CaseFileItem(deployed.CaseInstanceId, "ExitItem");
+            await exitItem.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "ExitItem" }, JsonNode.Parse("""{"abort": false}"""));
+            await exitItem.Update(JsonNode.Parse("""{"abort": true}"""));
+
+            var taskTerminated = await ConformanceHarness.PollUntil(
+                async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
+            taskTerminated.Should().BeTrue(
+                "Table 8.8 (exit): TaskA must transition Active -> Terminated when ExitCriterion_1's sentry is satisfied");
+
+            var listenerCompleted = await ConformanceHarness.PollUntil(
+                async () => (await listenerGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
+            listenerCompleted.Should().BeTrue(
+                "Table 5.30 (exit mode): ListenerSentry's planItemOnPart names TaskA's own ExitCriterion_1 via " +
+                "exitCriterionRef - TaskA exiting through THAT criterion must occur the OnPart, satisfy " +
+                "ListenerSentry, and complete ListenerMilestone (Table 8.11 occur)");
+        }
+
         // 5.4.4/Table 5.30 + Table 8.11 (occur): a PlanItem's entryCriteria is a collection - MORE
         // THAN ONE <entryCriterion> may be declared, each pointing at its own independent Sentry,
         // and "when ONE of the achieving Sentries (entry criteria) is satisfied" the PlanItem's

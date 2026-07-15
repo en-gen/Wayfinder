@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Stateless;
@@ -11,12 +12,26 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
 
         private readonly ILogger _logger;
 
+        // D10 - registers PlanItemTransition.Exit as a Stateless parameterized trigger (Stateless's
+        // own mechanism for attaching a payload to a fired trigger - see SetTriggerParameters/
+        // FireAsync<TArg0> in Stateless.StateMachine<TState,TTrigger>, which this class extends
+        // directly). Configuration (Permit/PermitIf/etc., in ConfigureFor* below) is keyed on the
+        // plain PlanItemTransition value regardless of whether it is fired parameterized or not -
+        // registering this costs nothing for state machines that never fire Exit (Milestone/
+        // EventListener/CasePlanModel) and lets FireAsync(PlanItemTransition, string) below carry
+        // "which ExitCriterion drove this Exit" through Stateless's own Transition.Parameters into
+        // BaseBehavior.HandleTransitioned's OnTransitionedAsync callback - see that method and
+        // SentryGrain's class remarks for the full picture this closes.
+        private readonly TriggerWithParameters<string> _exitWithCriterionRef;
+
         public PlanItemStateMachine(IBehaviorStore planItemStore, ILogger<PlanItemStateMachine> logger) :
             base(planItemStore.PlanItemState)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             ParentSuspendState = planItemStore.ParentSuspendState;
+
+            _exitWithCriterionRef = SetTriggerParameters<string>(PlanItemTransition.Exit);
 
             // #64 - Orleans activation-context safety for reentrant/queued Fire calls
             // ~~~~~
@@ -74,6 +89,21 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
             RetainSynchronizationContext = true;
 
             ConfigureFor(planItemStore.PlanItemDefinition);
+        }
+
+        // D10 - the parameterized counterpart of FireAsync(PlanItemTransition). Only Exit has a
+        // registered TriggerWithParameters<string> (see _exitWithCriterionRef above) - there is no
+        // spec-driven reason today for any other trigger to carry a payload, so this throws rather
+        // than silently discarding exitCriterionRef for a trigger nothing will ever read it from.
+        public Task FireAsync(PlanItemTransition trigger, string exitCriterionRef)
+        {
+            if (trigger != PlanItemTransition.Exit)
+            {
+                throw new NotSupportedException(
+                    $"Parameterized {nameof(FireAsync)} is only supported for {nameof(PlanItemTransition.Exit)}, not {trigger}.");
+            }
+
+            return FireAsync(_exitWithCriterionRef, exitCriterionRef);
         }
 
         private void ConfigureFor(PlanItemDefinition planItemDefinition)

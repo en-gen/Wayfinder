@@ -196,7 +196,7 @@ disagrees with prose elsewhere, the Status column wins.
 | Entry criteria ready while Available | every entry-criterion scenario (milestone waits in Available until satisfied) | Pinned |
 | Exit criteria ready while Active (Task and Stage) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…` / `…StageExitCriterion__…` | Pinned |
 | Per-OnPart re-arm across distinct source occurrences (Figure 8.5 B/B′; D5 fix) | `SentryScenarios.Sentry__Given_RepeatableMilestone__…RearmsAcrossDistinctSourceInstances` | Pinned |
-| PlanItemOnPart via `sentryRef`/`exitCriterionRef` (Table 5.30 exit mode) | unreachable: `PlanItemTransitionedEvent.ExitCriterionRef` is never populated (D10 remainder; `CmmnCapabilityLint` rule 4 flags it on import) | KnownGap:#19-adjacent (D10) — lint-guarded, no runnable scenario |
+| PlanItemOnPart via `sourceRef`/`exitCriterionRef` (Table 5.30 exit mode) | `SentryScenarios.Sentry__Given_PlanItemOnPartWithExitCriterionRef__…` | Pinned (Bug #82 — D10 fix: `PlanItemStateMachine`'s parameterized Exit trigger threads the firing `ExitCriterion`'s own id through `BaseBehavior.HandleTransitioned` into `PlanItemTransitionedEvent.ExitCriterionRef`; `CmmnCapabilityLint`'s former rule 4 removed) |
 | Multiple entry/exit criteria — only one needed | `SentryScenarios.Sentry__Given_TwoEntryCriteria__Then_EitherAloneSatisfiesEntry` (#87): a PlanItem with two independent, single-OnPart entry criteria fires on satisfying only the second; the exit-criteria analog is untested — no sample declares a PlanItem with two `<exitCriterion>` elements | Pinned (entry criteria, #87) / KnownGap (exit criteria — no scenario yet, no work item filed) |
 
 ## §8.6 Behavior property rules

@@ -38,12 +38,12 @@ namespace Flow.Grains.Interchange
     //     still runs (via Jint, always), so the document is not broken, it just silently does not
     //     honor the default language it declares for itself.
     //
-    //  4. PlanItemOnPart.ExitCriterionRef populated (Unsupported) - again in the engine's own
-    //     words (SentryGrain.cs's remarks): "PlanItemTransitionedEvent.ExitCriterionRef has
-    //     exactly one construction site... and it never supplies a non-null value, so this match
-    //     branch is unreachable in practice: an OnPart configured with an exitCriterionRef will
-    //     never see a live event carrying one." Verified against SentryGrain.
-    //     HandlePlanItemTransitioned's matching predicate directly.
+    //  4. (formerly PlanItemOnPart.ExitCriterionRef populated) - closed by Bug #82: SentryGrain's
+    //     D10 remarks. PlanItemTransitionedEvent.ExitCriterionRef is now populated at its one
+    //     construction site (BaseBehavior.HandleTransitioned, fed via Stateless's own
+    //     parameterized-trigger mechanism - see PlanItemStateMachine.FireAsync(PlanItemTransition,
+    //     string)), so a PlanItemOnPart naming an ExitCriterion is a live, runnable construct, not
+    //     a dead one - nothing left here to flag.
     //
     //  5. CaseFileItem hierarchy - a non-empty Children, or a set SourceRef/TargetRefs
     //     (Unsupported) - CaseFileItemGrain (Plan/CaseFileItem/CaseFileItemGrain.cs) addresses and
@@ -132,24 +132,8 @@ namespace Flow.Grains.Interchange
                 }
             }
 
-            // Rule 4 - PlanItemOnPart.ExitCriterionRef is a dead path.
-            foreach (var sentry in allSentries)
-            {
-                foreach (var onPart in sentry.PlanItemOnParts)
-                {
-                    if (!string.IsNullOrWhiteSpace(onPart.ExitCriterionRef))
-                    {
-                        yield return new CmmnCapabilityFinding(
-                            CmmnCapabilitySeverity.Unsupported,
-                            sentry.Id,
-                            nameof(Sentry),
-                            $"PlanItemOnPart '{onPart.Id}' sets exitCriterionRef='{onPart.ExitCriterionRef}', but " +
-                            "PlanItemTransitionedEvent never carries a non-null ExitCriterionRef (see SentryGrain's " +
-                            "own remarks) - this OnPart can never match a live event, so this Sentry can never be " +
-                            "satisfied through it");
-                    }
-                }
-            }
+            // Rule 4 (PlanItemOnPart.ExitCriterionRef) removed - closed by Bug #82, see this
+            // class's remarks above.
 
             // Rule 5 - CaseFileItem hierarchy is structural only.
             if (@case.CaseFileModel != null)

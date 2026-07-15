@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Bug #82 (D10): Table 5.30 exit mode - "the PlanItemOnPart of the
+  Sentry occurs when the PlanItem referenced by sourceRef transits by the specified exitCriterion
+  due to the Sentry that it refers to being satisfied" / "When sentryRef is specified,
+  standardEvent MUST have value 'exit.'"
+  ~~~~~
+  TaskA declares its own exitCriterion (ExitCriterion_1, backed by ExitSentry). ListenerSentry's
+  planItemOnPart names TaskA as sourceRef, standardEvent=exit, AND exitCriterionRef=
+  ExitCriterion_1 - it must occur ONLY when TaskA exits specifically THROUGH that criterion, not
+  through any other route. ListenerMilestone's entry criterion is ListenerSentry, so it completes
+  once TaskA's ExitCriterion_1 fires. Before Bug #82's fix, PlanItemTransitionedEvent never
+  carried a non-null ExitCriterionRef, so this OnPart could never match a live event and
+  ListenerMilestone could never occur - see SentryGrain's D10 class remarks.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-exit-criterion-ref-onpart"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryExitCriterionRefOnPart"
+             name="SentryExitCriterionRefOnPartSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryExitCriterionRefOnPartCase" name="SentryExitCriterionRefOnPartCase">
+    <caseFileModel>
+      <caseFileItem id="ExitItem" name="ExitItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA">
+        <exitCriterion id="ExitCriterion_1" sentryRef="ExitSentry"/>
+      </planItem>
+      <planItem id="PlanItemListener" name="PlanItemListener" definitionRef="ListenerMilestone">
+        <entryCriterion id="EntryCriterion_1" sentryRef="ListenerSentry"/>
+      </planItem>
+      <sentry id="ExitSentry" name="ExitSentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="ExitItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <sentry id="ListenerSentry" name="ListenerSentry">
+        <planItemOnPart id="OnPart_2" sourceRef="PlanItemA" exitCriterionRef="ExitCriterion_1">
+          <standardEvent>exit</standardEvent>
+        </planItemOnPart>
+      </sentry>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_1">
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint">false</condition>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+      <milestone id="ListenerMilestone" name="ListenerMilestone"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>
