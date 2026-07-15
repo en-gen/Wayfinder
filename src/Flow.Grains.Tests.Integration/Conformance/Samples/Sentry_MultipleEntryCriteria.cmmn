@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #87 conformance scenario - multiple entry criteria on one PlanItem (OR-of-sentries).
+  ~~~~~
+  5.4.4/Table 5.30: a PlanItem's entryCriteria is a COLLECTION - tPlanItem allows any number of
+  <entryCriterion> children, each pointing at its own independent Sentry. Table 8.11 (occur):
+  "when ONE of the achieving Sentries (entry criteria) is satisfied" - satisfying any single
+  criterion in the collection is enough; the others need not also fire. This is a distinct
+  concern from 8.5's own AND-join (Sentry_AndJoin.cmmn), which is about MULTIPLE OnParts INSIDE
+  ONE Sentry all needing to be satisfied - here there are two separate, single-OnPart Sentries,
+  either of which alone must satisfy PlanItemA's entry.
+
+  MilestoneA carries two entry criteria: EntryCriterion_1 -> SentryA (ItemA update),
+  EntryCriterion_2 -> SentryB (ItemB update). The scenario drives ONLY ItemB and asserts the
+  Milestone still occurs - proof that a single satisfied criterion in the collection is
+  sufficient and ItemA's criterion need never fire.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://case.flow/conformance/sentry-multiple-entry-criteria"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryMultipleEntryCriteria"
+             name="SentryMultipleEntryCriteriaSample"
+             exporter="Case.Flow conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryMultipleEntryCriteriaCase" name="SentryMultipleEntryCriteriaCase">
+    <caseFileModel>
+      <caseFileItem id="ItemA" name="ItemA" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+      <caseFileItem id="ItemB" name="ItemB" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="MilestoneA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="SentryA"/>
+        <entryCriterion id="EntryCriterion_2" sentryRef="SentryB"/>
+      </planItem>
+      <sentry id="SentryA" name="SentryA">
+        <caseFileItemOnPart id="OnPart_A" sourceRef="ItemA">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <sentry id="SentryB" name="SentryB">
+        <caseFileItemOnPart id="OnPart_B" sourceRef="ItemB">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <milestone id="MilestoneA" name="MilestoneA"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

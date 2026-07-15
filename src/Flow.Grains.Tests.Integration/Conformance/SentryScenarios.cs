@@ -301,5 +301,40 @@ namespace Flow.Grains.Tests.Integration.Conformance
             repeated.Should().BeTrue(
                 "8.6.4/Figure 8.5: the second, distinct source occurrence must satisfy the SAME sentry again - it re-arms per occurrence rather than latching Satisfied forever - reaching the milestone's repetition branch");
         }
+
+        // 5.4.4/Table 5.30 + Table 8.11 (occur): a PlanItem's entryCriteria is a collection - MORE
+        // THAN ONE <entryCriterion> may be declared, each pointing at its own independent Sentry,
+        // and "when ONE of the achieving Sentries (entry criteria) is satisfied" the PlanItem's
+        // entry fires. Distinct from 8.5's AND-join (Sentry__Given_TwoOnParts__...), which is
+        // about multiple OnParts inside ONE Sentry: here MilestoneA carries TWO independent
+        // single-OnPart Sentries. Only ItemB is ever touched - ItemA's criterion never fires - and
+        // the Milestone must still occur, proving satisfaction of any ONE criterion in the
+        // collection is sufficient (OR semantics across entry criteria, not AND).
+        [Fact]
+        [ConformanceCitation("5.4.4 / Table 5.30 - PlanItem entryCriteria collection")]
+        [ConformanceCitation("Table 8.11 / occur - one of the achieving Sentries")]
+        public async Task Sentry__Given_TwoEntryCriteria__Then_EitherAloneSatisfiesEntry()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_MultipleEntryCriteria.cmmn");
+
+            var milestoneGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemA", deployed.Scope);
+            (await milestoneGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available);
+
+            var itemA = _harness.CaseFileItem(deployed.CaseInstanceId, "ItemA");
+            var itemB = _harness.CaseFileItem(deployed.CaseInstanceId, "ItemB");
+            await itemA.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "ItemA" }, JsonNode.Parse("""{"seen": false}"""));
+            await itemB.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "ItemB" }, JsonNode.Parse("""{"seen": false}"""));
+
+            // Only the SECOND criterion's source (ItemB) is ever updated - ItemA's own
+            // EntryCriterion_1/SentryA never fires.
+            await itemB.Update(JsonNode.Parse("""{"seen": true}"""));
+
+            var completed = await ConformanceHarness.PollUntil(
+                async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
+            completed.Should().BeTrue(
+                "Table 8.11 (occur): satisfying EntryCriterion_2/SentryB alone is enough - a PlanItem " +
+                "with multiple entry criteria needs only ONE of its achieving Sentries satisfied");
+        }
     }
 }
