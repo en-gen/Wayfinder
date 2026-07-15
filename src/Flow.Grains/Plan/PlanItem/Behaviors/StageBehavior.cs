@@ -701,7 +701,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
             Host.RaiseEvent(new ChildCreated
             {
-                PlanItemDefinitionId = child.Id,
+                PlanItemId = child.Id,
                 PlanItemInstanceId = childInstanceId,
                 Repetition = repetition
             });

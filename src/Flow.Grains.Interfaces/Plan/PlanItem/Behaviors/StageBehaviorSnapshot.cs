@@ -7,7 +7,7 @@ namespace Flow.Grains.Interfaces.Plan.PlanItem.Behaviors
     [GenerateSerializer]
     public class StageBehaviorSnapshot
     {
-        // PlanItemDefinitionId => PlanItemInstanceId => Repetition
+        // PlanItemId => PlanItemInstanceId => Repetition
         [Id(0)]
         public IDictionary<string, IDictionary<string, int>> Children { get; set; }
     }

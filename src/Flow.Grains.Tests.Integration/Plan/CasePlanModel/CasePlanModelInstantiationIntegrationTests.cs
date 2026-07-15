@@ -43,11 +43,10 @@ namespace Flow.Grains.Tests.Integration.Plan.CasePlanModel
     // themselves when constructing PlanItem/Sentry grains directly; that claim was never
     // exercised against a real CreateChild call before this fix existed. These tests instead
     // discover the real, engine-assigned instance id via CaseSnapshot.BehaviorExtension.Children
-    // (StageBehaviorStore's Children map, keyed by ChildCreated.PlanItemDefinitionId - which,
-    // despite the name, CreateChild populates with the PlanItem's OWN Id, not its
-    // DefinitionRef/PlanItemDefinition.Id - -> PlanItemInstanceId -> Repetition), then address
-    // the child grain with that id - proving instantiation happened, without assuming an address
-    // the engine does not actually use.
+    // (StageBehaviorStore's Children map, keyed by ChildCreated.PlanItemId - the PlanItem's OWN
+    // Id, not its DefinitionRef/PlanItemDefinition.Id - -> PlanItemInstanceId -> Repetition),
+    // then address the child grain with that id - proving instantiation happened, without
+    // assuming an address the engine does not actually use.
     [Collection(ClusterCollection.Name)]
     public class CasePlanModelInstantiationIntegrationTests
     {
@@ -167,8 +166,8 @@ namespace Flow.Grains.Tests.Integration.Plan.CasePlanModel
 
             // Assert the child was instantiated: recover the engine-assigned instance id from
             // StageBehaviorStore's Children tracking, keyed by the PlanItem's own Id (see class
-            // remarks on ChildCreated.PlanItemDefinitionId's actual semantics) - CreateChild
-            // assigns its own fresh instance id, it does not reuse PlanItem.Id as the address.
+            // remarks on ChildCreated.PlanItemId's semantics) - CreateChild assigns its own
+            // fresh instance id, it does not reuse PlanItem.Id as the address.
             var milestoneGrain = ResolveChildGrain(caseInstanceId, afterCreateSnapshot, planItemId);
 
             var beforeSnapshot = await milestoneGrain.GetSnapshot();
@@ -377,10 +376,9 @@ namespace Flow.Grains.Tests.Integration.Plan.CasePlanModel
         // convention: StageBehavior.CreateChild assigns each child a freshly generated instance
         // id (ShortGuid.NewGuid()), never the PlanItem's own Id, so the only reliable way to find
         // it is via StageBehaviorStore's Children tracking (surfaced on CaseSnapshot as
-        // BehaviorExtension.Children, keyed by ChildCreated.PlanItemDefinitionId - which, despite
-        // the name, CreateChild populates with the PlanItem's OWN Id from Stage.PlanItems, not
-        // its DefinitionRef/PlanItemDefinition.Id -> PlanItemInstanceId -> Repetition), which
-        // ChildCreated populates at the moment CreateChild runs.
+        // BehaviorExtension.Children, keyed by ChildCreated.PlanItemId - the PlanItem's OWN Id
+        // from Stage.PlanItems, not its DefinitionRef/PlanItemDefinition.Id -> PlanItemInstanceId
+        // -> Repetition), which ChildCreated populates at the moment CreateChild runs.
         private IPlanItemInternalGrain ResolveChildGrain(Guid caseInstanceId, CaseSnapshot caseSnapshot, string planItemId)
         {
             caseSnapshot.BehaviorExtension.Should().NotBeNull(

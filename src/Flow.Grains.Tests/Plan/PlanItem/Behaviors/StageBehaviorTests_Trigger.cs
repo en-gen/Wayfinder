@@ -180,7 +180,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
                 testStore.Apply(new ChildCreated
                 {
-                    PlanItemDefinitionId = childDefinitionId,
+                    PlanItemId = childDefinitionId,
                     PlanItemInstanceId = childInstanceId,
                     Repetition = 0
                 });

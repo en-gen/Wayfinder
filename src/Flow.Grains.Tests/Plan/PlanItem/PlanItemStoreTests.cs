@@ -407,7 +407,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
             var @event = new ChildCreated
             {
                 PlanItemInstanceId = instanceId,
-                PlanItemDefinitionId = definitionId,
+                PlanItemId = definitionId,
                 Repetition = repetition
             };
 

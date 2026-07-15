@@ -15,7 +15,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors.Stores
         {
             var @event = new ChildCreated
             {
-                PlanItemDefinitionId = planItemDefinitionId,
+                PlanItemId = planItemDefinitionId,
                 PlanItemInstanceId = planItemInstanceId,
                 Repetition = repetition
             };
