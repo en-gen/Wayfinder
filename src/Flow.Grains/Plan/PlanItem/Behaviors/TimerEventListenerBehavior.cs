@@ -173,6 +173,12 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // timerStart is specified, then at runtime, if the trigger occurs the time of occurrence of
         // the trigger is captured and the timerExpression SHOULD be relative to the timestamp
         // captured when the timerStart trigger occurs.
+        //
+        // #79: this is a stream-subscription handler (reached via HandleStartTriggerSourceTransitioned,
+        // not a state-machine transition callback), so nothing else in the pipeline confirms the
+        // event it raises - the same shape of gap #61 fixed for HandleEnterAvailableFromCreate above.
+        // Without an explicit confirm, TimerStartTriggerOccurred would sit queued in TentativeState
+        // and be lost outright if the grain deactivates before anything else happens to confirm.
         private async Task HandleStartTriggerOccurred(DateTime occurred)
         {
             Host.LogWithContext(logger => logger.LogInformation(
@@ -189,6 +195,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             {
                 Occurred = occurred
             });
+            await Host.ConfirmEvents();
 
             await Host.GrainFactory.GetScheduler(Host.CaseInstanceId)
                 .ScheduleTimer(Host.InstanceId, TimerStore.TimerSchedule, occurred, Host.Context);
