@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Flow.Grains.Plan.PlanningTable;

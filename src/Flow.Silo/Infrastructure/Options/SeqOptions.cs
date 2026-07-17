@@ -1,4 +1,4 @@
-﻿namespace Flow.Silo.Infrastructure.Options
+namespace Flow.Silo.Infrastructure.Options
 {
     public class SeqOptions
     {

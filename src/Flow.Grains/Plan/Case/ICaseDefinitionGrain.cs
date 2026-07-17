@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 
 namespace Flow.Grains.Plan.Case

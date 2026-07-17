@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,7 +24,7 @@ namespace Flow.Grains.Plan.PlanItem.Definitions
         public Task Define(PlanItemDefinition planItemDefinition)
         {
             if (State.Created != null) throw new InvalidOperationException($"PlanItemDefinition {_id} already defined for tenant {_tenantId}");
-            if(planItemDefinition.Id != _id) throw new ArgumentException($"PlanItemDefinition id {planItemDefinition.Id} must match grain id {_id}");
+            if (planItemDefinition.Id != _id) throw new ArgumentException($"PlanItemDefinition id {planItemDefinition.Id} must match grain id {_id}");
 
             State.PlanItemDefinition = planItemDefinition;
             State.Created = DateTime.UtcNow;

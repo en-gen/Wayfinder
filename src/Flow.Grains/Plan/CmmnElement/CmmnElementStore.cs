@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.Serialization;
 using Flow.Grains.Plan.CmmnElement.Events;
 using Orleans;

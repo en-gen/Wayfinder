@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
@@ -109,26 +109,26 @@ namespace Flow.Grains.Plan.PlanItem.StateMachine
         private void ConfigureFor(PlanItemDefinition planItemDefinition)
         {
             _logger.LogInformation("Initializing {BehaviorType} state machine", planItemDefinition.GetType().Name);
-            
+
             switch (planItemDefinition)
             {
                 case Stage stage when stage.IsCasePlanModel:
-                {
-                    ConfigureForCasePlanModel();
-                    break;
-                }
+                    {
+                        ConfigureForCasePlanModel();
+                        break;
+                    }
                 case Stage stage:
                 case BaseTask task:
-                {
-                    ConfigureForStageOrTask();
-                    break;
-                }
+                    {
+                        ConfigureForStageOrTask();
+                        break;
+                    }
                 case Milestone milestone:
                 case EventListener eventListener:
-                {
-                    ConfigureForMilestoneOrEventListener();
-                    break;
-                }
+                    {
+                        ConfigureForMilestoneOrEventListener();
+                        break;
+                    }
             }
         }
 

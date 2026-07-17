@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans;
 
 namespace Flow.Grains.Plan.CmmnElement.Events

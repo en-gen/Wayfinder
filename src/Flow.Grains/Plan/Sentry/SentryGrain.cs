@@ -146,23 +146,23 @@ namespace Flow.Grains.Plan.Sentry
                         switch (onPart)
                         {
                             case PlanItemOnPart planItemOnPart:
-                            {
-                                return SubscribeTo<PlanItemTransitionedEvent>(
-                                    planItemOnPart.SourceRef,
-                                    HandlePlanItemTransitioned,
-                                    flags);
-                            }
+                                {
+                                    return SubscribeTo<PlanItemTransitionedEvent>(
+                                        planItemOnPart.SourceRef,
+                                        HandlePlanItemTransitioned,
+                                        flags);
+                                }
                             case CaseFileItemOnPart caseFileItemOnPart:
-                            {
-                                return SubscribeTo<CaseFileItemTransitionedEvent>(
-                                    caseFileItemOnPart.SourceRef,
-                                    HandleCaseFileItemTransitioned,
-                                    flags);
-                            }
+                                {
+                                    return SubscribeTo<CaseFileItemTransitionedEvent>(
+                                        caseFileItemOnPart.SourceRef,
+                                        HandleCaseFileItemTransitioned,
+                                        flags);
+                                }
                             default:
-                            {
-                                return Task.CompletedTask;
-                            }
+                                {
+                                    return Task.CompletedTask;
+                                }
                         }
                     })));
 

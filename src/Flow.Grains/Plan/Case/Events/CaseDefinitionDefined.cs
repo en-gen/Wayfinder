@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Plan.CmmnElement.Events;
 using Flow.Grains.Plan.PlanItem.Definitions;
 using Orleans;

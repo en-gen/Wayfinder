@@ -1,4 +1,4 @@
-﻿using Flow.Grains.Plan.PlanItem.Events;
+using Flow.Grains.Plan.PlanItem.Events;
 using Orleans;
 
 namespace Flow.Grains.Plan.PlanningTable.Events

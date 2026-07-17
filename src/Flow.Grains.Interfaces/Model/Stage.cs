@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
@@ -15,7 +15,7 @@ namespace Flow.Grains.Interfaces.Model
         [JsonIgnore]
         [IgnoreDataMember]
         public IEnumerable<PlanItemDefinition> PlanItemDefinitionsNested => GetAllPlanItemDefinitions(this);
-        
+
         private static IEnumerable<PlanItemDefinition> GetAllPlanItemDefinitions(Stage stage)
         {
             yield return stage;

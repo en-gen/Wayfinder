@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
@@ -24,7 +24,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         public async Task HandleTransitioned__Given_ConfiguredBehavior__When_StateMachineCannotComplete__Then_ReturnFalse()
         {
             var eventListener = new UserEventListener();
-            
+
             var mockStore = new Mock<IBehaviorStore>();
             mockStore.Setup(x => x.PlanItemDefinition)
                 .Returns(eventListener);
@@ -142,7 +142,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var roleId = "admin";
             var eventListener = new UserEventListener
             {
-                AuthorizedRoleRefs =new [] { roleId }
+                AuthorizedRoleRefs = new[] { roleId }
             };
 
             var mockStore = new Mock<IBehaviorStore>();

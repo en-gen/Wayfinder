@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
@@ -36,7 +36,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
             subject.EntryCriterionStore.State.Should().HaveFlag(CriterionState.Unsatisfied);
             subject.EntryCriterionStore.State.Should().NotHaveFlag(CriterionState.Satisfied);
             subject.EntryCriterionStore.State.Should().NotHaveFlag(CriterionState.OnPartOccurred);
-            
+
             subject.ExitCriterionStore.SatisfiedByAddress.Should().BeNull();
             subject.ExitCriterionStore.State.Should().HaveFlag(CriterionState.Unsatisfied);
             subject.ExitCriterionStore.State.Should().NotHaveFlag(CriterionState.Satisfied);
@@ -123,7 +123,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
 
             subject.Updated.Should().HaveValue()
                 .And.Be(@event.Updated);
-            
+
             subject.EntryCriterionStore.State.Should().HaveFlag(CriterionState.Satisfied);
             if (onPartOccurred)
             {
@@ -144,7 +144,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
         {
             var scope = Guid.NewGuid().ToString();
             var sentryId = Guid.NewGuid().ToString();
-            
+
             var @event = new ExitCriterionSatisfied
             {
                 SourceScope = scope,
@@ -401,7 +401,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem
                 Definition = new Interfaces.Model.PlanItem(),
                 PlanItemDefinition = new Stage(),
                 Repetition = 0
-                
+
             });
 
             var @event = new ChildCreated

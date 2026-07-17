@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem;
@@ -34,7 +34,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.StateMachine
         [InlineData(typeof(HumanTask))]
         public void Ctor__When_StageOrTask__Then_ConfigureForStageOrTask(Type piDefType)
         {
-            var piDef = (PlanItemDefinition) Activator.CreateInstance(piDefType);
+            var piDef = (PlanItemDefinition)Activator.CreateInstance(piDefType);
 
             var store = CreateStore(piDef: piDef);
 
@@ -61,7 +61,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.StateMachine
             subject.State.Should().Be(preSuspendState);
             subject.ParentSuspendState.Should().BeNull();
         }
-        
+
         private PlanItemStore CreateStore(
             string caseDefId = null,
             PlanItemDefinition piDef = null,

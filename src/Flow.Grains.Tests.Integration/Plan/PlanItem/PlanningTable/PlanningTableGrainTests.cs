@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces;
@@ -122,7 +122,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
         {
             var expectedResult = new DiscretionaryItem
             {
-                ApplicabilityRuleRefs = new []
+                ApplicabilityRuleRefs = new[]
                 {
                     Rules.IsApplicable.Id
                 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Specialized;
 using Flow.Grains.Executables;
 using Flow.Grains.Infrastructure.Quartz;
