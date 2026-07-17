@@ -1,4 +1,4 @@
-﻿using Flow.Grains.Interfaces;
+using Flow.Grains.Interfaces;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.Sentry;
 using Flow.Grains.Plan.Sentry.Events;

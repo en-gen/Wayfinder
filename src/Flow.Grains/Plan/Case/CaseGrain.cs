@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -104,8 +104,8 @@ namespace Flow.Grains.Plan.Case
         {
             var caseDefinitionGrain = GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId);
 
-            if(!await caseDefinitionGrain.Defined()) throw new InvalidOperationException($"case definition {caseDefinitionId} not found");
-            if(State.Defined) throw new InvalidOperationException($"case {_caseInstanceId} has already been created");
+            if (!await caseDefinitionGrain.Defined()) throw new InvalidOperationException($"case definition {caseDefinitionId} not found");
+            if (State.Defined) throw new InvalidOperationException($"case {_caseInstanceId} has already been created");
 
             var @case = await caseDefinitionGrain.GetDefinition();
             @case.CasePlanModel.IsCasePlanModel = true;

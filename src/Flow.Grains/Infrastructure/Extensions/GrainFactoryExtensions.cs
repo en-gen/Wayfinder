@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Interfaces.Plan.CaseFileItem;
 using Flow.Grains.Plan.CaseFileItem;
 using Flow.Grains.Scheduler;

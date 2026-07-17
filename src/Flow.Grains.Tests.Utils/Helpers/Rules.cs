@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Interfaces.Model;
 
 namespace Flow.Grains.Tests.Utils.Helpers

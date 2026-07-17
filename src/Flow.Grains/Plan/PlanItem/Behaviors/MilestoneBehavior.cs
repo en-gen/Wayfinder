@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces.Model;
@@ -22,7 +22,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             StateMachine.Configure(PlanItemState.Available)
                 .OnEntryFromAsync(PlanItemTransition.Create, HandleEnterAvailableFromCreate);
         }
-        
+
         // 8.11 - EventListener and Milestone instance transitions
         // ~~~~~
         // Create: Transition to the initial state (Available) when an EventListener
@@ -69,7 +69,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
 
             // disregard events in our scope, but are not our concern
             if (criterion == null) return;
-            
+
             Host.LogWithContext(logger => logger.LogInformation(
                 "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | {CriterionType} {CriterionId} satisfied by sentry {SentryRef}.  OnPart: {OnPartOccurred}",
                 Host.Definition.GetType().Name,
@@ -80,7 +80,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 criterion.Id,
                 @event.SourceDefinitionId,
                 @event.OnPartOccurred));
-            
+
             Host.RaiseEvent(new EntryCriterionSatisfied
             {
                 SourceScope = @event.SourceScope,
@@ -130,11 +130,11 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             {
                 case PlanItemTransition.Suspend:
                 case PlanItemTransition.ParentSuspend:
-                {
-                    Host.RaiseEvent(new ParentSuspended());
-                    transition = PlanItemTransition.Suspend;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentSuspended());
+                        transition = PlanItemTransition.Suspend;
+                        break;
+                    }
                 case PlanItemTransition.Resume:
                 case PlanItemTransition.ParentResume:
                 // Table 8.6 re-activate + Table 8.9 note (2) (#63 D8 carve-out): see
@@ -144,18 +144,18 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // gating - Available is the only pre-Suspend state), and StateMachine.CanFire
                 // below still no-ops for a child not currently Suspended.
                 case PlanItemTransition.Reactivate:
-                {
-                    Host.RaiseEvent(new ParentResumed());
-                    transition = PlanItemTransition.Resume;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentResumed());
+                        transition = PlanItemTransition.Resume;
+                        break;
+                    }
                 case PlanItemTransition.Exit:
                 case PlanItemTransition.Terminate:
-                {
-                    Host.RaiseEvent(new ParentTerminated());
-                    transition = PlanItemTransition.ParentTerminate;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentTerminated());
+                        transition = PlanItemTransition.ParentTerminate;
+                        break;
+                    }
             }
 
             if (transition.HasValue && StateMachine.CanFire(transition.Value))

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Flow.Grains.Executables;
@@ -90,7 +90,7 @@ namespace Flow.Grains.Plan.PlanningTable
                     .ExecuteAsBool(rule.ContextRef, rule.Condition);
             }
             var result = ruleResult?.Value ?? true;
-            
+
             RaiseEvent(new ApplicabilityRuleEvaluated
             {
                 Result = result,

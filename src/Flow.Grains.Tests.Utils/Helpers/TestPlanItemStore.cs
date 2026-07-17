@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Events;

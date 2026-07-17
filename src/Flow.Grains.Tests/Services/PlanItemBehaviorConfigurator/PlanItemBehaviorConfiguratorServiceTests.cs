@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces.Model;
@@ -29,7 +29,7 @@ namespace Flow.Grains.Tests.Services.PlanItemBehaviorConfigurator
                 Definition = planItem,
                 PlanItemDefinition = new Milestone()
             });
-            
+
             var host = new Mock<IBehaviorHost>();
             host.Setup(x => x.State)
                 .Returns(planItemStore);

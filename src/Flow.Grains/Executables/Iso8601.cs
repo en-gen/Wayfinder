@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using NodaTime.Text;
 using Orleans;
@@ -17,7 +17,7 @@ namespace Flow.Grains.Executables
         public int? Repetitions { get; }
 
         [Id(3)]
-        public DateTime? Start { get;  }
+        public DateTime? Start { get; }
         [Id(4)]
         public DateTime? End { get; }
         [Id(5)]
@@ -25,10 +25,10 @@ namespace Flow.Grains.Executables
 
         public Iso8601(string iso8601)
         {
-            if(string.IsNullOrWhiteSpace(iso8601)) throw new ArgumentNullException(nameof(iso8601));
+            if (string.IsNullOrWhiteSpace(iso8601)) throw new ArgumentNullException(nameof(iso8601));
 
             RawValue = iso8601;
-            
+
             var isoParts = iso8601.Split('/');
             if (isoParts.Any(string.IsNullOrWhiteSpace))
             {
@@ -43,7 +43,7 @@ namespace Flow.Grains.Executables
             {
                 HasRepetitions = true;
                 var repetitionPart = isoParts[partsIndex];
-                if(repetitionPart.Length > 1)
+                if (repetitionPart.Length > 1)
                 {
                     if (int.TryParse(isoParts[partsIndex].Substring(1), out var repetitions))
                     {
@@ -57,7 +57,7 @@ namespace Flow.Grains.Executables
 
                 partsIndex++;
             }
-            
+
             /*
              * <start>/<end>
              * <start>/<duration>
@@ -67,7 +67,7 @@ namespace Flow.Grains.Executables
             {
                 var firstPart = isoParts[partsIndex];
                 var secondPart = isoParts[partsIndex + 1];
-                
+
                 if (firstPart.StartsWith('P') && secondPart.StartsWith('P'))
                 {
                     throw new ArgumentException($"provided ISO8601 string {iso8601} is invalid", nameof(iso8601));

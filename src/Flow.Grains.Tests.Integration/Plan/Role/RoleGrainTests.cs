@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces;
@@ -66,7 +66,7 @@ namespace Flow.Grains.Tests.Integration.Plan.Role
             {
                 Name = "admin"
             };
-            
+
             var roleGrain = _clusterClient.GetGrain<IRoleGrain>(caseInstanceId, role.Id);
 
             await roleGrain.Define(caseDefinitionId, role);

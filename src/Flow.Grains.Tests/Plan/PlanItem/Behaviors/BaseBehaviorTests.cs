@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
@@ -247,7 +247,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
-            
+
             var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
 
             await subject.EvaluateRepetitionRule();
@@ -318,7 +318,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
-            
+
             var mockExpressionGrain = new Mock<IExpressionGrain>();
             mockExpressionGrain
                 .Setup(x => x.ExecuteAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition))
@@ -397,7 +397,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         public async Task EvaluateManualActivationRule__Given_Host__When_NoItemControl__Then_True(Guid caseInstanceId)
         {
             var planItem = new Interfaces.Model.PlanItem();
-            
+
             var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
 
             var mockHost = new Mock<IBehaviorHost>();
@@ -709,7 +709,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             public PlanItemControl GetItemControl()
             {
                 var mi = GetType().BaseType.GetMethod(nameof(GetItemControl), BindingFlags.Instance | BindingFlags.NonPublic);
-                return (PlanItemControl) mi.Invoke(this, Array.Empty<object>());
+                return (PlanItemControl)mi.Invoke(this, Array.Empty<object>());
             }
         }
     }

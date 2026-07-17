@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Flow.Grains.Expressions;
@@ -58,7 +58,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Setup(x => x.State)
                 .Returns(testStore);
             mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
-                .Callback<object>(x => testStore.Apply((dynamic) x));
+                .Callback<object>(x => testStore.Apply((dynamic)x));
             mockHost.Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
@@ -66,7 +66,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var subject = new TaskBehavior<HumanTask>(mockHost.Object, task, mockMachine.Object);
 
-            Func<Task> act = () => (Task) typeof(TaskBehavior<HumanTask>)
+            Func<Task> act = () => (Task)typeof(TaskBehavior<HumanTask>)
                 .GetMethod("HandleEnterAvailableFromCreate", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[0]);
 

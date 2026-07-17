@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Plan;
 using Flow.Grains.Plan.PlanItem.StateMachine;
 using Microsoft.Extensions.Logging;

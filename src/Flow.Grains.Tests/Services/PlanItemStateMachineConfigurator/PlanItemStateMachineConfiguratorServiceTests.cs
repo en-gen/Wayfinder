@@ -1,4 +1,4 @@
-﻿using AutoFixture.Xunit2;
+using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem;
 using Flow.Grains.Plan.PlanItem.Events;
@@ -23,12 +23,12 @@ namespace Flow.Grains.Tests.Services.PlanItemStateMachineConfigurator
             var store = new PlanItemStore();
             store.Apply(new Defined
             {
-               CaseDefinitionId = caseDefinitionId,
-               PlanItemDefinition = new Milestone()
+                CaseDefinitionId = caseDefinitionId,
+                PlanItemDefinition = new Milestone()
             });
 
             var subject = CreateSubject();
-            
+
             var stateMachine = subject.Configure(store);
 
             var info = stateMachine.GetInfo();
@@ -42,7 +42,7 @@ namespace Flow.Grains.Tests.Services.PlanItemStateMachineConfigurator
             logFactory
                 .Setup(x => x.CreateLogger(PlanItemStateMachineTypeName))
                 .Returns(Mock.Of<ILogger<PlanItemStateMachine>>());
-            
+
             return new PlanItemStateMachineConfiguratorService(logFactory.Object);
         }
     }

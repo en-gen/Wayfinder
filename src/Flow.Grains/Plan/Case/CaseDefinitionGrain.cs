@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -45,7 +45,7 @@ namespace Flow.Grains.Plan.Case
         }
 
         public Task<bool> Defined() => Task.FromResult(State.Defined);
-        
+
         public async Task Define(Interfaces.Model.Case definition)
         {
             // ADO #66 - Case.ExitCriteria was disconnected from CasePlanModel.ExitCriteria

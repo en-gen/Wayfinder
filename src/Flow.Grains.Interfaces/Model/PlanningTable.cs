@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
@@ -12,7 +12,7 @@ namespace Flow.Grains.Interfaces.Model
         [JsonIgnore]
         [IgnoreDataMember]
         public IEnumerable<DiscretionaryItem> DiscretionaryItems => GetDiscretionaryItems(this);
-        
+
         private static IEnumerable<DiscretionaryItem> GetDiscretionaryItems(PlanningTable table)
         {
             foreach (var tableItem in table.TableItems)
@@ -20,18 +20,18 @@ namespace Flow.Grains.Interfaces.Model
                 switch (tableItem)
                 {
                     case DiscretionaryItem discretionaryItem:
-                    {
-                        yield return discretionaryItem;
-                        break;
-                    }
-                    case PlanningTable planningTable:
-                    {
-                        foreach (var subItem in GetDiscretionaryItems(planningTable))
                         {
-                            yield return subItem;
+                            yield return discretionaryItem;
+                            break;
                         }
-                        break;
-                    }
+                    case PlanningTable planningTable:
+                        {
+                            foreach (var subItem in GetDiscretionaryItems(planningTable))
+                            {
+                                yield return subItem;
+                            }
+                            break;
+                        }
                 }
             }
         }

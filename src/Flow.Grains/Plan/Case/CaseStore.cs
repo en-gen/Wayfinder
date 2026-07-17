@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.Case.Events;
 using Flow.Grains.Plan.CmmnElement;
@@ -58,7 +58,7 @@ namespace Flow.Grains.Plan.Case
 
         [Id(14)]
         public object BehaviorExtension { get; private set; }
-        
+
         public void Apply(CaseCreated @event)
         {
             base.Apply(@event);

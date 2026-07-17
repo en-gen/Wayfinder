@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Flow.Grains.Executables;
@@ -23,7 +23,7 @@ namespace Flow.Grains.Expressions
     // them without touching any of those call sites. Behavior-rule *wiring* itself is out of scope for
     // this work item (that already shipped); only this binder was the gap.
     [StatelessWorker]
-    public class ExpressionGrain: Grain, IExpressionGrain
+    public class ExpressionGrain : Grain, IExpressionGrain
     {
         // 5.4.6.4 / 5.3.2 - IfPart.ContextRef / ApplicabilityRule.ContextRef etc. are all optional
         // IDREFs to a CaseFileItem. When bound, the CaseFileItem's Value (a JsonNode of any shape -

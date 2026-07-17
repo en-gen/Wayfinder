@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
@@ -32,7 +32,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         // scope, not Address/Scope - the same instance-vs-definition confusion #63 fixed for the
         // parent-transition subscription, here in the definition-index lookup (#65).
         string DefinitionScope { get; }
-        
+
         IBehaviorDefinition Definition { get; }
         IBehaviorStore State { get; }
 
