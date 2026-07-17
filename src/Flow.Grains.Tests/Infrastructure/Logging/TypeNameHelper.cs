@@ -9,7 +9,7 @@ namespace Flow.Grains.Tests.Infrastructure.Logging
     {
         private const char DefaultNestedTypeDelimiter = '+';
 
-        private static readonly Dictionary<Type, string> _builtInTypeNames = new Dictionary<Type, string>
+        private static readonly Dictionary<Type, string> BuiltInTypeNames = new Dictionary<Type, string>
         {
             { typeof(void), "void" },
             { typeof(bool), "bool" },
@@ -61,7 +61,7 @@ namespace Flow.Grains.Tests.Infrastructure.Logging
             {
                 ProcessArrayType(builder, type, options);
             }
-            else if (_builtInTypeNames.TryGetValue(type, out string builtInName))
+            else if (BuiltInTypeNames.TryGetValue(type, out string builtInName))
             {
                 builder.Append(builtInName);
             }
