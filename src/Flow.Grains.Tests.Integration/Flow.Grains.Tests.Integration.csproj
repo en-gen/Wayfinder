@@ -42,7 +42,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <!-- pinned: last version before v8's Xceed commercial license -->
-    <PackageReference Include="FluentAssertions" Version="7.2.0" />
+    <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <!-- Azurite restart-survival suite (work item #54): journaled-grain storage backend under test. -->
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
