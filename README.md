@@ -55,14 +55,10 @@ Dependency security is enforced at restore time: NuGet Audit fails any build wit
 
 ## Documentation
 
-- **Project wiki** — *what is built*: architecture, plan-item lifecycles, technical decisions, current state and gaps
-- **Work items / [docs/07-product-roadmap.md](docs/07-product-roadmap.md)** — *what is planned*: milestones M0–M4, expression-language strategy
+- **GitHub Issues and Milestones** — *what is planned*: roadmap milestones and expression-language strategy
 - [docs/01-cmmn-overview.md](docs/01-cmmn-overview.md) — CMMN standard overview and concept mapping
 - [docs/02-codebase-evaluation.md](docs/02-codebase-evaluation.md) — architectural assessment (historical snapshot, pre-modernization)
-- [docs/03-modernization-plan.md](docs/03-modernization-plan.md) — modernization plan (historical; executed as milestone M0)
-- [docs/04-market-analysis.md](docs/04-market-analysis.md) — market landscape and positioning
-- [docs/05-business-case.md](docs/05-business-case.md) — business case
-- [docs/06-commercial-readiness-deep-dive.md](docs/06-commercial-readiness-deep-dive.md) — spec-adherence, quality, and market deep-dive
+- [docs/08-orleans-provider-evaluation.md](docs/08-orleans-provider-evaluation.md) — Orleans storage and stream provider evaluation
 
 ## Building and Testing
 
