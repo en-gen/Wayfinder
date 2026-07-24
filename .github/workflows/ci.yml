@@ -1,0 +1,141 @@
+# Case.Flow CI — version, build, test, merged coverage.
+#
+# GitHub Actions port of devops/build/case.flow.ci.yml (Azure Pipelines). Same
+# stack: GitVersion 6.x computes SemVer from GitVersion.yml + `Case.Flow-`
+# tags, dotnet build/test on the SDK pinned in global.json, Coverlet collects
+# and merges coverage across both test projects.
+#
+# Deliberate differences from the ADO pipeline:
+#   - No custom PackageVersion/build-number reconstruction. GitVersion's own
+#     SemVer already carries a per-branch incrementing pre-release number
+#     (e.g. 1.0.0-develop.5); ADO rebuilt that only to rename its run list,
+#     which has no GitHub Actions equivalent worth replicating.
+#   - Coverage/test-result publishing uses GitHub-native equivalents
+#     (dorny/test-reporter for trx, an uploaded artifact, and Codecov) in
+#     place of the ADO PublishTestResults@2 / PublishCodeCoverageResults@2
+#     tasks.
+
+name: CI
+
+on:
+  push:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: 0 # skip git hook installation in CI (Husky hook lives on another branch)
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      COVERAGE_DIR: ${{ github.workspace }}/coverage
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GitVersion needs full history
+          fetch-tags: true # ...and tags (Case.Flow-<version> release tags)
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Run GitVersion
+        id: gitversion
+        shell: pwsh
+        run: |
+          dotnet tool install --global GitVersion.Tool --version 6.*
+          $toolPath = Join-Path $env:HOME '.dotnet/tools/dotnet-gitversion'
+          $json = & $toolPath /output json
+          if ($LASTEXITCODE -ne 0) { Write-Error "GitVersion failed:`n$json"; exit 1 }
+          Write-Host ($json -join "`n")
+          $gv = ($json -join "`n") | ConvertFrom-Json
+
+          # Surface the values downstream jobs/steps need via steps.gitversion.outputs.*
+          $names = @(
+              'Major', 'Minor', 'Patch',
+              'MajorMinorPatch',      # "1.0.0" - clean 3-part version
+              'SemVer',               # "1.0.0-develop.5" - canonical string, used as -p:Version
+              'FullSemVer',
+              'AssemblySemVer',       # "1.0.0.0" - 4-part assembly version
+              'AssemblySemFileVer',
+              'InformationalVersion', # version + branch + sha
+              'BuildMetaData',
+              'PreReleaseLabel',      # "develop", "rc", ...
+              'PreReleaseNumber',
+              'BranchName',
+              'Sha', 'ShortSha'
+          )
+          foreach ($n in $names) {
+              $value = $gv.$n
+              if ($null -eq $value) { $value = '' }
+              "$n=$value" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
+              Write-Host "GitVersion.$n = $value"
+          }
+
+      - name: Build (${{ steps.gitversion.outputs.SemVer }})
+        run: >
+          dotnet build src/CaseFlow.sln -c Release
+          -p:Version=${{ steps.gitversion.outputs.SemVer }}
+          -p:AssemblyVersion=${{ steps.gitversion.outputs.AssemblySemVer }}
+          -p:FileVersion=${{ steps.gitversion.outputs.AssemblySemFileVer }}
+          -p:InformationalVersion="${{ steps.gitversion.outputs.InformationalVersion }}"
+
+      # Vulnerable-package enforcement is restore-time via NuGet Audit
+      # (Directory.Build.props: NU1902-NU1904 as errors, transitive included),
+      # so the Build step above already fails on any vulnerable package - no
+      # separate gate step needed here either (work item #12).
+
+      - name: Unit tests (+coverage)
+        run: >
+          dotnet test src/Flow.Grains.Tests/Flow.Grains.Tests.csproj
+          -c Release --no-build --logger trx
+          /p:CollectCoverage=true
+          /p:CoverletOutput=${{ env.COVERAGE_DIR }}/
+          /p:CoverletOutputFormat=json
+          /p:Exclude="[*.Tests*]*"
+
+      # Azurite for the opt-in restart-survival suite is Testcontainers-provisioned per run:
+      # AzuriteClusterFixture starts and tears down its own container via Testcontainers.Azurite,
+      # so no separate start/readiness-wait step is needed - ubuntu-latest already has Docker,
+      # which is all the suite requires. RequiresDockerFact (Flow.Grains.Tests.Integration/Storage)
+      # skips (does not fail) if Docker itself isn't reachable.
+      - name: Integration tests (+merged coverage)
+        run: >
+          dotnet test src/Flow.Grains.Tests.Integration/Flow.Grains.Tests.Integration.csproj
+          -c Release --no-build --logger trx
+          /p:CollectCoverage=true
+          /p:MergeWith=${{ env.COVERAGE_DIR }}/coverage.json
+          /p:CoverletOutput=${{ env.COVERAGE_DIR }}/merged
+          /p:CoverletOutputFormat=cobertura
+          /p:Exclude="[*.Tests*]*"
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test results
+          path: '**/*.trx'
+          reporter: dotnet-trx
+          fail-on-error: false
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ env.COVERAGE_DIR }}/merged.cobertura.xml
+          if-no-files-found: warn
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # private repo: tokenless upload won't work: add the repo secret
+          files: ${{ env.COVERAGE_DIR }}/merged.cobertura.xml
+          fail_ci_if_error: false
