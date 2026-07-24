@@ -49,11 +49,10 @@ comparing:
   (`Program.cs:151`) — **in-memory in both environments today**, not Table/Blob. The brief's
   "durable PubSubStore on Table/Blob" describes an intended, not yet implemented, state.
 - **Streams**: `AddMemoryStreams("Default")` (`Program.cs:152`) — **in-memory in both
-  environments today**, not Azure Queue. This is a known, already-documented correctness gap
-  (`docs/06-commercial-readiness-deep-dive.md` §3.2: *"Fire-and-forget stream delivery
-  (`FireAndForgetDelivery = true`) — a deactivated sentry silently misses transition events and
-  stays unsatisfied forever"*), and the M2 roadmap item that fixes it (`docs/07-product-roadmap.md`
-  M2.1: *"replace fire-and-forget SMS streams for criticality-1 events"*) hasn't landed.
+  environments today**, not Azure Queue. This is a known correctness gap: with fire-and-forget
+  stream delivery (`FireAndForgetDelivery = true`), a deactivated sentry silently misses
+  transition events and stays unsatisfied forever. The roadmap item that fixes it — replacing
+  fire-and-forget streams for criticality-1 events — hasn't landed.
 
 Practically: this memo's Streams section (§5.4) is evaluating **what should replace memory
 streams**, not swapping between two already-durable options. Everything else — clustering,

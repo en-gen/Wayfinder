@@ -156,5 +156,3 @@ A financial audit engagement is a strong fit for CMMN modeling. Key mapping:
 | Mandatory ISA/GAAS procedures | Required tasks |
 | Partner sign-off required | ManualActivationRule |
 | Re-test after failure | RepetitionRule |
-
-See [docs/04-market-analysis.md](docs/04-market-analysis.md) for the full market context.
