@@ -59,7 +59,7 @@ This project was recently renamed **Case.Flow → Wayfinder**. The rename is in 
 | `src/Flow.Grains.Tests.Utils` | Shared test utilities and mocks |
 | `src/Flow.Api.Tests` | API layer tests |
 | `devops/` | CI pipeline, deploy, and infrastructure (Docker Compose for local dependencies) |
-| `docs/` | Design docs — CMMN overview, roadmap, market/business analysis, architecture evaluations |
+| `docs/` | Design docs — CMMN overview and architecture evaluations |
 
 ## Technology Stack
 
@@ -76,14 +76,10 @@ Dependency security is enforced at restore time: NuGet Audit fails any build wit
 ## Documentation
 
 - **[COVERAGE.md](src/Flow.Grains.Tests.Integration/Conformance/COVERAGE.md)** — *what is built and verified*: the internal CMMN conformance suite's row-by-row spec mapping
-- **Work items / [docs/07-product-roadmap.md](docs/07-product-roadmap.md)** — *what is planned*: milestones, expression-language strategy
+- **GitHub Milestones** — *what is planned*: roadmap milestones and expression-language strategy
 - **GitHub Issues** — bug reports, feature requests, and open questions
 - [docs/01-cmmn-overview.md](docs/01-cmmn-overview.md) — CMMN standard overview and concept mapping
 - [docs/02-codebase-evaluation.md](docs/02-codebase-evaluation.md) — architectural assessment (historical snapshot, pre-modernization)
-- [docs/03-modernization-plan.md](docs/03-modernization-plan.md) — modernization plan (historical)
-- [docs/04-market-analysis.md](docs/04-market-analysis.md) — market landscape and positioning
-- [docs/05-business-case.md](docs/05-business-case.md) — business case
-- [docs/06-commercial-readiness-deep-dive.md](docs/06-commercial-readiness-deep-dive.md) — spec-adherence, quality, and market deep-dive
 - [docs/08-orleans-provider-evaluation.md](docs/08-orleans-provider-evaluation.md) — Orleans storage/streaming provider evaluation
 
 ## Building and Testing
