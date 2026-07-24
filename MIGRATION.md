@@ -58,7 +58,7 @@ so CI passes without it — but coverage will not land until the secret is added
 | Build pipeline (`devops/build/case.flow.ci.yml`) | `.github/workflows/ci.yml` | ⏸ Written + reviewed — **blocked on `workflow` scope** |
 | CD pipeline (`Case.Flow.CD` — never authored in ADO) | `.github/workflows/cd.yml` | ⏳ To draft (same scope blocker) |
 | Branch policies (build validation on develop/main) | Branch protection / rulesets | ⛔ **Blocked — needs paid plan** (see above) |
-| Work items (~135, full hierarchy) | Issues + Milestones + sub-issues + labels | ⏳ In progress |
+| Work items (138, full hierarchy) | Issues + Milestones + sub-issues + labels | ✅ **Done** — 130 issues (80 open / 50 closed), 8 milestones, 18 labels, 5 sub-issue links, 60 comments |
 | Project wiki | `docs/` in-repo + GitHub Issues | ✅ Docs already in-repo; wiki disabled |
 | README / issue + PR templates / CODEOWNERS / Dependabot | `.github/*`, `README.md` | ⏳ In review (`chore/repo-scaffolding`) |
 | NuGet Audit gate (moderate+ advisories fail the build) | Unchanged — `Directory.Build.props` | ✅ Moved with the code |
@@ -73,6 +73,15 @@ so CI passes without it — but coverage will not land until the secret is added
 - **Type, priority (P1/P2/P3), tags** → **labels**
 - **State**: New/Active/Resolved → open (Resolved labelled); Closed → closed; Removed → closed + `removed`
 - Original ADO id and links are preserved in each issue body for traceability.
+
+**Verified after the run** (checked against GitHub directly, not the migration script's own summary):
+130 issues — 80 open / 50 closed; 121 carry a milestone and the other 9 are exactly the legacy
+block (ADO #1–8, #71), which correctly have none. Issue bodies are **byte-verbatim** ADO
+descriptions converted to Markdown — an audit found 60 of 130 were not byte-exact on the first
+pass (HTML-entity artifacts plus some paraphrase) and all were re-fetched from ADO and replaced.
+Epic-level comments, which have nowhere to live once epics become milestones, were folded into
+the milestone descriptions — including M1's "REOPENING" note, so the record of *why* that
+milestone is open survives the move.
 
 ---
 
