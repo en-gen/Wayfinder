@@ -3,3 +3,7 @@
 # contributor's Linux dev machine) - CRLF line endings on a shebang line make the interpreter path
 # unresolvable ("bad interpreter"). Force LF regardless of the checkout OS's core.autocrlf setting.
 *.sh text eol=lf
+
+# Husky.NET pre-commit hook is a #!/bin/sh script with no file extension - same
+# "bad interpreter" risk as the .sh files above, so force LF on checkout too.
+.husky/pre-commit text eol=lf

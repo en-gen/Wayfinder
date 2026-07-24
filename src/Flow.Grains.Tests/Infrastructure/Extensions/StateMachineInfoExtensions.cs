@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Flow.Grains.Interfaces.Model;
 using FluentAssertions;
 using FluentAssertions.Primitives;
@@ -12,8 +12,8 @@ namespace Flow.Grains.Tests.Infrastructure.Extensions
         {
             should.BeAssignableTo<StateMachineInfo>();
 
-            var info = (StateMachineInfo) should.Subject;
-            
+            var info = (StateMachineInfo)should.Subject;
+
             info.StateType.Should().Be<PlanItemState>();
             info.TriggerType.Should().Be<PlanItemTransition>();
 

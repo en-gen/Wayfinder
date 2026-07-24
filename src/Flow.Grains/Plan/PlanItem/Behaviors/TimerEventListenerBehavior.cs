@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Executables;
@@ -39,26 +39,26 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             switch (PlanItemDefinition.TimerStart)
             {
                 case PlanItemStartTrigger piStartTrigger:
-                {
-                    return Host.SubscribeTo<PlanItemTransitionedEvent>(
-                        piStartTrigger.SourceRef,
-                        HandleStartTriggerSourceTransitioned,
-                        StreamFlags.Resume);
-                }
+                    {
+                        return Host.SubscribeTo<PlanItemTransitionedEvent>(
+                            piStartTrigger.SourceRef,
+                            HandleStartTriggerSourceTransitioned,
+                            StreamFlags.Resume);
+                    }
                 case CaseFileItemStartTrigger cfiStartTrigger:
-                {
-                    return Host.SubscribeTo<CaseFileItemTransitionedEvent>(
-                        cfiStartTrigger.SourceRef,
-                        HandleStartTriggerSourceTransitioned,
-                        StreamFlags.Resume);
-                }
+                    {
+                        return Host.SubscribeTo<CaseFileItemTransitionedEvent>(
+                            cfiStartTrigger.SourceRef,
+                            HandleStartTriggerSourceTransitioned,
+                            StreamFlags.Resume);
+                    }
                 default:
-                {
-                    return Task.CompletedTask;
-                }
+                    {
+                        return Task.CompletedTask;
+                    }
             }
         }
-        
+
         // if we have a start trigger, subscribe
         // if we have a start date (from expression) schedule start
         // if we have both, error
@@ -108,32 +108,32 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             switch (PlanItemDefinition.TimerStart)
             {
                 case null:
-                {
-                    // no deferred start trigger, so schedule immediately
-                    await Host.SubscribeTo<TimerTickedEvent>(
-                        Host.InstanceId,
-                        HandleTimerTickedEvent,
-                        StreamFlags.Create);
-                    await Host.GrainFactory.GetScheduler(Host.CaseInstanceId)
-                        .ScheduleTimer(Host.InstanceId, TimerStore.TimerSchedule, null, Host.Context);
-                    break;
-                }
+                    {
+                        // no deferred start trigger, so schedule immediately
+                        await Host.SubscribeTo<TimerTickedEvent>(
+                            Host.InstanceId,
+                            HandleTimerTickedEvent,
+                            StreamFlags.Create);
+                        await Host.GrainFactory.GetScheduler(Host.CaseInstanceId)
+                            .ScheduleTimer(Host.InstanceId, TimerStore.TimerSchedule, null, Host.Context);
+                        break;
+                    }
                 case PlanItemStartTrigger piStartTrigger:
-                {
-                    await Host.SubscribeTo<PlanItemTransitionedEvent>(
-                        piStartTrigger.SourceRef,
-                        HandleStartTriggerSourceTransitioned,
-                        StreamFlags.Create);
-                    break;
-                }
+                    {
+                        await Host.SubscribeTo<PlanItemTransitionedEvent>(
+                            piStartTrigger.SourceRef,
+                            HandleStartTriggerSourceTransitioned,
+                            StreamFlags.Create);
+                        break;
+                    }
                 case CaseFileItemStartTrigger cfiStartTrigger:
-                {
-                    await Host.SubscribeTo<CaseFileItemTransitionedEvent>(
-                        cfiStartTrigger.SourceRef,
-                        HandleStartTriggerSourceTransitioned,
-                        StreamFlags.Create);
-                    break;
-                }
+                    {
+                        await Host.SubscribeTo<CaseFileItemTransitionedEvent>(
+                            cfiStartTrigger.SourceRef,
+                            HandleStartTriggerSourceTransitioned,
+                            StreamFlags.Create);
+                        break;
+                    }
             }
         }
 
@@ -188,8 +188,8 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 Host.Scope,
                 Host.InstanceId,
                 PlanItemDefinition.TimerStart.GetType().Name,
-                (string)((dynamic) PlanItemDefinition.TimerStart).SourceRef,
-                (object)((dynamic) PlanItemDefinition.TimerStart).StandardEvent));
+                (string)((dynamic)PlanItemDefinition.TimerStart).SourceRef,
+                (object)((dynamic)PlanItemDefinition.TimerStart).StandardEvent));
 
             Host.RaiseEvent(new TimerStartTriggerOccurred
             {
@@ -221,7 +221,7 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
         private async Task<Iso8601> EvaluateTimerExpression()
         {
             if (PlanItemDefinition.TimerExpression == null) return null;
-            
+
             var timerExpressionResult = await Host.GrainFactory.GetGrain<IExpressionGrain>(Host.CaseInstanceId)
                 .ExecuteAsIso8601(null, PlanItemDefinition.TimerExpression);
 

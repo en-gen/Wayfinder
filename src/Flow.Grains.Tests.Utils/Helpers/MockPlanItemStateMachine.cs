@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan;

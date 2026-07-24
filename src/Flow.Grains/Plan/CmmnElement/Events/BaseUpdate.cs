@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces;
 using Orleans;

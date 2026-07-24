@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Flow.Grains.Plan.PlanItem.Events;
 using Orleans;

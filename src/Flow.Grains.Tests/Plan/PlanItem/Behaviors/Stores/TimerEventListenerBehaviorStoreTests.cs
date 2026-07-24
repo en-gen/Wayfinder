@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using AutoFixture.Xunit2;
@@ -37,7 +37,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors.Stores
             };
 
             var subject = new TimerEventListenerBehaviorStore();
-            
+
             subject.Apply(@event);
 
             subject.TimerSchedule.Should().Be(@event.Result);

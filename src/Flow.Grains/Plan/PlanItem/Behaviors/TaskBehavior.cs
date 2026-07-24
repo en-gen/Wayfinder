@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces.Model;
@@ -135,11 +135,11 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             {
                 case PlanItemTransition.Suspend:
                 case PlanItemTransition.ParentSuspend:
-                {
-                    Host.RaiseEvent(new ParentSuspended());
-                    transition = PlanItemTransition.ParentSuspend;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentSuspended());
+                        transition = PlanItemTransition.ParentSuspend;
+                        break;
+                    }
                 case PlanItemTransition.Resume:
                 case PlanItemTransition.ParentResume:
                 // Table 8.6 re-activate + Table 8.9 note (2) (#63 D8 carve-out): see
@@ -148,18 +148,18 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
                 // ParentSuspendState.HasValue so this no-ops for a child not actually cascaded
                 // into Suspended.
                 case PlanItemTransition.Reactivate:
-                {
-                    Host.RaiseEvent(new ParentResumed());
-                    transition = PlanItemTransition.ParentResume;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentResumed());
+                        transition = PlanItemTransition.ParentResume;
+                        break;
+                    }
                 case PlanItemTransition.Exit:
                 case PlanItemTransition.Terminate:
-                {
-                    Host.RaiseEvent(new ParentTerminated());
-                    transition = PlanItemTransition.Exit;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentTerminated());
+                        transition = PlanItemTransition.Exit;
+                        break;
+                    }
             }
 
             if (transition.HasValue && StateMachine.CanFire(transition.Value))

@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Flow.Grains.Events;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.PlanItem.Events;
@@ -39,29 +39,29 @@ namespace Flow.Grains.Plan.PlanItem.Behaviors
             {
                 case PlanItemTransition.Suspend:
                 case PlanItemTransition.ParentSuspend:
-                {
-                    Host.RaiseEvent(new ParentSuspended());
-                    transition = PlanItemTransition.Suspend;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentSuspended());
+                        transition = PlanItemTransition.Suspend;
+                        break;
+                    }
                 case PlanItemTransition.Resume:
                 case PlanItemTransition.ParentResume:
                 // Table 8.6 re-activate + Table 8.9 note (2) (#63 D8 carve-out): see
                 // StageBehavior.HandleParentTransitioned's remarks - the Case leaves Suspended via
                 // Reactivate, not Resume. Mirrors MilestoneBehavior's unconditional Resume permit.
                 case PlanItemTransition.Reactivate:
-                {
-                    Host.RaiseEvent(new ParentResumed());
-                    transition = PlanItemTransition.Resume;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentResumed());
+                        transition = PlanItemTransition.Resume;
+                        break;
+                    }
                 case PlanItemTransition.Exit:
                 case PlanItemTransition.Terminate:
-                {
-                    Host.RaiseEvent(new ParentTerminated());
-                    transition = PlanItemTransition.ParentTerminate;
-                    break;
-                }
+                    {
+                        Host.RaiseEvent(new ParentTerminated());
+                        transition = PlanItemTransition.ParentTerminate;
+                        break;
+                    }
             }
 
             if (transition.HasValue && StateMachine.CanFire(transition.Value))

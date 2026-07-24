@@ -1,4 +1,4 @@
-﻿using Flow.Grains.Plan.CmmnElement;
+using Flow.Grains.Plan.CmmnElement;
 using Orleans;
 
 namespace Flow.Grains.Plan.PlanningTable

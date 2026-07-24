@@ -135,6 +135,7 @@ jobs:
       assemblySemFileVer: $[dependencies.Version.outputs['publish.AssemblySemFileVer']]
       informationalVersion: $[dependencies.Version.outputs['publish.InformationalVersion']]
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      HUSKY: 0   # ADO doesn't auto-set CI=true like GitHub Actions - skip git hook installation in CI
 
     steps:
       - task: UseDotNet@2
@@ -142,6 +143,9 @@ jobs:
         inputs:
           packageType: sdk
           version: 10.x
+
+      - script: dotnet format src/CaseFlow.sln --verify-no-changes
+        displayName: Format check
 
       - script: >
           dotnet build src/CaseFlow.sln -c Release -v minimal

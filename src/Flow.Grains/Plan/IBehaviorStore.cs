@@ -1,4 +1,4 @@
-﻿using Flow.Grains.Interfaces.Model;
+using Flow.Grains.Interfaces.Model;
 
 namespace Flow.Grains.Plan
 {
@@ -6,7 +6,7 @@ namespace Flow.Grains.Plan
     {
         bool Defined { get; }
         string CaseDefinitionId { get; }
-        
+
         PlanItemDefinition PlanItemDefinition { get; }
 
         bool UserCompletable { get; }

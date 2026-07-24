@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
@@ -166,7 +166,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
         {
             var scope = ShortGuid.NewGuid();
             var sentryDefinitionId = ShortGuid.NewGuid();
-            
+
             var milestone = new Milestone();
 
             var pi = new Interfaces.Model.PlanItem
@@ -195,14 +195,14 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var subject = new MilestoneBehavior(mockHost.Object, milestone, mockMachine.Object);
 
-            await (Task) typeof(MilestoneBehavior)
+            await (Task)typeof(MilestoneBehavior)
                 .GetMethod("HandleSentrySatisfied", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
                     new SentrySatisfiedEvent(
                         scope,
                         sentryDefinitionId,
-                        true), 
+                        true),
                     (StreamSequenceToken)null
                 });
 
@@ -442,7 +442,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                 });
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<EntryCriterionSatisfied>()), Times.Once);
-            
+
             mockMachine.Verify(x => x.CanFire(PlanItemTransition.Occur), Times.Once);
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Occur), Times.Never);
 

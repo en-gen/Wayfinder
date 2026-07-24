@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -175,7 +175,7 @@ namespace Flow.Grains.Plan.CmmnElement
 
         protected void LogWithContext(Action<ILogger> logAction)
         {
-            using(_logger.BeginScope(LogContext))
+            using (_logger.BeginScope(LogContext))
             {
                 logAction?.Invoke(_logger);
             }

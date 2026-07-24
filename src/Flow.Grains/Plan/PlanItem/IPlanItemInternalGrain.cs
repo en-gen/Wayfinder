@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Flow.Grains.Interfaces.Plan.PlanItem;
 
 namespace Flow.Grains.Plan.PlanItem

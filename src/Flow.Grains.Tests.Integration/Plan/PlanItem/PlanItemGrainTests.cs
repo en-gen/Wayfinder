@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces;
@@ -57,7 +57,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem
             var subject = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{ShortGuid.NewGuid()}.{ShortGuid.NewGuid()}");
 
             await subject
-                .Awaiting(x => x.Define(caseDefinitionId, new Interfaces.Model.PlanItem {DefinitionRef = "not_defined"}))
+                .Awaiting(x => x.Define(caseDefinitionId, new Interfaces.Model.PlanItem { DefinitionRef = "not_defined" }))
                 .Should()
                 .ThrowAsync<InvalidOperationException>();
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using AutoFixture.Xunit2;
 using Flow.Grains.Executables;
 using NodaTime;
@@ -22,7 +22,7 @@ namespace Flow.Grains.Tests.Executables
             Assert.Null(iso.End);
             Assert.Null(iso.Duration);
         }
-        
+
         [Theory, AutoData] // <duration>
         public void Ctor__Given_Period__Then_PeriodSet
             (int days, int hours, int minutes, int seconds)

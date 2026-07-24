@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Flow.Grains.Interfaces.Model;
 using Flow.Grains.Plan.CmmnElement;
 using Flow.Grains.Plan.CmmnElement.Events;
@@ -76,15 +76,15 @@ namespace Flow.Grains.Plan.PlanItem
             switch (PlanItemDefinition)
             {
                 case Stage s:
-                {
-                    BehaviorExtension = new StageBehaviorStore();
-                    break;
-                }
+                    {
+                        BehaviorExtension = new StageBehaviorStore();
+                        break;
+                    }
                 case TimerEventListener tel:
-                {
-                    BehaviorExtension = new TimerEventListenerBehaviorStore();
-                    break;
-                }
+                    {
+                        BehaviorExtension = new TimerEventListenerBehaviorStore();
+                        break;
+                    }
             }
         }
 
@@ -157,7 +157,7 @@ namespace Flow.Grains.Plan.PlanItem
             Updated = @event.Updated;
             Repeated = true;
         }
-        
+
         public void Apply(ChildCreated @event)
         {
             Updated = @event.Updated;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using Flow.Grains.Interfaces.Model;
 using NodaTime;
@@ -16,7 +16,7 @@ namespace Flow.Grains.Tests.Utils.Helpers
             {
                 builder.Append($"R{repetitions.Value}/");
             }
-            
+
             builder.Append(InstantPattern.ExtendedIso.Format(start));
 
             if (end.HasValue)

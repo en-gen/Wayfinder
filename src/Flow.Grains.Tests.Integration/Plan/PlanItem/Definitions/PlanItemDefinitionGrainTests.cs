@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Flow.Grains.Interfaces;
@@ -45,7 +45,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             await defGrain
-                .Awaiting(x => x.Define(new PlanItemDefinition {Id = defId}))
+                .Awaiting(x => x.Define(new PlanItemDefinition { Id = defId }))
                 .Should()
                 .NotThrowAsync();
         }
@@ -60,7 +60,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
             var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
             await defGrain
-                .Awaiting(x => x.Define(new PlanItemDefinition {Id = Guid.NewGuid().ToString()}))
+                .Awaiting(x => x.Define(new PlanItemDefinition { Id = Guid.NewGuid().ToString() }))
                 .Should()
                 .ThrowAsync<ArgumentException>();
         }
@@ -95,7 +95,7 @@ namespace Flow.Grains.Tests.Integration.Plan.PlanItem.Definitions
 
             var defGrain = _clusterClient.GetGrain<IPlanItemDefinitionGrain>(caseId, $"{cpmId}.{defId}");
 
-            await defGrain.Define(new PlanItemDefinition {Id = defId});
+            await defGrain.Define(new PlanItemDefinition { Id = defId });
 
             var isDefined = await defGrain.IsDefined();
 

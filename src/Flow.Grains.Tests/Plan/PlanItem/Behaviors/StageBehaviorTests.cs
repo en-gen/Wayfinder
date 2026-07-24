@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
@@ -80,7 +80,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Setup(x => x.State)
                 .Returns(testStore);
             mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
-                .Callback<object>(x => testStore.Apply((dynamic) x));
+                .Callback<object>(x => testStore.Apply((dynamic)x));
             mockHost.Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
 
@@ -88,7 +88,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
 
-            Func<Task> act = () => (Task) typeof(StageBehavior)
+            Func<Task> act = () => (Task)typeof(StageBehavior)
                 .GetMethod("HandleEnterAvailableFromCreate", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[0]);
 
@@ -134,7 +134,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
 
-            Func<Task> act = () => (Task) typeof(StageBehavior)
+            Func<Task> act = () => (Task)typeof(StageBehavior)
                 .GetMethod("DefinePlanningTable", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[0]);
 
@@ -308,7 +308,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
 
-            await (Task) typeof(StageBehavior)
+            await (Task)typeof(StageBehavior)
                 .GetMethod("HandleEnterAvailableFromCreate", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[0]);
 

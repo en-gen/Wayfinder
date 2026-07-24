@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Flow.Grains.Events;
@@ -95,7 +95,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var planItemDefinitionId = ShortGuid.NewGuid();
             var definitionScope = $"CPM.{ShortGuid.NewGuid()}";
 
-            var pi = new Interfaces.Model.PlanItem{ Id = planItemDefinitionId};
+            var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
 
             var stage = new Stage
             {
@@ -136,8 +136,8 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
-            
-            await (Task) typeof(StageBehavior)
+
+            await (Task)typeof(StageBehavior)
                 .GetMethod("HandleChildRepeated", BindingFlags.NonPublic | BindingFlags.Instance)
                 .Invoke(subject, new object[]
                 {
@@ -523,7 +523,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
                         PlanItemState.Completed),
                     (StreamSequenceToken)null
                 });
-            
+
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<object>()), Times.Never);
             mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>()), Times.Never);
         }
@@ -629,7 +629,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
             var planItemBDefinitionId = ShortGuid.NewGuid();
             var planItemBInstanceId = ShortGuid.NewGuid();
 
-            var pi = new Interfaces.Model.PlanItem();;
+            var pi = new Interfaces.Model.PlanItem(); ;
 
             var stage = new Stage
             {
@@ -811,7 +811,7 @@ namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
 
             var planItemADefinitionId = ShortGuid.NewGuid();
             var planItemAInstanceId = ShortGuid.NewGuid();
-            var piA = new Interfaces.Model.PlanItem {Id = planItemADefinitionId};
+            var piA = new Interfaces.Model.PlanItem { Id = planItemADefinitionId };
 
             var planItemBDefinitionId = ShortGuid.NewGuid();
             var planItemBInstanceId = ShortGuid.NewGuid();

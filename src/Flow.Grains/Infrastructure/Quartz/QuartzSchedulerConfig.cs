@@ -1,4 +1,4 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 
 namespace Flow.Grains.Infrastructure.Quartz
 {
@@ -9,7 +9,7 @@ namespace Flow.Grains.Infrastructure.Quartz
 
         };
 
-        public static readonly  NameValueCollection Volatile = new NameValueCollection
+        public static readonly NameValueCollection Volatile = new NameValueCollection
         {
             { "quartz.scheduler.instanceName", "UnitTest" },
             { "quartz.jobStore.type", "Quartz.Simpl.RAMJobStore, Quartz" },

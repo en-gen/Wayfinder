@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +25,7 @@ namespace Flow.Grains.Plan.PlanItem
         private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
 
         private IPlanItemBehavior _behavior;
-        
+
         #region BehaviorHost
 
         Guid IBehaviorHost.CaseInstanceId => _caseInstanceId;

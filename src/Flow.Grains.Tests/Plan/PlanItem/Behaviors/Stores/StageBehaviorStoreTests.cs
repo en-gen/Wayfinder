@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using AutoFixture.Xunit2;
 using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
 using Flow.Grains.Plan.PlanItem.Events;

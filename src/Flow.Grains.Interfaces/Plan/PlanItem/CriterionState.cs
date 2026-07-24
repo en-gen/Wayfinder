@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Flow.Grains.Interfaces.Plan.PlanItem
 {
