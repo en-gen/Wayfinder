@@ -25,7 +25,7 @@
          has been stable/additive since net8, so it loads and runs correctly on net10 - the same
          "run an n-2 stable library on the latest runtime" pattern already used elsewhere in this
          solution. MIT licensed (Microsoft/.NET Foundation). -->
-    <PackageReference Include="Microsoft.AspNetCore.OData" Version="9.4.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OData" Version="9.5.0" />
     <!-- ADO #32/#33 - URL-segment API versioning (api/v1/..., additive toward a future v2).
          Asp.Versioning.OData (the OData-aware versioning package) has NO stable net10 release yet
          (only 10.0.0-rc.1, pulling in Microsoft.AspNetCore.OData 10.0.0-preview.2) - disqualified by
