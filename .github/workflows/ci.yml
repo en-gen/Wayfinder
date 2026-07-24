@@ -44,14 +44,23 @@ jobs:
       COVERAGE_DIR: ${{ github.workspace }}/coverage
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # GitVersion needs full history
           fetch-tags: true # ...and tags (Case.Flow-<version> release tags)
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore src/CaseFlow.sln
+
+      # Server-side style gate. The Husky pre-commit hook runs the same command, but it is
+      # client-side and `--no-verify` walks straight past it, so the check is repeated here
+      # where it cannot be skipped. Run `dotnet format src/CaseFlow.sln` to fix locally.
+      - name: Format check
+        run: dotnet format src/CaseFlow.sln --verify-no-changes
 
       - name: Run GitVersion
         id: gitversion
