@@ -38,7 +38,7 @@
     <!-- ADO #32 - net10's built-in Microsoft-owned OpenAPI document generator (Microsoft.
          AspNetCore.OpenApi, not Swashbuckle) - MIT licensed, versioned in lockstep with the
          TargetFramework's runtime line. -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <!-- Microsoft.AspNetCore.OpenApi 10.0.9 pins a floor of Microsoft.OpenApi 2.0.0, which carries
          a known high-severity advisory (GHSA-v5pm-xwqc-g5wc, stack-overflow-via-circular-schema on
          parse) that trips this solution's NuGetAudit gate (Directory.Build.props). Pinned up to the
