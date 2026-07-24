@@ -1,0 +1,33 @@
+# Codecov configuration. Coverage is collected by Coverlet in the CI workflow ("Unit tests"
+# and "Integration tests" steps, merged into a single cobertura report) and uploaded by
+# codecov-action.
+#
+# Note: this repository is private, so the upload requires a CODECOV_TOKEN repository
+# secret — tokenless upload only works for public repositories. Until that secret exists
+# the upload step no-ops (it runs with fail_ci_if_error: false), and no coverage will
+# appear here.
+#
+# Status checks are informational for now: there is no trustworthy baseline until CI has
+# run on develop a few times. Once a real number settles, set explicit targets here and
+# drop `informational`.
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+
+# Test projects and test-only helpers do not count toward the number on the badge.
+ignore:
+  - "src/Flow.Grains.Tests/**"
+  - "src/Flow.Grains.Tests.Integration/**"
+  - "src/Flow.Grains.Tests.Utils/**"
+  - "src/Flow.Api.Tests/**"
