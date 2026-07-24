@@ -25,7 +25,7 @@
          belt-and-braces assertion that the journal actually lands in blob storage, not a silent
          fallback to memory. -->
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.29.1" />
     <!-- Testcontainers-provisioned Azurite (work item #60, replacing the manual/compose-managed
          probe from #54/#17): MIT-licensed, maintained by the Testcontainers org, actively
          released (4.13.0, 2026-07). AzuriteClusterFixture owns the container lifecycle; see
