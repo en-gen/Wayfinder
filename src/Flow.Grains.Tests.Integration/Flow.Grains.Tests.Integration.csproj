@@ -58,7 +58,7 @@
          -> controllers -> ISender) without a real socket. Pinned to the same stable 10.0.9 line as
          Flow.Api's own JwtBearer/OpenApi packages (Flow.Api.csproj) - MIT licensed, part of the
          ASP.NET Core repo/release train. -->
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.10" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
