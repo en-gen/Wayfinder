@@ -22,16 +22,19 @@ Implemented today:
 - Expression evaluation with case-file context — conditions like `value.amount > 100` evaluate over the referenced case file item (sandboxed Jint)
 - Multi-tenant case isolation via Orleans compound grain keys
 - Event sourcing via Orleans JournaledGrain — a full audit trail by construction
+- `.cmmn` XML import/export (`CmmnXmlSerializer.Import`/`.Export`), gated by a capability lint (`CmmnCapabilityLint`) that flags unsupported constructs at import time rather than failing silently at runtime
+- Deployed multi-silo Orleans clustering — Azure Table cluster membership and durable Azure Table reminders, container-aware endpoints, a `Dockerfile` (`src/Flow.Silo/Dockerfile`), and a 3-silo evaluation stack (`devops/eval/docker-compose.yml`)
 
 Known gaps (tracked as work items; see the roadmap):
 
-- A stage's bookkeeping of repeated child instances is incomplete — repetition works at the plan-item level, but the owning stage never learns of repeated instances
 - ProcessTask / CaseTask / DecisionTask exist in the model but have no runtime behaviors
 - HTTP ingress (`src/Flow.Api`, OData) is in progress — cases and definitions have initial endpoints, but coverage of the full engine surface is not complete yet
-- No production deployment configuration (localhost clustering + volatile timers today)
-- No `.cmmn` XML import/export (the XSD-generated model layer is serializer-ready; a structural importer is planned)
+- No runtime planning-apply surface yet — a discretionary item can be queried (`PlanningTableGrain.GetPlannableItems`) but not yet selected into a live case
+- Orleans streams and the pub/sub store are still in-memory in every environment, including the deployed clustering path (`AddMemoryStreams`, `AddMemoryGrainStorage("PubSubStore")`) — a real durability gap: a deactivated grain's sentries can miss events delivered while it wasn't listening
+- CMMN timers still run on Quartz's volatile in-memory `RAMJobStore`, not a durable job store, even where Orleans clustering itself is durable
+- No MCP ingress yet — agents drive the engine through `Flow.Application`'s command/query handlers or the OData API today, not a dedicated agent protocol
 
-**Wayfinder does not claim OMG CMMN conformance** — see the project wiki's *Current State and Gaps* page for the honest scorecard.
+**Wayfinder does not claim OMG CMMN conformance** against the OMG spec's own certification process. What it does have: an internal conformance suite (`src/Flow.Grains.Tests.Integration/Conformance`) that drives real `.cmmn` sample files through the public grain surface and checks them against the spec's own lifecycle tables — currently **35 scenarios, 35 green, 0 skipped** (see [`COVERAGE.md`](src/Flow.Grains.Tests.Integration/Conformance/COVERAGE.md) for the row-by-row spec mapping, including the gaps it still tracks honestly as `KnownGap`/`NotApplicable`).
 
 ### Why agent-native
 
@@ -72,8 +75,9 @@ Dependency security is enforced at restore time: NuGet Audit fails any build wit
 
 ## Documentation
 
-- **Project wiki** — *what is built*: architecture, plan-item lifecycles, technical decisions, current state and gaps
+- **[COVERAGE.md](src/Flow.Grains.Tests.Integration/Conformance/COVERAGE.md)** — *what is built and verified*: the internal CMMN conformance suite's row-by-row spec mapping
 - **Work items / [docs/07-product-roadmap.md](docs/07-product-roadmap.md)** — *what is planned*: milestones, expression-language strategy
+- **GitHub Issues** — bug reports, feature requests, and open questions
 - [docs/01-cmmn-overview.md](docs/01-cmmn-overview.md) — CMMN standard overview and concept mapping
 - [docs/02-codebase-evaluation.md](docs/02-codebase-evaluation.md) — architectural assessment (historical snapshot, pre-modernization)
 - [docs/03-modernization-plan.md](docs/03-modernization-plan.md) — modernization plan (historical)
