@@ -2,7 +2,7 @@
 # (ADO definition id 4 targets devops/build/case.flow.ci.yml on refs/heads/develop)
 #
 # Versioning: GitVersion (dotnet tool, 6.x) computes SemVer from GitVersion.yml
-# and `Case.Flow-<X.Y.Z>` tags. The Version job republishes the results as job
+# and `Wayfinder-<X.Y.Z>` tags. The Version job republishes the results as job
 # outputs for downstream jobs and renames the build run to
 #   <MajorMinorPatch>-<PreReleaseLabel>.<per-branch counter>   (prerelease)
 #   <MajorMinorPatch>                                          (main / tagged)
@@ -11,7 +11,7 @@
 # Baseline 1.0.0 (GitVersion.yml next-version): no tags exist pre-GA, so all
 # builds are previews of 1.0.0 — develop -> 1.0.0-develop.<n>,
 # release/1.0.0 -> 1.0.0-rc.<n>, PR -> 1.0.0-PullRequest<id>.<n>.
-# At GA, tag mainline `Case.Flow-1.0.0`; main then emits clean 1.0.0 and
+# At GA, tag mainline `Wayfinder-1.0.0`; main then emits clean 1.0.0 and
 # develop advances to 1.1.0-develop.<n> automatically.
 
 trigger:

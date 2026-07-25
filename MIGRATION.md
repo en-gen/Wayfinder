@@ -76,9 +76,6 @@ milestone is open survives the move.
 
 ## Follow-ups (tracked, not blockers)
 
-- **Code rename** — `Flow.*` → `Wayfinder.*`, `src/CaseFlow.sln` → `src/Wayfinder.sln`,
-  GitVersion `tag-prefix: Case.Flow-` → `Wayfinder-`. The repo and docs already say
-  Wayfinder; the namespaces do not yet. Tracked as its own PR.
 - **Re-open the format-gate PR** (Husky) on GitHub once CI exists, so it validates here.
 - **Milestones are semver** — `0.1.0` (engine complete) … `1.0.0` (GA). See the roadmap.
 
