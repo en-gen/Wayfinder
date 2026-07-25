@@ -90,7 +90,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 
             // D7 HALF 2 - completing the no-entry-criteria instance re-evaluates the rule (TRUE)
             // and must spawn repetition 1 under the parent CasePlanModel.
-            var rep1Grain = await PollUntilGrainFound(caseInstanceId, TaskPlanItemId, repetition: 1, TimeSpan.FromSeconds(10));
+            var rep1Grain = await PollUntilGrainFound(caseInstanceId, TaskPlanItemId, repetition: 1, TimeSpan.FromSeconds(30));
             rep1Grain.Should().NotBeNull(
                 "8.6.4: a no-entry-criteria item whose RepetitionRule re-evaluates TRUE on Complete must produce a new instance");
 

@@ -83,7 +83,7 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
             afterCreate.PlanItemState.Should().Be(PlanItemState.Available, "the plan item must reach Available before its timer can be scheduled");
 
             var reachedCompleted = false;
-            var deadline = DateTime.UtcNow.AddSeconds(15);
+            var deadline = DateTime.UtcNow.AddSeconds(30);
             var lastObservedState = afterCreate.PlanItemState;
 
             while (DateTime.UtcNow < deadline)

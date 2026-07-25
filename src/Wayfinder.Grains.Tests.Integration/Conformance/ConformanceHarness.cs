@@ -33,8 +33,11 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
     {
         // Generous by design: a poll returns the moment its condition holds, so this ceiling only
         // matters on a cold first run (JIT + TestCluster warm-up under the full 33-scenario
-        // suite), where 10s proved marginal once during authoring.
-        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(20);
+        // suite), where 10s proved marginal once during authoring. Widened 20s -> 30s to match
+        // the #149 precedent (repetition-cascade settle flake in CI); every ConformanceHarness
+        // scenario uses this default with no per-call override, so this single constant is the
+        // effective ceiling for all ~30 Conformance scenarios.
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
         public IClusterClient ClusterClient { get; }
 
