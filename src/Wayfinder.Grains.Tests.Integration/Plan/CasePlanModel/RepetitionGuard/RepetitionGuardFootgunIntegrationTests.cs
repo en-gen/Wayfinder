@@ -118,7 +118,12 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
             // HandleChildRepeated spawning the next one) runs across several separate grain turns,
             // not synchronously inside the Trigger(Create) call above - poll until it settles into
             // the terminal Failed state the ceiling breach drives it to.
-            var caseSnapshot = await PollUntilCaseState(caseInstanceId, PlanItemState.Failed, TimeSpan.FromSeconds(15));
+            // 30s, not 15s: the settle is a multi-turn spawn->auto-Complete->stream-delivered
+            // HandleChildRepeated cascade (ceiling-plus-one turns), and on a contended CI runner
+            // that cascade can exceed 15s and leave the case still Active when the poll gives up.
+            // The poll returns as soon as Failed is observed, so the wider budget never slows the
+            // passing path - it only stops fast runners from flaking (build validation #148/#147).
+            var caseSnapshot = await PollUntilCaseState(caseInstanceId, PlanItemState.Failed, TimeSpan.FromSeconds(30));
 
             caseSnapshot.PlanItemState.Should().Be(PlanItemState.Failed,
                 "ADO #67: breaching RepetitionGuardOptions.MaxRepetitionsPerPlanItem must fault the containing CasePlanModel instead of spawning past the ceiling - an unbounded spawn would never settle here");
