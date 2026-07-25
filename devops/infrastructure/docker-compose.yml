@@ -1,5 +1,5 @@
-# Local Azurite stack backing Flow.Silo's Development journaled-grain storage
-# (work item #54). Blob is the only service Flow.Silo consumes today - queue
+# Local Azurite stack backing Wayfinder.Silo's Development journaled-grain storage
+# (work item #54). Blob is the only service Wayfinder.Silo consumes today - queue
 # and table ports are exposed because they cost nothing and match the
 # well-known Azurite port trio, in case later work items need them.
 services:

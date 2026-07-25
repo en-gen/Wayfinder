@@ -1,4 +1,4 @@
-# Case.Flow.CI — version, build, test, merged coverage
+# Case.Wayfinder.CI — version, build, test, merged coverage
 # (ADO definition id 4 targets devops/build/case.flow.ci.yml on refs/heads/develop)
 #
 # Versioning: GitVersion (dotnet tool, 6.x) computes SemVer from GitVersion.yml
@@ -64,7 +64,7 @@ jobs:
         displayName: Run GitVersion
 
       # Republish as job-output variables (isOutput=true) so downstream jobs —
-      # here Build; later Case.Flow.CD, pack, docker tagging — can consume via
+      # here Build; later Case.Wayfinder.CD, pack, docker tagging — can consume via
       # dependencies.Version.outputs['publish.<name>'].
       - pwsh: |
           $names = @(
@@ -144,11 +144,11 @@ jobs:
           packageType: sdk
           version: 10.x
 
-      - script: dotnet format src/CaseFlow.sln --verify-no-changes
+      - script: dotnet format src/CaseWayfinder.sln --verify-no-changes
         displayName: Format check
 
       - script: >
-          dotnet build src/CaseFlow.sln -c Release -v minimal
+          dotnet build src/CaseWayfinder.sln -c Release -v minimal
           /p:Version=$(version)
           /p:AssemblyVersion=$(assemblySemVer)
           /p:FileVersion=$(assemblySemFileVer)
@@ -160,7 +160,7 @@ jobs:
       # so the Build step above fails on any vulnerable package - no separate
       # gate step needed (work item #12).
       - script: >
-          dotnet test src/Flow.Grains.Tests/Flow.Grains.Tests.csproj
+          dotnet test src/Wayfinder.Grains.Tests/Wayfinder.Grains.Tests.csproj
           -c Release --no-build --logger trx
           /p:CollectCoverage=true
           /p:CoverletOutput=$(Build.SourcesDirectory)/coverage/
@@ -172,10 +172,10 @@ jobs:
       # provisioned per run (work item #60): AzuriteClusterFixture starts and tears down its own
       # container via Testcontainers.Azurite, so no separate start/readiness-wait step is needed
       # here - ubuntu-latest already has Docker, which is all the suite requires.
-      # RequiresDockerFact (Flow.Grains.Tests.Integration/Storage) skips (does not fail) if
+      # RequiresDockerFact (Wayfinder.Grains.Tests.Integration/Storage) skips (does not fail) if
       # Docker itself isn't reachable.
       - script: >
-          dotnet test src/Flow.Grains.Tests.Integration/Flow.Grains.Tests.Integration.csproj
+          dotnet test src/Wayfinder.Grains.Tests.Integration/Wayfinder.Grains.Tests.Integration.csproj
           -c Release --no-build --logger trx
           /p:CollectCoverage=true
           /p:MergeWith=$(Build.SourcesDirectory)/coverage/coverage.json

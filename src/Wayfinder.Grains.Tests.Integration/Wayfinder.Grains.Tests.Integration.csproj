@@ -1,0 +1,97 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ADO #32/#33 (sub-unit 4) - the full-pipeline multi-tenant isolation HTTP suite (Api/) wires
+         Wayfinder.Api's real AddFlowApi()/MapFlowApi() composition onto a Microsoft.AspNetCore.TestHost
+         TestServer, so this project needs the ASP.NET Core shared framework directly (same reason
+         Wayfinder.Api/Wayfinder.Api.Tests declare it: HttpContext/IActionResult/routing/middleware types).
+         Same "class library depends on the shared framework directly" pattern as those projects. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoFixture.Xunit2" Version="4.18.1" />
+    <!-- Azurite restart-survival suite (work item #54): AzuriteClusterFixture mirrors Wayfinder.Silo's
+         AddAzureClients config-section registration path exactly (Microsoft.Extensions.Azure +
+         Azure.Identity for the UseCredential fallback); Azure.Storage.Blobs also backs the
+         belt-and-braces assertion that the journal actually lands in blob storage, not a silent
+         fallback to memory. -->
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <!-- Testcontainers-provisioned Azurite (work item #60, replacing the manual/compose-managed
+         probe from #54/#17): MIT-licensed, maintained by the Testcontainers org, actively
+         released (4.13.0, 2026-07). AzuriteClusterFixture owns the container lifecycle; see
+         that file for the AzuriteBuilder/AzuriteContainer wiring. -->
+    <PackageReference Include="Testcontainers.Azurite" Version="4.13.0" />
+    <!-- Docker-availability gate (DockerAvailability/RequiresDockerFact): the same client
+         library Testcontainers itself uses to talk to the daemon (pinned to the exact version
+         Testcontainers.Azurite 4.13.0 pulls transitively), so the discovery-time probe and the
+         real container start resolve the Docker endpoint identically and can never disagree. -->
+    <PackageReference Include="Docker.DotNet.Enhanced" Version="4.3.3" />
+    <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
+    <PackageReference Include="coverlet.msbuild" Version="6.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- pinned: last version before v8's Xceed commercial license -->
+    <PackageReference Include="FluentAssertions" Version="7.2.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <!-- Azurite restart-survival suite (work item #54): journaled-grain storage backend under test. -->
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
+    <!-- Real Azure Table clustering suite (work item #30): validates Wayfinder.Silo's
+         ConfigureDeployedOrleans clustering choice (UseAzureStorageClustering) actually forms a
+         multi-silo cluster against a real Azure Table membership store (Azurite locally/in CI). -->
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
+    <!-- ADO #32/#33 (sub-unit 4) - Microsoft's own in-memory ASP.NET Core test server (Api/
+         ApiTestHostFactory): drives Wayfinder.Api's real HTTP pipeline (auth -> IdentityContextMiddleware
+         -> controllers -> ISender) without a real socket. Pinned to the same stable 10.0.9 line as
+         Wayfinder.Api's own JwtBearer/OpenApi packages (Wayfinder.Api.csproj) - MIT licensed, part of the
+         ASP.NET Core repo/release train. -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="9.1.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ADO #32/#33 (sub-unit 4) - the full-pipeline isolation suite (Api/) composes the REAL
+         Wayfinder.Api HTTP surface (AddFlowApi/MapFlowApi) over ClusterFixture's TestCluster - see that
+         folder's ApiTestHostFactory. -->
+    <ProjectReference Include="..\Wayfinder.Api\Wayfinder.Api.csproj" />
+    <!-- ADO #32 - the CQRS core under test: the Application/ suite dispatches the case commands/
+         queries through the real ISender (AddFlowApplication) over the in-memory ClusterFixture,
+         asserting the Wayfinder.Contracts.V1 projections come back correct. -->
+    <ProjectReference Include="..\Wayfinder.Application\Wayfinder.Application.csproj" />
+    <ProjectReference Include="..\Wayfinder.Contracts\Wayfinder.Contracts.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains.Tests.Utils\Wayfinder.Grains.Tests.Utils.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains\Wayfinder.Grains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ADO #20 - the flagship .cmmn file; embedded so the test never depends on the test
+         assembly's output directory layout. -->
+    <EmbeddedResource Include="Interchange\Samples\*.cmmn" />
+    <!-- ADO #21 - the conformance suite's scenario corpus: every scenario is a real .cmmn file,
+         embedded for the same reason as the #20 flagship above. -->
+    <EmbeddedResource Include="Conformance\Samples\*.cmmn" />
+  </ItemGroup>
+
+</Project>

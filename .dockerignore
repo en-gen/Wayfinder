@@ -1,5 +1,5 @@
-# Docker build context for src/Flow.Silo/Dockerfile - context root is the REPOSITORY ROOT
-# (see that Dockerfile's header comment for why). This trims the context to what a Flow.Silo
+# Docker build context for src/Wayfinder.Silo/Dockerfile - context root is the REPOSITORY ROOT
+# (see that Dockerfile's header comment for why). This trims the context to what a Wayfinder.Silo
 # image build actually needs: no git metadata, no local build output that could shadow a
 # clean in-container restore/build, no unrelated tooling/docs/test trees.
 
@@ -24,10 +24,10 @@ docs/
 scripts/
 *.md
 
-# Test projects - never referenced by Flow.Silo, no reason to enter the build context
-src/Flow.Grains.Tests/
-src/Flow.Grains.Tests.Integration/
-src/Flow.Grains.Tests.Utils/
+# Test projects - never referenced by Wayfinder.Silo, no reason to enter the build context
+src/Wayfinder.Grains.Tests/
+src/Wayfinder.Grains.Tests.Integration/
+src/Wayfinder.Grains.Tests.Utils/
 
 # devops pipeline/compose definitions aren't part of the application image
 devops/
