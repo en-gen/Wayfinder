@@ -3,10 +3,13 @@ using System.Net;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Infrastructure.Extensions;
 using Wayfinder.Grains.Infrastructure.Quartz;
+using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
 using Wayfinder.Grains.Plan.PlanItem.Behaviors;
 using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
 using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,10 +23,8 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Exceptions;
 using Xunit;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 
 namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 {
@@ -49,7 +50,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 
         private bool _disposed = false;
 
-        public Task InitializeAsync()
+        public async Task InitializeAsync()
         {
             var builder = new TestClusterBuilder();
 
@@ -64,7 +65,104 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 
             ClusterClient = Cluster.Client;
 
-            return Task.CompletedTask;
+            // Issue #153: this fixture is the sole test in its own TestCluster (see the class
+            // remarks on why it can't share ClusterFixture/ClusterCollection), so unlike every
+            // other integration test it never gets the first-hit JIT/serializer/streaming-path
+            // warm-up amortized across other tests in the collection - the timed test below would
+            // otherwise pay that cold-start cost on top of the O(ceiling) sequential stream hops
+            // it is already measuring, on every single run. Run the exact same spawn->complete->
+            // re-spawn->breach->fault cascade once here, through a throwaway case (its own tenant,
+            // definition id and instance id - never referenced by the real test, so there is no
+            // shared-state or id-collision risk), so those first-hit costs are already paid before
+            // the timed assertion starts. Best-effort: if the warm-up itself fails or times out,
+            // swallow it rather than fail fixture setup over what is purely a priming step - the
+            // real test still exercises and asserts on the cascade regardless.
+            try
+            {
+                await WarmUpRepetitionCascadeAsync();
+            }
+            catch
+            {
+                // Best-effort warm-up only - see remarks above.
+            }
+        }
+
+        // See the warm-up remarks in InitializeAsync above. Deliberately mirrors the shape of
+        // RepetitionGuardFootgunIntegrationTests's own case (same foot-gun: non-blocking task,
+        // RepetitionRule=TRUE, ManualActivationRule=FALSE, no entry criteria, blocking sentinel
+        // sibling) so it exercises the identical behavior/streaming/serializer code paths, but
+        // with entirely distinct ids so it can never interact with the real test's state.
+        private async Task WarmUpRepetitionCascadeAsync()
+        {
+            const string scope = "WarmUpCPM";
+            const string taskDefinitionId = "WarmUpSourceTask";
+            const string taskPlanItemId = "WarmUpPlanItemSource";
+            const string sentinelDefinitionId = "WarmUpSentinelTask";
+            const string sentinelPlanItemId = "WarmUpPlanItemSentinel";
+
+            CaseRequestContext.TenantId = Guid.Parse("00000000-0000-0000-0000-0000000000ff");
+            CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-0000000000fe");
+
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"warmup-case-{Guid.NewGuid()}";
+
+            var taskDefinition = new HumanTask { Id = taskDefinitionId, IsBlocking = false };
+            var sentinelDefinition = new HumanTask { Id = sentinelDefinitionId, IsBlocking = true };
+
+            var @case = new Case
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRoles(),
+                CasePlanModel = new Stage
+                {
+                    Id = scope,
+                    PlanItemDefinitions = { taskDefinition, sentinelDefinition },
+                    PlanItems =
+                    {
+                        // Wayfinder.Grains.Tests.Integration.Plan.PlanItem (see
+                        // Plan/PlanItem/PlanItemGrainTests.cs) shares an enclosing namespace with
+                        // this fixture's own Wayfinder.Grains.Tests.Integration.Plan.* namespace
+                        // and shadows the imported Interfaces.Model.PlanItem model type, exactly
+                        // as in RepetitionGuardFootgunIntegrationTests - fully qualify to
+                        // disambiguate, matching that file's own convention.
+                        new Interfaces.Model.PlanItem
+                        {
+                            Id = taskPlanItemId,
+                            DefinitionRef = taskDefinition.Id,
+                            ItemControl = new PlanItemControl
+                            {
+                                RepetitionRule = Rules.IsRepeatableRule,
+                                ManualActivationRule = Rules.NotManuallyActivated
+                            }
+                        },
+                        new Interfaces.Model.PlanItem
+                        {
+                            Id = sentinelPlanItemId,
+                            DefinitionRef = sentinelDefinition.Id
+                        }
+                    }
+                }
+            };
+
+            await ClusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = ClusterClient.GetGrain<ICaseGrain>(caseInstanceId, scope);
+            await caseGrain.Create(caseDefinitionId);
+            await caseGrain.Trigger(PlanItemTransition.Create);
+
+            // Bounded, generous wait - this only needs to pay the first-hit cost, not prove the
+            // guard fires correctly (the real test already asserts that). If it doesn't settle in
+            // time, just move on: the outer try/catch has nothing to catch here, so simply
+            // returning is enough to let the real test proceed (cold, at worst - never broken).
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (DateTime.UtcNow < deadline)
+            {
+                var snapshot = await caseGrain.GetSnapshot();
+                if (snapshot.PlanItemState == PlanItemState.Failed) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(20));
+            }
         }
 
         public Task DisposeAsync()
@@ -104,11 +202,11 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
                     .AddMemoryGrainStorageAsDefault(ConfigureMemoryStorage) // grain state
                     .AddLogStorageBasedLogConsistencyProvider() // journaled grain
                     .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
-                    .AddMemoryStreams("Default") // cluster stream provider
+                    .AddMemoryStreams("Default", ConfigureMemoryStreamsPullingAgent) // cluster stream provider
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(ConfigureLogging);
+                    .ConfigureLogging(IntegrationTestLogging.Configure);
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
@@ -118,6 +216,14 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
             private static void ConfigureMemoryStorage(OptionsBuilder<MemoryGrainStorageOptions> options) =>
                 options.Configure<Serializer>((storageOptions, serializer) =>
                     storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer));
+
+            // Issue #153 - see SiloFixture.ClusterFixture.ConfigureMemoryStreamsPullingAgent for
+            // the full rationale: this fixture's flagship test IS the O(ceiling) sequential
+            // stream-hop cascade, so it is the direct beneficiary of polling faster than Orleans'
+            // ~100ms default.
+            private static void ConfigureMemoryStreamsPullingAgent(ISiloMemoryStreamConfigurator configurator) =>
+                configurator.ConfigurePullingAgent(ob => ob.Configure(options =>
+                    options.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(15)));
 
             private static void ConfigureServices(IServiceCollection services)
             {
@@ -135,23 +241,6 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
                     .AddQuartz(QuartzSchedulerConfig.Volatile);
             }
 
-            private static void ConfigureLogging(ILoggingBuilder logging)
-            {
-                var levelSwitch = new LoggingLevelSwitch
-                {
-                    MinimumLevel = LogEventLevel.Debug
-                };
-
-                logging.AddSerilog(new LoggerConfiguration()
-                    .MinimumLevel.ControlledBy(levelSwitch)
-                    .Enrich.FromLogContext()
-                    .Enrich.WithExceptionDetails()
-                    .WriteTo.Seq(
-                        "http://localhost:5341",
-                        controlLevelSwitch: levelSwitch
-                    )
-                    .CreateLogger());
-            }
         }
 
         private class TestClientConfigurator : IClientBuilderConfigurator

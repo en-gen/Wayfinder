@@ -19,9 +19,6 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Exceptions;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Integration.SiloFixture
@@ -88,11 +85,11 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .AddMemoryGrainStorageAsDefault(ConfigureMemoryStorage) // grain state
                     .AddLogStorageBasedLogConsistencyProvider() // journaled grain
                     .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
-                    .AddMemoryStreams("Default") // cluster stream provider
+                    .AddMemoryStreams("Default", ConfigureMemoryStreamsPullingAgent) // cluster stream provider
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(ConfigureLogging);
+                    .ConfigureLogging(IntegrationTestLogging.Configure);
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
@@ -124,6 +121,19 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                 options.Configure<Serializer>((storageOptions, serializer) =>
                     storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer));
 
+            // Issue #153: Orleans' default pulling-agent poll (StreamPullingAgentOptions.
+            // GetQueueMsgsTimerPeriod, ~100ms) means every memory-stream hop pays at least that
+            // long before a message is picked up. Grain-to-grain cascades that chain several
+            // stream hops sequentially (e.g. the RepetitionGuardFootgun spawn->complete->
+            // re-spawn->breach->fault cascade in RepetitionGuardClusterFixture) multiply that
+            // latency by the chain length, and the wait balloons further under CI thread-pool
+            // contention - eating into fixed test poll budgets. Polling every 15ms instead cuts
+            // both the steady-state latency and its CI variance; it is a stream-provider timing
+            // knob only, it does not change any delivery guarantee or guard/fault behavior.
+            private static void ConfigureMemoryStreamsPullingAgent(ISiloMemoryStreamConfigurator configurator) =>
+                configurator.ConfigurePullingAgent(ob => ob.Configure(options =>
+                    options.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(15)));
+
             private static void ConfigureServices(IServiceCollection services)
             {
                 services
@@ -134,23 +144,6 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .AddQuartz(QuartzSchedulerConfig.Volatile);
             }
 
-            private static void ConfigureLogging(ILoggingBuilder logging)
-            {
-                var levelSwitch = new LoggingLevelSwitch
-                {
-                    MinimumLevel = LogEventLevel.Debug
-                };
-
-                logging.AddSerilog(new LoggerConfiguration()
-                    .MinimumLevel.ControlledBy(levelSwitch)
-                    .Enrich.FromLogContext()
-                    .Enrich.WithExceptionDetails()
-                    .WriteTo.Seq(
-                        "http://localhost:5341",
-                        controlLevelSwitch: levelSwitch
-                    )
-                    .CreateLogger());
-            }
         }
 
         // TestCluster's in-process client independently validates serializer coverage for every
