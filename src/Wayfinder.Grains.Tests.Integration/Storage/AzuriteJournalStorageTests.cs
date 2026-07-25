@@ -119,7 +119,7 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
             while (DateTime.UtcNow < deadline)
             {
                 if (await managementGrain.GetActivationAddress(grain) is null) return;
-                await Task.Delay(TimeSpan.FromMilliseconds(50));
+                await Task.Delay(TimeSpan.FromMilliseconds(100)); // 100ms matches every other poll helper in this suite
             }
 
             (await managementGrain.GetActivationAddress(grain)).Should().BeNull(
