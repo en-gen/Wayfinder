@@ -5,11 +5,11 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
-  <!-- ADO #32 - deliberately zero ProjectReferences/PackageReferences. Flow.Contracts is the
+  <!-- ADO #32 - deliberately zero ProjectReferences/PackageReferences. Wayfinder.Contracts is the
        outermost, most stable layer: plain, System.Text.Json-friendly DTOs versioned by namespace
-       (V1 today), with no dependency on Flow.Grains/Flow.Grains.Interfaces (and so no transitive
+       (V1 today), with no dependency on Wayfinder.Grains/Wayfinder.Grains.Interfaces (and so no transitive
        Orleans package) - a future MCP server or thin client could reference this assembly alone.
-       Flow.Application maps between its own domain types and these DTOs inside its handlers; see
+       Wayfinder.Application maps between its own domain types and these DTOs inside its handlers; see
        Cases/CaseViewProjector.cs. -->
 
 </Project>

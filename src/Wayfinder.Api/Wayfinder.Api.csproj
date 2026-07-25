@@ -9,9 +9,9 @@
   <ItemGroup>
     <!-- The HTTP ingress: controllers, model binding, ProblemDetails, IActionResult - all live in
          the shared ASP.NET Core runtime, not a NuGet package. FrameworkReference (not
-         PackageReference) is the correct way for a class library to depend on it - Flow.Silo (a
-         Sdk.Web project) already carries the framework at the host level; this makes Flow.Api
-         buildable/testable as its own class library too, same reasoning as Flow.Grains referencing
+         PackageReference) is the correct way for a class library to depend on it - Wayfinder.Silo (a
+         Sdk.Web project) already carries the framework at the host level; this makes Wayfinder.Api
+         buildable/testable as its own class library too, same reasoning as Wayfinder.Grains referencing
          Microsoft.Orleans.Sdk directly. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
@@ -54,13 +54,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Flow.Application\Flow.Application.csproj" />
-    <ProjectReference Include="..\Flow.Contracts\Flow.Contracts.csproj" />
-    <!-- Named explicitly (not left to transitivity through Flow.Application) - the identity
+    <ProjectReference Include="..\Wayfinder.Application\Wayfinder.Application.csproj" />
+    <ProjectReference Include="..\Wayfinder.Contracts\Wayfinder.Contracts.csproj" />
+    <!-- Named explicitly (not left to transitivity through Wayfinder.Application) - the identity
          middleware and the CrossTenantAccessException->404 mapper both speak
-         Flow.Grains.Interfaces types directly (CaseRequestContext, CrossTenantAccessException),
-         same as Flow.Application does. -->
-    <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
+         Wayfinder.Grains.Interfaces types directly (CaseRequestContext, CrossTenantAccessException),
+         same as Wayfinder.Application does. -->
+    <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

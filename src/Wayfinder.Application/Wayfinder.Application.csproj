@@ -9,19 +9,19 @@
     <!-- The mediator/DI seam (ServiceCollectionExtensions.AddFlowApplication) needs IServiceCollection
          and the ServiceCollectionServiceExtensions fluent registration methods (AddScoped/AddTransient) -
          both live in the Abstractions package; the concrete container implementation is supplied by
-         whatever host composes this layer (Flow.Silo today, a future Flow.Api/MCP host, or a test's
+         whatever host composes this layer (Wayfinder.Silo today, a future Wayfinder.Api/MCP host, or a test's
          own ServiceCollection), so only the abstractions are referenced here. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
-    <!-- Command/query handlers call grains through IClusterClient (constructor-injected). Flow.Grains
+    <!-- Command/query handlers call grains through IClusterClient (constructor-injected). Wayfinder.Grains
          already carries Microsoft.Orleans.Sdk transitively, but the Application layer depends on the
          Orleans client surface directly, so it is named explicitly here too. -->
     <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.2.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Flow.Contracts\Flow.Contracts.csproj" />
-    <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
-    <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
+    <ProjectReference Include="..\Wayfinder.Contracts\Wayfinder.Contracts.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains\Wayfinder.Grains.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

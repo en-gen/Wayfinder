@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains\Wayfinder.Grains.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 # Case.Flow EVAL stack (work item #49, extended by #32/#33 sub-unit 4 "First Light"): Azurite +
-# a REAL multi-container Orleans cluster - 3 separate Flow.Silo CONTAINERS running the DEPLOYED
+# a REAL multi-container Orleans cluster - 3 separate Wayfinder.Silo CONTAINERS running the DEPLOYED
 # clustering path (Program.cs ConfigureDeployedOrleans - Azure Table clustering + reminders,
 # container-aware endpoints) against Azurite, instead of Orleans TestingHost's in-process
 # TestCluster membership - PLUS Postgres + Zitadel, so the same stack can also demonstrate the
@@ -10,11 +10,11 @@
 # stack backing `dotnet run`'s Development configuration) is untouched by this work item and
 # can keep running independently - see the port-offset comment on the azurite service below.
 #
-# Bring up (builds the Flow.Silo image from src/Flow.Silo/Dockerfile first):
+# Bring up (builds the Wayfinder.Silo image from src/Wayfinder.Silo/Dockerfile first):
 #   docker compose -f devops/eval/docker-compose.yml up -d --build
 #
 # Once the 3 silo containers have started AND found each other in Azure Table membership
-# (Azurite), each one's cluster-status endpoint (src/Flow.Silo/Startup.cs) reports the full
+# (Azurite), each one's cluster-status endpoint (src/Wayfinder.Silo/Startup.cs) reports the full
 # cluster - curl any/all of them:
 #   curl http://localhost:8081/cluster
 #   curl http://localhost:8082/cluster
@@ -59,7 +59,7 @@ x-silo-environment: &silo-environment
     DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
   Azure__Storage__CaseStateContainer: case-flow-casestate
 
-  # ADO #32/#33 sub-unit 4 - the silo's ONE trusted token issuer (Flow.Api's AddFlowApi/
+  # ADO #32/#33 sub-unit 4 - the silo's ONE trusted token issuer (Wayfinder.Api's AddFlowApi/
   # ZitadelAuthOptions - see that file's remarks). "zitadel" is the compose SERVICE hostname
   # (Docker's embedded DNS), reachable identically by the silo (server-side JWKS/discovery fetch)
   # and by anything else running ON this compose network - deliberately NOT "localhost" or a
@@ -72,11 +72,11 @@ x-silo-environment: &silo-environment
   # Left BLANK until the manual "create the Case.Flow project + API application" bootstrap step
   # (devops/eval/README.md) produces a real application/client id to use as the audience -
   # JwtBearer's ValidateAudience would otherwise reject every real token outright. A silo with a
-  # blank Audience still boots fine (Flow.Api.Tests covers ZitadelAuthOptions validation
+  # blank Audience still boots fine (Wayfinder.Api.Tests covers ZitadelAuthOptions validation
   # separately); it simply cannot yet accept a real Zitadel-issued token.
   Auth__Zitadel__Audience: ""
 
-  # ADO #32/#33 sub-unit 4 - EvalIdentityOptions (Flow.Silo/Infrastructure/Options), consumed only
+  # ADO #32/#33 sub-unit 4 - EvalIdentityOptions (Wayfinder.Silo/Infrastructure/Options), consumed only
   # by Program.cs's Docker-gated SeedEvalIdentityRegistryAsync. Two placeholder tenant slots
   # (tenant A / tenant B) ship with blank Subjects - SeedEvalIdentityRegistryAsync skips any entry
   # with a blank Subject rather than seeding an unreachable registration, so the stack boots
@@ -205,7 +205,7 @@ services:
   silo1:
     build:
       context: ../..
-      dockerfile: src/Flow.Silo/Dockerfile
+      dockerfile: src/Wayfinder.Silo/Dockerfile
     # Same image tag on all 3 silo services (identical build context/dockerfile) - Compose
     # builds it once and reuses it for silo2/silo3 rather than rebuilding 3 times.
     image: case-flow-silo:eval
@@ -229,7 +229,7 @@ services:
   silo2:
     build:
       context: ../..
-      dockerfile: src/Flow.Silo/Dockerfile
+      dockerfile: src/Wayfinder.Silo/Dockerfile
     image: case-flow-silo:eval
     container_name: case-flow-eval-silo2
     hostname: silo2
@@ -246,7 +246,7 @@ services:
   silo3:
     build:
       context: ../..
-      dockerfile: src/Flow.Silo/Dockerfile
+      dockerfile: src/Wayfinder.Silo/Dockerfile
     image: case-flow-silo:eval
     container_name: case-flow-eval-silo3
     hostname: silo3

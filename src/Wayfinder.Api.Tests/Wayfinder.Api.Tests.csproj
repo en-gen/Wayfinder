@@ -33,10 +33,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Flow.Api\Flow.Api.csproj" />
-    <ProjectReference Include="..\Flow.Application\Flow.Application.csproj" />
-    <ProjectReference Include="..\Flow.Contracts\Flow.Contracts.csproj" />
-    <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
+    <ProjectReference Include="..\Wayfinder.Api\Wayfinder.Api.csproj" />
+    <ProjectReference Include="..\Wayfinder.Application\Wayfinder.Application.csproj" />
+    <ProjectReference Include="..\Wayfinder.Contracts\Wayfinder.Contracts.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />
   </ItemGroup>
 
 </Project>

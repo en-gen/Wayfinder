@@ -5,25 +5,25 @@ VisualStudioVersion = 16.0.30225.117
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "~Tests", "~Tests", "{D0DB18E2-B342-4CEC-9EBE-6F5C5141824F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains", "Flow.Grains\Flow.Grains.csproj", "{165311F8-8097-41B4-A9D2-15D3E1885D3F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wayfinder.Grains", "Wayfinder.Grains\Wayfinder.Grains.csproj", "{165311F8-8097-41B4-A9D2-15D3E1885D3F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests", "Flow.Grains.Tests\Flow.Grains.Tests.csproj", "{3AF96888-D575-4825-B914-37F2F67BE4FB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wayfinder.Grains.Tests", "Wayfinder.Grains.Tests\Wayfinder.Grains.Tests.csproj", "{3AF96888-D575-4825-B914-37F2F67BE4FB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Interfaces", "Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj", "{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wayfinder.Grains.Interfaces", "Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj", "{5958164A-6DAA-46FB-A07B-E3BC74A5AF4D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests.Integration", "Flow.Grains.Tests.Integration\Flow.Grains.Tests.Integration.csproj", "{C2B9B169-8901-4958-93A6-410CF388B4AF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wayfinder.Grains.Tests.Integration", "Wayfinder.Grains.Tests.Integration\Wayfinder.Grains.Tests.Integration.csproj", "{C2B9B169-8901-4958-93A6-410CF388B4AF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Grains.Tests.Utils", "Flow.Grains.Tests.Utils\Flow.Grains.Tests.Utils.csproj", "{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wayfinder.Grains.Tests.Utils", "Wayfinder.Grains.Tests.Utils\Wayfinder.Grains.Tests.Utils.csproj", "{6259116E-64EE-4AC1-95CE-C4D5E96D4CB0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flow.Silo", "Flow.Silo\Flow.Silo.csproj", "{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wayfinder.Silo", "Wayfinder.Silo\Wayfinder.Silo.csproj", "{6DFAEBF7-A4AE-4463-9C23-07EFB4C9D89D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flow.Application", "Flow.Application\Flow.Application.csproj", "{5F35811E-BA77-4612-B997-14F44257749D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wayfinder.Application", "Wayfinder.Application\Wayfinder.Application.csproj", "{5F35811E-BA77-4612-B997-14F44257749D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flow.Contracts", "Flow.Contracts\Flow.Contracts.csproj", "{D593A1AE-1D90-41D8-B6DF-7AC2578EAB9A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wayfinder.Contracts", "Wayfinder.Contracts\Wayfinder.Contracts.csproj", "{D593A1AE-1D90-41D8-B6DF-7AC2578EAB9A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Flow.Api", "Flow.Api\Flow.Api.csproj", "{0818E37C-448A-4EA8-8A67-1E3B03E2B87C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wayfinder.Api", "Wayfinder.Api\Wayfinder.Api.csproj", "{0818E37C-448A-4EA8-8A67-1E3B03E2B87C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flow.Api.Tests", "Flow.Api.Tests\Flow.Api.Tests.csproj", "{5677D7E4-8111-482A-B7E0-C8DDDFB235BB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wayfinder.Api.Tests", "Wayfinder.Api.Tests\Wayfinder.Api.Tests.csproj", "{5677D7E4-8111-482A-B7E0-C8DDDFB235BB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -31,9 +31,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Flow.Grains.Interfaces\Flow.Grains.Interfaces.csproj" />
-    <ProjectReference Include="..\Flow.Grains.Tests.Utils\Flow.Grains.Tests.Utils.csproj" />
-    <ProjectReference Include="..\Flow.Grains\Flow.Grains.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains.Tests.Utils\Wayfinder.Grains.Tests.Utils.csproj" />
+    <ProjectReference Include="..\Wayfinder.Grains\Wayfinder.Grains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

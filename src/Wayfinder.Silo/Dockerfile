@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-# Flow.Silo container image (work item #49): multi-stage build so the shipped runtime image
+# Wayfinder.Silo container image (work item #49): multi-stage build so the shipped runtime image
 # carries only published bits, not the SDK. Build context MUST be the REPOSITORY ROOT, not
-# this directory - Flow.Silo's ProjectReferences pull in sibling projects (Flow.Grains,
-# Flow.Grains.Interfaces) and restore/build also depend on repo-root files (global.json's SDK
+# this directory - Wayfinder.Silo's ProjectReferences pull in sibling projects (Wayfinder.Grains,
+# Wayfinder.Grains.Interfaces) and restore/build also depend on repo-root files (global.json's SDK
 # pin, Directory.Build.props' NuGet Audit gate, nuget.config's pinned package source). Build
 # from the repo root, e.g.:
 #
-#   docker build -f src/Flow.Silo/Dockerfile -t case-flow-silo:eval .
+#   docker build -f src/Wayfinder.Silo/Dockerfile -t case-flow-silo:eval .
 #
 # (devops/eval/docker-compose.yml does exactly this via its build.context/build.dockerfile.)
 
@@ -20,21 +20,21 @@ COPY global.json Directory.Build.props nuget.config ./
 
 # Project files only, for the same layer-caching reason: `dotnet restore` only needs to re-run
 # when a .csproj actually changes.
-COPY src/Flow.Silo/Flow.Silo.csproj src/Flow.Silo/
-COPY src/Flow.Grains/Flow.Grains.csproj src/Flow.Grains/
-COPY src/Flow.Grains.Interfaces/Flow.Grains.Interfaces.csproj src/Flow.Grains.Interfaces/
+COPY src/Wayfinder.Silo/Wayfinder.Silo.csproj src/Wayfinder.Silo/
+COPY src/Wayfinder.Grains/Wayfinder.Grains.csproj src/Wayfinder.Grains/
+COPY src/Wayfinder.Grains.Interfaces/Wayfinder.Grains.Interfaces.csproj src/Wayfinder.Grains.Interfaces/
 
 # EnableSourceControlManagerQueries=false: SourceLink's git-metadata probe has no .git to
 # query inside a Docker build context (COPY doesn't bring .git along - see .dockerignore) and
 # errors out otherwise; same flag used for solution builds outside a real git checkout.
-RUN dotnet restore src/Flow.Silo/Flow.Silo.csproj -p:EnableSourceControlManagerQueries=false
+RUN dotnet restore src/Wayfinder.Silo/Wayfinder.Silo.csproj -p:EnableSourceControlManagerQueries=false
 
 # Now the rest of the source for those same three projects.
-COPY src/Flow.Silo/ src/Flow.Silo/
-COPY src/Flow.Grains/ src/Flow.Grains/
-COPY src/Flow.Grains.Interfaces/ src/Flow.Grains.Interfaces/
+COPY src/Wayfinder.Silo/ src/Wayfinder.Silo/
+COPY src/Wayfinder.Grains/ src/Wayfinder.Grains/
+COPY src/Wayfinder.Grains.Interfaces/ src/Wayfinder.Grains.Interfaces/
 
-RUN dotnet publish src/Flow.Silo/Flow.Silo.csproj \
+RUN dotnet publish src/Wayfinder.Silo/Wayfinder.Silo.csproj \
     -c Release \
     -o /app/publish \
     --no-restore \
@@ -66,4 +66,4 @@ USER $APP_UID
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["dotnet", "Flow.Silo.dll"]
+ENTRYPOINT ["dotnet", "Wayfinder.Silo.dll"]

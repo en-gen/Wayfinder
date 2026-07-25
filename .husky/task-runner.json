@@ -3,7 +3,7 @@
     {
       "name": "dotnet-format",
       "command": "dotnet",
-      "args": ["format", "src/CaseFlow.sln", "--include", "${staged}", "--no-restore"],
+      "args": ["format", "src/Wayfinder.sln", "--include", "${staged}", "--no-restore"],
       "include": ["**/*.cs", "**/*.csproj"]
     }
   ]
