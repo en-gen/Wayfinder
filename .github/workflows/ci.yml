@@ -17,23 +17,32 @@
 
 name: CI
 
-# Path filter mirrors the ADO pipeline's `trigger.paths.include` - docs-only
-# changes don't trigger a build there and shouldn't here either. Note for
-# branch protection: if `build-and-test` is made a required status check,
-# a PR that only touches out-of-scope paths will never report a status for
-# it, which GitHub treats as "not passed" rather than "not applicable" the
-# way an ADO filename-pattern branch policy does.
+# push: keep the ADO-style path filter (mirrors the old pipeline's trigger.paths.include)
+# so docs-only pushes to develop/main don't rebuild.
+#
+# pull_request: deliberately NO path filter, so that `build-and-test` can serve as a
+# required status check on develop/main. A path filter can skip the whole workflow, and
+# GitHub treats a required check that never reports as "not passed" rather than "not
+# applicable" - which would wedge a docs-only PR permanently un-mergeable (unlike the ADO
+# filename-pattern branch policy this replaced). Running CI on every PR is the price of a
+# reliable required check.
 on:
   push:
     branches: [develop, main, 'release/**', 'hotfix/**']
     paths: [src/**, devops/**, GitVersion.yml, global.json, .github/workflows/ci.yml]
   pull_request:
     branches: [develop, main]
-    paths: [src/**, devops/**, GitVersion.yml, global.json, .github/workflows/ci.yml]
 
 permissions:
   contents: read
   checks: write
+
+# Now that every PR runs the full suite (no path filter), collapse superseded runs from
+# rapid pushes to the same ref instead of letting them pile up. Safe for a required check:
+# a cancelled run is never the latest commit's, and the newest commit's run is what gates.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -161,8 +170,12 @@ jobs:
           /p:CoverletOutputFormat=cobertura
           /p:Exclude="[*.Tests*]*"
 
+      # Same-repo PRs and pushes only: a fork PR gets a read-only GITHUB_TOKEN, so
+      # test-reporter's check-run creation would error there. Skip it on fork PRs (the
+      # build-and-test result itself is still correct) so a required check never reports a
+      # false failure to an external contributor. fail-on-error:false is a second belt.
       - name: Publish test results
-        if: always()
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: dorny/test-reporter@v1
         with:
           name: Test results
