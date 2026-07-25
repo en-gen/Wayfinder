@@ -9,7 +9,6 @@ using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
 using Xunit;
-using CaseModel = Wayfinder.Grains.Interfaces.Model.Case;
 
 namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 {
@@ -59,15 +58,15 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
             var caseInstanceId = Guid.NewGuid();
             var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
 
-            var taskDefinition = new HumanTask { Id = TaskDefinitionId, IsBlocking = false };
-
-            // Sentinel sibling (blocking HumanTask, no ItemControl - so ManualActivationRule
-            // defaults TRUE per 8.6.2/Table 5.51 and it simply sits Enabled, never triggered by
-            // this test): AutoComplete defaults FALSE on a Stage/CasePlanModel (Spec.CMMN.MODEL's
-            // own default), and Table 8.12's autoComplete=FALSE Branch 1 (StageBehavior.
-            // HandleChildTransitioned) auto-completes the CasePlanModel the instant EVERY
-            // currently-existing child is momentarily terminal - which, with PlanItemSource as
-            // the ONLY child, is true again after every single repetition completes (each
+            // Foot-gun shape shared with RepetitionGuardClusterFixture's warm-up (issue #153) via
+            // FootgunCaseBuilder, so the warm-up can never silently drift from this test's actual
+            // model. Sentinel sibling (blocking HumanTask, no ItemControl - so
+            // ManualActivationRule defaults TRUE per 8.6.2/Table 5.51 and it simply sits Enabled,
+            // never triggered by this test): AutoComplete defaults FALSE on a Stage/CasePlanModel
+            // (Spec.CMMN.MODEL's own default), and Table 8.12's autoComplete=FALSE Branch 1
+            // (StageBehavior.HandleChildTransitioned) auto-completes the CasePlanModel the instant
+            // EVERY currently-existing child is momentarily terminal - which, with PlanItemSource
+            // as the ONLY child, is true again after every single repetition completes (each
             // repetition is created-and-auto-completed inside one child-grain turn, well before
             // the NEXT repetition is spawned). Without this sentinel the CasePlanModel races to
             // Completed after the very first repetition, before the ceiling can ever be
@@ -75,36 +74,8 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
             // keeps the CasePlanModel Active long enough for RepetitionGuardOptions.
             // MaxRepetitionsPerPlanItem to be the thing that actually ends the case, proving the
             // ceiling (not an unrelated auto-complete race) is what halted the cascade.
-            var sentinelDefinition = new HumanTask { Id = SentinelDefinitionId, IsBlocking = true };
-
-            var @case = new CaseModel
-            {
-                Id = caseDefinitionId,
-                CaseRoles = new CaseRoles(),
-                CasePlanModel = new Stage
-                {
-                    Id = Scope,
-                    PlanItemDefinitions = { taskDefinition, sentinelDefinition },
-                    PlanItems =
-                    {
-                        new Interfaces.Model.PlanItem
-                        {
-                            Id = TaskPlanItemId,
-                            DefinitionRef = taskDefinition.Id,
-                            ItemControl = new PlanItemControl
-                            {
-                                RepetitionRule = Rules.IsRepeatableRule,
-                                ManualActivationRule = Rules.NotManuallyActivated
-                            }
-                        },
-                        new Interfaces.Model.PlanItem
-                        {
-                            Id = SentinelPlanItemId,
-                            DefinitionRef = sentinelDefinition.Id
-                        }
-                    }
-                }
-            };
+            var @case = FootgunCaseBuilder.BuildFootgunCase(
+                caseDefinitionId, Scope, TaskDefinitionId, TaskPlanItemId, SentinelDefinitionId, SentinelPlanItemId);
 
             await _clusterClient
                 .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)

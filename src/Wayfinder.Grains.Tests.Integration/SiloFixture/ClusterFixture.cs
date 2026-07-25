@@ -85,7 +85,7 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .AddMemoryGrainStorageAsDefault(ConfigureMemoryStorage) // grain state
                     .AddLogStorageBasedLogConsistencyProvider() // journaled grain
                     .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
-                    .AddMemoryStreams("Default", ConfigureMemoryStreamsPullingAgent) // cluster stream provider
+                    .AddMemoryStreams("Default", IntegrationTestStreamConfiguration.Configure) // cluster stream provider
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
@@ -120,19 +120,6 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
             private static void ConfigureMemoryStorage(OptionsBuilder<MemoryGrainStorageOptions> options) =>
                 options.Configure<Serializer>((storageOptions, serializer) =>
                     storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer));
-
-            // Issue #153: Orleans' default pulling-agent poll (StreamPullingAgentOptions.
-            // GetQueueMsgsTimerPeriod, ~100ms) means every memory-stream hop pays at least that
-            // long before a message is picked up. Grain-to-grain cascades that chain several
-            // stream hops sequentially (e.g. the RepetitionGuardFootgun spawn->complete->
-            // re-spawn->breach->fault cascade in RepetitionGuardClusterFixture) multiply that
-            // latency by the chain length, and the wait balloons further under CI thread-pool
-            // contention - eating into fixed test poll budgets. Polling every 15ms instead cuts
-            // both the steady-state latency and its CI variance; it is a stream-provider timing
-            // knob only, it does not change any delivery guarantee or guard/fault behavior.
-            private static void ConfigureMemoryStreamsPullingAgent(ISiloMemoryStreamConfigurator configurator) =>
-                configurator.ConfigurePullingAgent(ob => ob.Configure(options =>
-                    options.GetQueueMsgsTimerPeriod = TimeSpan.FromMilliseconds(15)));
 
             private static void ConfigureServices(IServiceCollection services)
             {

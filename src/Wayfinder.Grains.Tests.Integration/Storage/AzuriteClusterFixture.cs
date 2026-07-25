@@ -17,10 +17,8 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Exceptions;
 using Testcontainers.Azurite;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Integration.Storage
@@ -210,7 +208,7 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
                     .AddMemoryStreams("Default") // cluster stream provider
                     .UseInMemoryReminderService()
 
-                    .ConfigureLogging(ConfigureLogging);
+                    .ConfigureLogging(IntegrationTestLogging.Configure);
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
@@ -233,23 +231,6 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
                         storageOptions.GrainStorageSerializer = new OrleansGrainStorageSerializer(serializer);
                     });
 
-            private static void ConfigureLogging(ILoggingBuilder logging)
-            {
-                var levelSwitch = new LoggingLevelSwitch
-                {
-                    MinimumLevel = LogEventLevel.Debug
-                };
-
-                logging.AddSerilog(new LoggerConfiguration()
-                    .MinimumLevel.ControlledBy(levelSwitch)
-                    .Enrich.FromLogContext()
-                    .Enrich.WithExceptionDetails()
-                    .WriteTo.Seq(
-                        "http://localhost:5341",
-                        controlLevelSwitch: levelSwitch
-                    )
-                    .CreateLogger());
-            }
         }
 
         // Mirror of Wayfinder.Silo/Program.cs CaseStateContainerFactory (the test assembly has no
