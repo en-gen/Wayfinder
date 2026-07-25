@@ -117,6 +117,16 @@ jobs:
           /p:CoverletOutputFormat=json
           /p:Exclude="[*.Tests*]*"
 
+      - name: API tests (+merged coverage)
+        run: >
+          dotnet test src/Wayfinder.Api.Tests/Wayfinder.Api.Tests.csproj
+          -c Release --no-build --logger trx
+          /p:CollectCoverage=true
+          /p:MergeWith=${{ env.COVERAGE_DIR }}/coverage.json
+          /p:CoverletOutput=${{ env.COVERAGE_DIR }}/
+          /p:CoverletOutputFormat=json
+          /p:Exclude="[*.Tests*]*"
+
       # Azurite for the opt-in restart-survival suite is Testcontainers-provisioned per run:
       # AzuriteClusterFixture starts and tears down its own container via Testcontainers.Azurite,
       # so no separate start/readiness-wait step is needed - ubuntu-latest already has Docker,
