@@ -19,8 +19,14 @@ WORKDIR /src
 COPY global.json Directory.Build.props nuget.config ./
 
 # Project files only, for the same layer-caching reason: `dotnet restore` only needs to re-run
-# when a .csproj actually changes.
+# when a .csproj actually changes. Wayfinder.Silo's full ProjectReference closure is copied so
+# restore resolves every reference: Silo -> Api -> {Application, Contracts}, plus Grains and
+# Grains.Interfaces. Missing any of these fails restore/build (Api is referenced by the silo's
+# HTTP composition in Program.cs/Startup.cs).
 COPY src/Wayfinder.Silo/Wayfinder.Silo.csproj src/Wayfinder.Silo/
+COPY src/Wayfinder.Api/Wayfinder.Api.csproj src/Wayfinder.Api/
+COPY src/Wayfinder.Application/Wayfinder.Application.csproj src/Wayfinder.Application/
+COPY src/Wayfinder.Contracts/Wayfinder.Contracts.csproj src/Wayfinder.Contracts/
 COPY src/Wayfinder.Grains/Wayfinder.Grains.csproj src/Wayfinder.Grains/
 COPY src/Wayfinder.Grains.Interfaces/Wayfinder.Grains.Interfaces.csproj src/Wayfinder.Grains.Interfaces/
 
@@ -29,8 +35,11 @@ COPY src/Wayfinder.Grains.Interfaces/Wayfinder.Grains.Interfaces.csproj src/Wayf
 # errors out otherwise; same flag used for solution builds outside a real git checkout.
 RUN dotnet restore src/Wayfinder.Silo/Wayfinder.Silo.csproj -p:EnableSourceControlManagerQueries=false
 
-# Now the rest of the source for those same three projects.
+# Now the rest of the source for those same projects.
 COPY src/Wayfinder.Silo/ src/Wayfinder.Silo/
+COPY src/Wayfinder.Api/ src/Wayfinder.Api/
+COPY src/Wayfinder.Application/ src/Wayfinder.Application/
+COPY src/Wayfinder.Contracts/ src/Wayfinder.Contracts/
 COPY src/Wayfinder.Grains/ src/Wayfinder.Grains/
 COPY src/Wayfinder.Grains.Interfaces/ src/Wayfinder.Grains.Interfaces/
 
