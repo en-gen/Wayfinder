@@ -9,18 +9,18 @@
 #
 # GitVersion 6.x quirk (verified empirically): when a custom tag-prefix is
 # configured, `next-version` MUST include the prefix or GitVersion fails with
-# "Failed to parse 1.0.0 into a Semantic Version". Hence `Case.Flow-1.0.0`.
+# "Failed to parse 1.0.0 into a Semantic Version". Hence `Wayfinder-1.0.0`.
 #
-# At GA: merge to main and tag it —  git tag Case.Flow-1.0.0 <sha> && git push origin Case.Flow-1.0.0
+# At GA: merge to main and tag it —  git tag Wayfinder-1.0.0 <sha> && git push origin Wayfinder-1.0.0
 # Release tags take precedence over next-version (it is a floor, never a
 # ceiling): main then emits clean 1.0.0, develop automatically advances to
 # 1.1.0-develop.<n>, and hotfixes from main emit 1.0.1-<wi>-<desc>.<n>.
 
 mode: ContinuousDelivery
 
-tag-prefix: 'Case.Flow-'
+tag-prefix: 'Wayfinder-'
 
-next-version: Case.Flow-1.0.0
+next-version: Wayfinder-1.0.0
 
 # How to extract a version from a branch name; required for release/X.Y.Z to
 # pin version X.Y.Z. Matches X, X.Y, X.Y.Z with optional v/V prefix.

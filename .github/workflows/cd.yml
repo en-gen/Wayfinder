@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # GitVersion needs full history
-          fetch-tags: true # ...and tags (Case.Flow-<version> release tags)
+          fetch-tags: true # ...and tags (Wayfinder-<version> release tags)
 
       - uses: actions/setup-dotnet@v6
         with:

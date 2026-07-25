@@ -1,7 +1,7 @@
 # Case.Flow CI — version, build, test, merged coverage.
 #
 # GitHub Actions port of devops/build/case.flow.ci.yml (Azure Pipelines). Same
-# stack: GitVersion 6.x computes SemVer from GitVersion.yml + `Case.Flow-`
+# stack: GitVersion 6.x computes SemVer from GitVersion.yml + `Wayfinder-`
 # tags, dotnet build/test on the SDK pinned in global.json, Coverlet collects
 # and merges coverage across both test projects.
 #
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # GitVersion needs full history
-          fetch-tags: true # ...and tags (Case.Flow-<version> release tags)
+          fetch-tags: true # ...and tags (Wayfinder-<version> release tags)
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -107,6 +107,25 @@ jobs:
       # (Directory.Build.props: NU1902-NU1904 as errors, transitive included),
       # so the Build step above already fails on any vulnerable package - no
       # separate gate step needed here either (work item #12).
+
+      # Build-only gate for the Silo image: catches a broken Dockerfile (e.g. a missing
+      # sibling-project COPY) at PR time instead of at cd.yml's next publish. Runs before the
+      # test steps so a broken image fails fast and is never skipped by a later test failure.
+      # Context/file mirror cd.yml's "Build and push Wayfinder.Silo image" step exactly; push
+      # is disabled here since this job only needs to prove the image builds, not publish it.
+      # GHA layer caching keeps the added build off the critical path on repeat runs and limits
+      # base-image-pull flakiness on what becomes a merge-gating check.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Wayfinder.Silo image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Wayfinder.Silo/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Unit tests (+coverage)
         run: >
