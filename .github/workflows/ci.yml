@@ -54,13 +54,13 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore src/CaseFlow.sln
+        run: dotnet restore src/Wayfinder.sln
 
       # Server-side style gate. The Husky pre-commit hook runs the same command, but it is
       # client-side and `--no-verify` walks straight past it, so the check is repeated here
-      # where it cannot be skipped. Run `dotnet format src/CaseFlow.sln` to fix locally.
+      # where it cannot be skipped. Run `dotnet format src/Wayfinder.sln` to fix locally.
       - name: Format check
-        run: dotnet format src/CaseFlow.sln --verify-no-changes
+        run: dotnet format src/Wayfinder.sln --verify-no-changes
 
       - name: Run GitVersion
         id: gitversion
@@ -97,7 +97,7 @@ jobs:
 
       - name: Build (${{ steps.gitversion.outputs.SemVer }})
         run: >
-          dotnet build src/CaseFlow.sln -c Release
+          dotnet build src/Wayfinder.sln -c Release
           -p:Version=${{ steps.gitversion.outputs.SemVer }}
           -p:AssemblyVersion=${{ steps.gitversion.outputs.AssemblySemVer }}
           -p:FileVersion=${{ steps.gitversion.outputs.AssemblySemFileVer }}
@@ -110,7 +110,7 @@ jobs:
 
       - name: Unit tests (+coverage)
         run: >
-          dotnet test src/Flow.Grains.Tests/Flow.Grains.Tests.csproj
+          dotnet test src/Wayfinder.Grains.Tests/Wayfinder.Grains.Tests.csproj
           -c Release --no-build --logger trx
           /p:CollectCoverage=true
           /p:CoverletOutput=${{ env.COVERAGE_DIR }}/
@@ -120,11 +120,11 @@ jobs:
       # Azurite for the opt-in restart-survival suite is Testcontainers-provisioned per run:
       # AzuriteClusterFixture starts and tears down its own container via Testcontainers.Azurite,
       # so no separate start/readiness-wait step is needed - ubuntu-latest already has Docker,
-      # which is all the suite requires. RequiresDockerFact (Flow.Grains.Tests.Integration/Storage)
+      # which is all the suite requires. RequiresDockerFact (Wayfinder.Grains.Tests.Integration/Storage)
       # skips (does not fail) if Docker itself isn't reachable.
       - name: Integration tests (+merged coverage)
         run: >
-          dotnet test src/Flow.Grains.Tests.Integration/Flow.Grains.Tests.Integration.csproj
+          dotnet test src/Wayfinder.Grains.Tests.Integration/Wayfinder.Grains.Tests.Integration.csproj
           -c Release --no-build --logger trx
           /p:CollectCoverage=true
           /p:MergeWith=${{ env.COVERAGE_DIR }}/coverage.json

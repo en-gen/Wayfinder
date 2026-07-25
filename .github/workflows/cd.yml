@@ -1,6 +1,6 @@
-# Case.Flow CD — build and publish the Flow.Silo container image.
+# Case.Flow CD — build and publish the Wayfinder.Silo container image.
 #
-# Fills the "planned, never authored" ADO Case.Flow.CD slot (see
+# Fills the "planned, never authored" ADO Case.Wayfinder.CD slot (see
 # devops/deploy/templates/README.md) with a GitHub-native equivalent, scoped
 # to exactly what that README describes: build the Orleans silo image and
 # publish it, versioned from GitVersion. No deploy-to-Azure steps here -
@@ -25,13 +25,13 @@ on:
   push:
     branches: [develop, main]
     # Only files that actually end up in the image (or affect how it's
-    # built/versioned) trigger a rebuild+republish - Flow.Silo's own
-    # ProjectReferences (Flow.Grains, Flow.Grains.Interfaces), the repo-root
+    # built/versioned) trigger a rebuild+republish - Wayfinder.Silo's own
+    # ProjectReferences (Wayfinder.Grains, Wayfinder.Grains.Interfaces), the repo-root
     # files the Dockerfile COPYs in explicitly, and this workflow itself.
     paths:
-      - src/Flow.Silo/**
-      - src/Flow.Grains/**
-      - src/Flow.Grains.Interfaces/**
+      - src/Wayfinder.Silo/**
+      - src/Wayfinder.Grains/**
+      - src/Wayfinder.Grains.Interfaces/**
       - global.json
       - Directory.Build.props
       - nuget.config
@@ -127,19 +127,19 @@ jobs:
             type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      # Build context MUST be the repository root, not src/Flow.Silo/ - the
+      # Build context MUST be the repository root, not src/Wayfinder.Silo/ - the
       # Dockerfile's own header comment explains why (its ProjectReferences
-      # pull in sibling projects Flow.Grains/Flow.Grains.Interfaces, and its
+      # pull in sibling projects Wayfinder.Grains/Wayfinder.Grains.Interfaces, and its
       # restore/build also need repo-root global.json/Directory.Build.props/
       # nuget.config). Verified against devops/eval/docker-compose.yml,
       # which builds this same image with `context: ../..` from inside
       # devops/eval/ - i.e. the repo root, just expressed relative to a
       # different working directory than this workflow's default ('.').
-      - name: Build and push Flow.Silo image
+      - name: Build and push Wayfinder.Silo image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: src/Flow.Silo/Dockerfile
+          file: src/Wayfinder.Silo/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
