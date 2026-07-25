@@ -2,10 +2,10 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Interfaces.Identity;
 using Orleans;
 
-namespace Flow.Application.Identity
+namespace Wayfinder.Application.Identity
 {
     public sealed class IdentityRegistrySeeder : IIdentityRegistrySeeder
     {

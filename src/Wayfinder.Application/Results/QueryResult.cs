@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Flow.Application.Results
+namespace Wayfinder.Application.Results
 {
     // ADO #32 - the read-side counterpart to CommandResult<T>; see that file's remarks. Carries the
     // full status vocabulary (not just Success/NotFound) for symmetry and future queries that need

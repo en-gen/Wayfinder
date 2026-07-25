@@ -2,26 +2,26 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Application.Cases;
-using Flow.Application.DependencyInjection;
-using Flow.Application.Mediator;
-using Flow.Contracts.V1;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Application.Cases;
+using Wayfinder.Application.DependencyInjection;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Contracts.V1;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Application
+namespace Wayfinder.Grains.Tests.Integration.Application
 {
     // ADO #32/#33 - the CQRS-layer equivalent of #39's CaseOperationsIntegrationTests: exercises the
-    // exact commands/queries Flow.Api (and a future MCP server) dispatch, but drives them through
+    // exact commands/queries Wayfinder.Api (and a future MCP server) dispatch, but drives them through
     // the REAL native mediator (ISender / AddFlowApplication) over the existing in-memory Orleans
     // ClusterFixture - no web host, no Azurite/Docker (case ops need no durable storage), and no
-    // JwtBearer/tenant-registry resolution either (that is Flow.Api's IdentityContextMiddleware,
-    // exercised in Flow.Api.Tests instead - see that project). Proves a timer-free flagship .cmmn
-    // file (MilestoneSentryCase.cmmn) becomes a live case and a readable Flow.Contracts.V1.CaseView
+    // JwtBearer/tenant-registry resolution either (that is Wayfinder.Api's IdentityContextMiddleware,
+    // exercised in Wayfinder.Api.Tests instead - see that project). Proves a timer-free flagship .cmmn
+    // file (MilestoneSentryCase.cmmn) becomes a live case and a readable Wayfinder.Contracts.V1.CaseView
     // entirely through the Application seam.
     [Collection(ClusterCollection.Name)]
     public class CaseCqrsIntegrationTests
@@ -35,7 +35,7 @@ namespace Flow.Grains.Tests.Integration.Application
             // wire ISender + every ICommandHandler<,>/IQueryHandler<,> by its own reflection scan.
             //
             // ADO #33 - the handlers no longer default CaseRequestContext themselves (that seam,
-            // CaseRequestContextDefaults, was deleted: Flow.Api's IdentityContextMiddleware is now
+            // CaseRequestContextDefaults, was deleted: Wayfinder.Api's IdentityContextMiddleware is now
             // the only place that happens, from an authenticated caller's resolved identity). This
             // fixture has no HTTP pipeline, so it primes CaseRequestContext directly instead - the
             // same values CaseRequestContextDefaults used, and the same pattern every grain-level
@@ -118,7 +118,7 @@ namespace Flow.Grains.Tests.Integration.Application
             var result = await sender.Send(new GetCaseQuery(Guid.NewGuid()));
 
             result.Failed.Should().BeTrue();
-            result.Status.Should().Be(Flow.Application.Results.ResultStatus.NotFound);
+            result.Status.Should().Be(Wayfinder.Application.Results.ResultStatus.NotFound);
             result.Value.Should().BeNull();
         }
 
@@ -133,7 +133,7 @@ namespace Flow.Grains.Tests.Integration.Application
             var deploy = await sender.Send(new DeployDefinitionCommand("<not-cmmn/>"));
 
             deploy.Failed.Should().BeTrue();
-            deploy.Status.Should().Be(Flow.Application.Results.ResultStatus.BadRequest);
+            deploy.Status.Should().Be(Wayfinder.Application.Results.ResultStatus.BadRequest);
             deploy.Error.Should().NotBeNullOrWhiteSpace();
             deploy.Value.Should().BeNull();
         }
@@ -150,7 +150,7 @@ namespace Flow.Grains.Tests.Integration.Application
             var created = await sender.Send(new CreateCaseCommand($"never-deployed-{Guid.NewGuid()}"));
 
             created.Failed.Should().BeTrue();
-            created.Status.Should().Be(Flow.Application.Results.ResultStatus.BadRequest);
+            created.Status.Should().Be(Wayfinder.Application.Results.ResultStatus.BadRequest);
             created.Value.Should().BeNull();
         }
 

@@ -2,18 +2,18 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Api.Controllers;
-using Flow.Application.Cases;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
+using Wayfinder.Api.Controllers;
+using Wayfinder.Application.Cases;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Xunit;
 
-namespace Flow.Api.Tests.Controllers
+namespace Wayfinder.Api.Tests.Controllers
 {
     // ADO #32 - unit-level: a faked ISender, a bare DefaultHttpContext for Request.Body (no host/
     // TestServer). Proves the raw request body becomes DeployDefinitionCommand.CmmnXml verbatim and

@@ -1,14 +1,14 @@
 using System;
-using Flow.Grains.Events;
-using Flow.Grains.Interfaces;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Interfaces;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Events
+namespace Wayfinder.Grains.Tests.Events
 {
     // ADO #59 - fast, isolated coverage of Events.ActorStamping (the helper CmmnElementGrain.
     // RaiseEvent and CaseDefinitionGrain.Define both call at append time), independent of the
-    // TestCluster-based proof that it is actually wired into a real RaiseEvent path (see Flow.
+    // TestCluster-based proof that it is actually wired into a real RaiseEvent path (see Wayfinder.
     // Grains.Tests.Integration.Events.ActorStampingIntegrationTests).
     public class ActorStampingTests
     {

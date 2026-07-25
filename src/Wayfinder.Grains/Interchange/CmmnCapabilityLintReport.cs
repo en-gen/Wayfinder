@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Flow.Grains.Interchange
+namespace Wayfinder.Grains.Interchange
 {
     // Severity rubric for a CmmnCapabilityLint finding (see that class's remarks for the exact
     // rule set and the runtime evidence behind each rule).

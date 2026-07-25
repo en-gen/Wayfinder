@@ -8,7 +8,7 @@ using Jint.Native.Array;
 using Jint.Native.Object;
 using Jint.Runtime.Descriptors;
 
-namespace Flow.Grains.Executables
+namespace Wayfinder.Grains.Executables
 {
     public class JsonObjectInstance : ObjectInstance
     {

@@ -6,11 +6,11 @@ using FluentAssertions;
 using Orleans;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Storage
+namespace Wayfinder.Grains.Tests.Integration.Storage
 {
     // Azurite restart-survival proof for work item #54: the journaled-grain storage path
     // (JournaledGrain + [LogConsistencyProvider("LogStorage")]) is backed by Azure Blob in
-    // Development, not memory. See Flow.Silo/Program.cs ConfigureDevelopmentOrleans for the
+    // Development, not memory. See Wayfinder.Silo/Program.cs ConfigureDevelopmentOrleans for the
     // Orleans-source citation establishing which storage slot that grain shape actually
     // resolves, and AzuriteClusterFixture for the TestCluster wiring that mirrors it.
     //

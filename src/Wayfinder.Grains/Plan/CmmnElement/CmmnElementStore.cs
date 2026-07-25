@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.Serialization;
-using Flow.Grains.Plan.CmmnElement.Events;
+using Wayfinder.Grains.Plan.CmmnElement.Events;
 using Orleans;
 
-namespace Flow.Grains.Plan.CmmnElement
+namespace Wayfinder.Grains.Plan.CmmnElement
 {
     [GenerateSerializer]
     public abstract class CmmnElementStore<TDefinition> : BaseStore

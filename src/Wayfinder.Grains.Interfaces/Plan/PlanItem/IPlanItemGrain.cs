@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.CmmnElementGrain;
 
-namespace Flow.Grains.Interfaces.Plan.PlanItem
+namespace Wayfinder.Grains.Interfaces.Plan.PlanItem
 {
     public interface IPlanItemGrain : ICmmnElementGrain<Model.PlanItem>
     {

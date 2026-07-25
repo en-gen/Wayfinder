@@ -1,4 +1,4 @@
-namespace Flow.Silo.Infrastructure.Options
+namespace Wayfinder.Silo.Infrastructure.Options
 {
     public class AzureOptions
     {
@@ -55,7 +55,7 @@ namespace Flow.Silo.Infrastructure.Options
             // Blob container names must be lowercase alphanumeric plus hyphens (Azure rule:
             // ^[a-z0-9]+(-[a-z0-9]+)*$, 3-63 chars - see AzureBlobUtils.ValidateContainerName
             // in Orleans.Persistence.AzureStorage), which is why the VALUE can't follow the
-            // project's dot-separated naming convention (e.g. Case.Flow.CaseState).
+            // project's dot-separated naming convention (e.g. Case.Wayfinder.CaseState).
             public string CaseStateContainer { get; set; } = "case-flow-casestate";
         }
     }

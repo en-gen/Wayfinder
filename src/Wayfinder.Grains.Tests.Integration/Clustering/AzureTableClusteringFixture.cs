@@ -3,8 +3,8 @@ using System.Net;
 using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Azure.Identity;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Tests.Integration.Storage;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Tests.Integration.Storage;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,10 +23,10 @@ using Serilog.Exceptions;
 using Testcontainers.Azurite;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Clustering
+namespace Wayfinder.Grains.Tests.Integration.Clustering
 {
     // Real Azure Table clustering validation for work item #30's deployed-cluster path
-    // (Flow.Silo/Program.cs ConfigureDeployedOrleans): a MULTI-silo TestCluster whose membership
+    // (Wayfinder.Silo/Program.cs ConfigureDeployedOrleans): a MULTI-silo TestCluster whose membership
     // is NOT TestCluster's own in-memory dev membership oracle but the real
     // UseAzureStorageClustering provider pointed at Azurite's table endpoint - the crux proof
     // that ConfigureDeployedOrleans's clustering choice actually forms a cluster against a real
@@ -48,7 +48,7 @@ namespace Flow.Grains.Tests.Integration.Clustering
     {
         private const string AzuriteImage = "mcr.microsoft.com/azure-storage/azurite:3.35.0";
 
-        // Mirrors Flow.Silo's AzureOptions.ClusteringSectionKey by value - the test assembly has
+        // Mirrors Wayfinder.Silo's AzureOptions.ClusteringSectionKey by value - the test assembly has
         // no reference to the silo project. The registration path built from it
         // (TestSiloConfigurator/TestClientConfigurator below) must match Program.cs's
         // ConfigureDeployedOrleans/ConfigureServices exactly (AddTableServiceClient section-shape
@@ -115,7 +115,7 @@ namespace Flow.Grains.Tests.Integration.Clustering
             builder.Options.UseTestClusterMembership = false;
 
             // Hierarchical keys land in each silo's/client's IConfiguration as the same
-            // Azure:Clustering section shape Flow.Silo reads from configuration (see AzureOptions
+            // Azure:Clustering section shape Wayfinder.Silo reads from configuration (see AzureOptions
             // and Program.cs ConfigureServices/ConfigureDeployedOrleans), so the configurators
             // below can consume it through the identical registration path.
             builder.Properties[ClusteringSectionKey + ":connectionString"] = connectionString;
@@ -193,7 +193,7 @@ namespace Flow.Grains.Tests.Integration.Clustering
 
                 // TestCluster's codegen scans every [Alias]-tagged grain interface in this test
                 // assembly when the silo starts - not just the ones this suite's own grain uses -
-                // so any CMMN-model-touching interface elsewhere in Flow.Grains.Tests.Integration
+                // so any CMMN-model-touching interface elsewhere in Wayfinder.Grains.Tests.Integration
                 // still needs this fallback registered here too (same reasoning as
                 // Storage.AzuriteClusterFixture's TestSiloConfigurator and
                 // SiloFixture.ClusterFixture's TestSiloConfigurator).

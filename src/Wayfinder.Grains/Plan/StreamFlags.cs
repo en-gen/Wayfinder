@@ -1,6 +1,6 @@
 using System;
 
-namespace Flow.Grains.Plan
+namespace Wayfinder.Grains.Plan
 {
     [Flags]
     public enum StreamFlags

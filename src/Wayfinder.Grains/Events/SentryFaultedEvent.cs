@@ -1,6 +1,6 @@
 using Orleans;
 
-namespace Flow.Grains.Events
+namespace Wayfinder.Grains.Events
 {
     // D10 - published on the same case-wide stream key (scope + sentry definition id) as
     // SentrySatisfiedEvent, when a sentry's IfPart could not be evaluated at all (as opposed to

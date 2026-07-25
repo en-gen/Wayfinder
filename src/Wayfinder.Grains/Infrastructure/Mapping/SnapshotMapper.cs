@@ -1,14 +1,14 @@
-using Flow.Grains.Executables;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.Case;
-using Flow.Grains.Plan.CaseFileItem;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
+using Wayfinder.Grains.Executables;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.Case;
+using Wayfinder.Grains.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
 
-namespace Flow.Grains.Infrastructure.Mapping
+namespace Wayfinder.Grains.Infrastructure.Mapping
 {
     // Hand-written replacement for the AutoMapper CaseFlowProfile (removed: license + CVE
     // exposure, see work item #50). The mapping surface is small and fixed-shape, so this is

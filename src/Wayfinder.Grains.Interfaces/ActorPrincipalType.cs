@@ -1,4 +1,4 @@
-namespace Flow.Grains.Interfaces
+namespace Wayfinder.Grains.Interfaces
 {
     // ADO #59 - who/what CaseRequestContext.ActorPrincipalId actually names. The overwhelming
     // majority of callers today are User (IdentityContextMiddleware resolves every authenticated

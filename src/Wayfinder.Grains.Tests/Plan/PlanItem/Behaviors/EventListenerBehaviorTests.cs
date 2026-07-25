@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 {
     public partial class EventListenerBehaviorTests
     {

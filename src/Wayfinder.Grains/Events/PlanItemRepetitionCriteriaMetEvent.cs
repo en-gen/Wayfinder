@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Events
+namespace Wayfinder.Grains.Events
 {
     [GenerateSerializer]
     public class PlanItemRepetitionCriteriaMetEvent : BaseEvent

@@ -3,25 +3,25 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using AutoFixture.Xunit2;
-using Flow.Grains.Infrastructure.Mapping;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.Case;
-using Flow.Grains.Plan.Case.Events;
-using Flow.Grains.Plan.CaseFileItem;
-using Flow.Grains.Plan.CaseFileItem.Events;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
-using Flow.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Infrastructure.Mapping;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.Case;
+using Wayfinder.Grains.Plan.Case.Events;
+using Wayfinder.Grains.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.CaseFileItem.Events;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using FluentAssertions;
 using NodaTime;
 using NodaTime.Text;
 using Xunit;
 
-namespace Flow.Grains.Tests.Infrastructure.Mapping
+namespace Wayfinder.Grains.Tests.Infrastructure.Mapping
 {
     // Replaces the AssertConfigurationIsValid-style coverage the removed AutoMapper profile
     // would have given us for free. Hand-written mapping's main risk is a silently-dropped
@@ -127,7 +127,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
             }.Build().Normalize();
 
             var isoString = $"R{repetitions}/{start:O}/{PeriodPattern.NormalizingIso.Format(period)}";
-            var iso = new Flow.Grains.Executables.Iso8601(isoString);
+            var iso = new Wayfinder.Grains.Executables.Iso8601(isoString);
 
             var snapshot = iso.ToSnapshot();
 
@@ -148,7 +148,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
         [Fact]
         public void ToSnapshot__Given_Null_Iso8601__Then_Null()
         {
-            ((Flow.Grains.Executables.Iso8601)null).ToSnapshot().Should().BeNull();
+            ((Wayfinder.Grains.Executables.Iso8601)null).ToSnapshot().Should().BeNull();
         }
 
         [Theory, AutoData]
@@ -256,7 +256,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
                 string requiredError, string repeatableError, string manuallyActivatableError,
                 string entrySourceScope, string entrySourceId, string exitSourceScope, string exitSourceId)
         {
-            var definition = new Flow.Grains.Interfaces.Model.PlanItem { Id = definitionId };
+            var definition = new Wayfinder.Grains.Interfaces.Model.PlanItem { Id = definitionId };
             var stage = new Stage();
 
             var store = new PlanItemStore();
@@ -326,7 +326,7 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
         public void ToSnapshot__Given_PlanItemStore_WithTimerEventListenerBehavior__Then_PolymorphicBehaviorExtensionRoutedCorrectly
             (string caseDefinitionId, DateTime timerStart, string rawIso, string evaluationError)
         {
-            var definition = new Flow.Grains.Interfaces.Model.PlanItem();
+            var definition = new Wayfinder.Grains.Interfaces.Model.PlanItem();
             var timerEventListener = new TimerEventListener();
             var iso = BuildIso8601(rawIso);
 
@@ -463,17 +463,17 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
         public void ToSnapshot__Given_CaseFileItemStore__Then_AllMembersMapped
             (string caseDefinitionId, string definitionId, string childId)
         {
-            var definition = new Flow.Grains.Interfaces.Model.CaseFileItem { Id = definitionId };
+            var definition = new Wayfinder.Grains.Interfaces.Model.CaseFileItem { Id = definitionId };
             var value = JsonValue.Create("some content");
 
-            var store = new Flow.Grains.Plan.CaseFileItem.CaseFileItemStore();
-            store.Apply(new Flow.Grains.Plan.CmmnElement.Events.CmmnElementDefined<Flow.Grains.Interfaces.Model.CaseFileItem>
+            var store = new Wayfinder.Grains.Plan.CaseFileItem.CaseFileItemStore();
+            store.Apply(new Wayfinder.Grains.Plan.CmmnElement.Events.CmmnElementDefined<Wayfinder.Grains.Interfaces.Model.CaseFileItem>
             {
                 CaseDefinitionId = caseDefinitionId,
                 Definition = definition
             });
-            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.ValueChanged { Value = value });
-            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.ChildAdded { ChildCaseFileItemId = childId });
+            store.Apply(new Wayfinder.Grains.Plan.CaseFileItem.Events.ValueChanged { Value = value });
+            store.Apply(new Wayfinder.Grains.Plan.CaseFileItem.Events.ChildAdded { ChildCaseFileItemId = childId });
 
             var snapshot = store.ToSnapshot();
 
@@ -500,14 +500,14 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
         {
             var value = JsonValue.Create("some content");
 
-            var store = new Flow.Grains.Plan.CaseFileItem.CaseFileItemStore();
-            store.Apply(new Flow.Grains.Plan.CmmnElement.Events.CmmnElementDefined<Flow.Grains.Interfaces.Model.CaseFileItem>
+            var store = new Wayfinder.Grains.Plan.CaseFileItem.CaseFileItemStore();
+            store.Apply(new Wayfinder.Grains.Plan.CmmnElement.Events.CmmnElementDefined<Wayfinder.Grains.Interfaces.Model.CaseFileItem>
             {
                 CaseDefinitionId = caseDefinitionId,
-                Definition = new Flow.Grains.Interfaces.Model.CaseFileItem { Id = definitionId }
+                Definition = new Wayfinder.Grains.Interfaces.Model.CaseFileItem { Id = definitionId }
             });
-            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.ValueChanged { Value = value });
-            store.Apply(new Flow.Grains.Plan.CaseFileItem.Events.Discarded());
+            store.Apply(new Wayfinder.Grains.Plan.CaseFileItem.Events.ValueChanged { Value = value });
+            store.Apply(new Wayfinder.Grains.Plan.CaseFileItem.Events.Discarded());
 
             var snapshot = store.ToSnapshot();
 
@@ -526,11 +526,11 @@ namespace Flow.Grains.Tests.Infrastructure.Mapping
         [Fact]
         public void ToSnapshot__Given_Null_CaseFileItemStore__Then_Null()
         {
-            ((Flow.Grains.Plan.CaseFileItem.CaseFileItemStore)null).ToSnapshot().Should().BeNull();
+            ((Wayfinder.Grains.Plan.CaseFileItem.CaseFileItemStore)null).ToSnapshot().Should().BeNull();
         }
 
-        private static Flow.Grains.Executables.Iso8601 BuildIso8601(string discriminator) =>
-            new Flow.Grains.Executables.Iso8601(DateTime.UtcNow.AddSeconds(
+        private static Wayfinder.Grains.Executables.Iso8601 BuildIso8601(string discriminator) =>
+            new Wayfinder.Grains.Executables.Iso8601(DateTime.UtcNow.AddSeconds(
                 Math.Abs(discriminator.GetHashCode()) % 3600).ToString("O"));
     }
 }

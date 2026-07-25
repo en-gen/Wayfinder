@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Model.Interchange;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model.Interchange;
 
-namespace Flow.Grains.Interchange
+namespace Wayfinder.Grains.Interchange
 {
     // ADO #20 - the capability lint / honesty gate.
     // ~~~~~

@@ -2,7 +2,7 @@ using System;
 using Orleans.Runtime;
 using Orleans.Streams;
 
-namespace Flow.Grains.Infrastructure.Extensions
+namespace Wayfinder.Grains.Infrastructure.Extensions
 {
     public static class StreamProviderExtensions
     {

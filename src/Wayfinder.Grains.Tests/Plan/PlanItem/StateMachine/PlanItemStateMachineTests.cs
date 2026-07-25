@@ -1,16 +1,16 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Plan.PlanItem.StateMachine;
-using Flow.Grains.Tests.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Tests.Infrastructure.Extensions;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.PlanItem.StateMachine
+namespace Wayfinder.Grains.Tests.Plan.PlanItem.StateMachine
 {
     public class PlanItemStateMachineTests
     {

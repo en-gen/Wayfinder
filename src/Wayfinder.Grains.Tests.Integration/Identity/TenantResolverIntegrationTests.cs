@@ -1,16 +1,16 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Application.DependencyInjection;
-using Flow.Application.Identity;
-using Flow.Grains.Interfaces.Identity;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Application.DependencyInjection;
+using Wayfinder.Application.Identity;
+using Wayfinder.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Identity
+namespace Wayfinder.Grains.Tests.Integration.Identity
 {
     // ADO #33 - proves the tenant-registry seam sub-unit 3's HTTP auth middleware will call:
     // seed two independent tenants (each with a user + roles), resolve each subject back to the
@@ -209,7 +209,7 @@ namespace Flow.Grains.Tests.Integration.Identity
         // then reactivate and re-read from the backing IGrainStorage
         // (AddMemoryGrainStorageAsDefault in ClusterFixture's TestSiloConfigurator - see
         // UserIdentityGrain's remarks for why "Default" is the correct storage name in both the
-        // test cluster and Flow.Silo/Program.cs).
+        // test cluster and Wayfinder.Silo/Program.cs).
         private async Task ForceDeactivateAllActivations()
         {
             var managementGrain = _clusterClient.GetGrain<IManagementGrain>(0);

@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 
-namespace Flow.Grains.Plan.Case
+namespace Wayfinder.Grains.Plan.Case
 {
     public interface ICaseDefinitionGrain : Interfaces.Plan.Case.ICaseDefinitionGrain
     {

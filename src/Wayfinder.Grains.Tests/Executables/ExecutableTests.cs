@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Nodes;
-using Flow.Grains.Executables;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Executables;
+using Wayfinder.Grains.Interfaces.Model;
 using Jint;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Flow.Grains.Tests.Executables
+namespace Wayfinder.Grains.Tests.Executables
 {
     public class ExecutableTests
     {

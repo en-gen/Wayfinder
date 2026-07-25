@@ -1,12 +1,12 @@
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.Sentry;
-using Flow.Grains.Plan.Sentry.Events;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.Sentry;
+using Wayfinder.Grains.Plan.Sentry.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.Sentry
+namespace Wayfinder.Grains.Tests.Plan.Sentry
 {
     public class SentryStoreTests
     {

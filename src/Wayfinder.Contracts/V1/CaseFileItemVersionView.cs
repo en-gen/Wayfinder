@@ -1,9 +1,9 @@
 using System;
 
-namespace Flow.Contracts.V1
+namespace Wayfinder.Contracts.V1
 {
     // ADO #58 - one entry of GetCaseFileItemHistoryQuery's result: the wire projection of
-    // Flow.Grains.Interfaces.Plan.CaseFileItem.CaseFileItemVersionDescriptor. See that type's
+    // Wayfinder.Grains.Interfaces.Plan.CaseFileItem.CaseFileItemVersionDescriptor. See that type's
     // remarks for exactly which journaled events produce one of these.
     public sealed class CaseFileItemVersionView
     {

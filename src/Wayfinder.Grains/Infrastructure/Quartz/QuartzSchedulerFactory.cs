@@ -5,7 +5,7 @@ using Quartz.Core;
 using Quartz.Impl;
 using Quartz.Spi;
 
-namespace Flow.Grains.Infrastructure.Quartz
+namespace Wayfinder.Grains.Infrastructure.Quartz
 {
     public class QuartzSchedulerFactory : StdSchedulerFactory
     {

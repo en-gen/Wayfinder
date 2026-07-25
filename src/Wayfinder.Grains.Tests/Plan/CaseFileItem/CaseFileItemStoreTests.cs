@@ -1,12 +1,12 @@
 using System.Text.Json.Nodes;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Plan.CaseFileItem;
-using Flow.Grains.Plan.CaseFileItem.Events;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.CaseFileItem.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.CaseFileItem
+namespace Wayfinder.Grains.Tests.Plan.CaseFileItem
 {
     public class CaseFileItemStoreTests
     {

@@ -1,11 +1,11 @@
 using System;
 using AutoFixture.Xunit2;
-using Flow.Grains.Executables;
+using Wayfinder.Grains.Executables;
 using NodaTime;
 using NodaTime.Text;
 using Xunit;
 
-namespace Flow.Grains.Tests.Executables
+namespace Wayfinder.Grains.Tests.Executables
 {
     public class Iso8601Tests
     {

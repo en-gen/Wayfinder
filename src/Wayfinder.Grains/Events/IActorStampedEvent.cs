@@ -1,7 +1,7 @@
 using System;
-using Flow.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces;
 
-namespace Flow.Grains.Events
+namespace Wayfinder.Grains.Events
 {
     // ADO #59 - implemented by every journaled lifecycle event so the RaiseEvent-path stamping in
     // Events.ActorStamping (called from CmmnElementGrain.RaiseEvent and CaseDefinitionGrain.Define)

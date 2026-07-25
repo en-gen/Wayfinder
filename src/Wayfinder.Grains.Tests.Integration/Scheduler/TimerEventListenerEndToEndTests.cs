@@ -1,18 +1,18 @@
 using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.Case;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
-using Flow.Grains.Tests.Utils.Helpers;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.Case;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using NodaTime;
 using Orleans;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Scheduler
+namespace Wayfinder.Grains.Tests.Integration.Scheduler
 {
     // End-to-end proof for fix #5 (work item #13): Quartz tick -> TimerTickJob publish ->
     // TimerEventListenerBehavior subscription -> Occur transition -> Completed.

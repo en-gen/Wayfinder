@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 
-namespace Flow.Grains.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
     public interface IPlanItemBehavior
     {

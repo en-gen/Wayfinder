@@ -1,16 +1,16 @@
 using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.Case;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.Case;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Plan.PlanItem
+namespace Wayfinder.Grains.Tests.Integration.Plan.PlanItem
 {
     [Collection(ClusterCollection.Name)]
     public class PlanItemGrainTests

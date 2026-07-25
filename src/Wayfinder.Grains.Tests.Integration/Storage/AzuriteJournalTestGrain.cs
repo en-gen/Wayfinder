@@ -4,7 +4,7 @@ using Orleans;
 using Orleans.EventSourcing;
 using Orleans.Providers;
 
-namespace Flow.Grains.Tests.Integration.Storage
+namespace Wayfinder.Grains.Tests.Integration.Storage
 {
     // Minimal state for the restart-survival proof: primitives plus a bare JsonNode document -
     // the same value shape CaseFileItemStore journals (work item #16) - with no CMMN model
@@ -45,7 +45,7 @@ namespace Flow.Grains.Tests.Integration.Storage
 
     // JsonNode-bearing journal event: LogStorage persists the event sequence itself, so this is
     // what must survive the grain-storage serializer round-trip (see the serializer pin in
-    // AzuriteClusterFixture / Flow.Silo Program.cs - the reflection-JSON default cannot do it).
+    // AzuriteClusterFixture / Wayfinder.Silo Program.cs - the reflection-JSON default cannot do it).
     [GenerateSerializer]
     public class AzuriteJournalDocumentSet
     {
@@ -66,7 +66,7 @@ namespace Flow.Grains.Tests.Integration.Storage
         Task DeactivateNow();
     }
 
-    // Same shape as CmmnElementGrain (Flow.Grains/Plan/CmmnElement/CmmnElementGrain.cs):
+    // Same shape as CmmnElementGrain (Wayfinder.Grains/Plan/CmmnElement/CmmnElementGrain.cs):
     // JournaledGrain<TState> (untyped event base) + [LogConsistencyProvider("LogStorage")],
     // reduced to the minimum needed to exercise the journaled-grain storage path -
     // deliberately CMMN-free.

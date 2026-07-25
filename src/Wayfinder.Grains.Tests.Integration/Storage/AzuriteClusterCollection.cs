@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Storage
+namespace Wayfinder.Grains.Tests.Integration.Storage
 {
     // Own collection, deliberately separate from SiloFixture.ClusterCollection: that fixture's
     // TestCluster is wired to in-memory journaled-grain storage, this one to Azure Blob/Azurite -

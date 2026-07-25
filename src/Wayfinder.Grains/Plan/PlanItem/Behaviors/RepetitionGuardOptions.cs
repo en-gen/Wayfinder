@@ -1,4 +1,4 @@
-namespace Flow.Grains.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
     // ADO #67 - Case.Flow ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
     // ~~~~~

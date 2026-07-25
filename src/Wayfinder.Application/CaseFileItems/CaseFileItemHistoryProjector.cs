@@ -1,15 +1,15 @@
 using System;
-using Flow.Contracts.V1;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using ContractActorPrincipalType = Flow.Contracts.V1.ActorPrincipalType;
-using ContractTransition = Flow.Contracts.V1.CaseFileItemTransition;
-using DomainActorPrincipalType = Flow.Grains.Interfaces.ActorPrincipalType;
-using DomainTransition = Flow.Grains.Interfaces.Model.CaseFileItemTransition;
+using Wayfinder.Contracts.V1;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using ContractActorPrincipalType = Wayfinder.Contracts.V1.ActorPrincipalType;
+using ContractTransition = Wayfinder.Contracts.V1.CaseFileItemTransition;
+using DomainActorPrincipalType = Wayfinder.Grains.Interfaces.ActorPrincipalType;
+using DomainTransition = Wayfinder.Grains.Interfaces.Model.CaseFileItemTransition;
 
-namespace Flow.Application.CaseFileItems
+namespace Wayfinder.Application.CaseFileItems
 {
     // ADO #58 - projects the domain CaseFileItemVersionDescriptor down to the wire-shaped
-    // Flow.Contracts.V1.CaseFileItemVersionView, mirroring CaseViewProjector's own explicit-switch
+    // Wayfinder.Contracts.V1.CaseFileItemVersionView, mirroring CaseViewProjector's own explicit-switch
     // anti-corruption pattern (not a same-ordinal cast) for every domain<->contract enum mapping in
     // this codebase.
     internal static class CaseFileItemHistoryProjector

@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.CaseFileItem
+namespace Wayfinder.Grains.Interfaces.Plan.CaseFileItem
 {
     // ADO #58 - the curated, typed history surface ICaseFileItemGrain.GetHistory returns. Not the
     // raw journal (see ICmmnElementGrain.GetJournaledEvents's remarks - that seam predates this

@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Flow.Application.Mediator
+namespace Wayfinder.Application.Mediator
 {
     // ADO #32 - the read-side counterpart to ICommandHandler<,>; see that file's remarks.
     public interface IQueryHandler<TQuery, TResult>

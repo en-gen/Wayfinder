@@ -2,10 +2,10 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Flow.Grains.Executables;
+using Wayfinder.Grains.Executables;
 using Jint.Native;
 
-namespace Flow.Grains.Infrastructure.Extensions
+namespace Wayfinder.Grains.Infrastructure.Extensions
 {
     public static class JsonNodeExtensions
     {

@@ -1,8 +1,8 @@
 using System;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Orleans;
 
-namespace Flow.Grains.Events
+namespace Wayfinder.Grains.Events
 {
     [GenerateSerializer]
     public class CaseFileItemTransitionedEvent : BaseEvent

@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Text.Json.Nodes;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Plan.CaseFileItem.Events;
-using Flow.Grains.Plan.CmmnElement;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.CaseFileItem.Events;
+using Wayfinder.Grains.Plan.CmmnElement;
 using Orleans;
 
-namespace Flow.Grains.Plan.CaseFileItem
+namespace Wayfinder.Grains.Plan.CaseFileItem
 {
     [GenerateSerializer]
     public class CaseFileItemStore : CmmnElementStore<Interfaces.Model.CaseFileItem>
@@ -22,7 +22,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         // 5.3.2 - CaseFileItem attributes, Table 5.17
         // ~~~~~
         // The CaseFileItem's content/data. Modeled as JsonNode (the engine's case-file data shape;
-        // see JsonNodeExtensions/JsonObjectInstance in Flow.Grains.Executables) rather than a typed
+        // see JsonNodeExtensions/JsonObjectInstance in Wayfinder.Grains.Executables) rather than a typed
         // CLR shape, since 5.3.1 states CaseFile "does not imply any assumptions about physical
         // storage of information" and a CaseFileItem "may represent a piece of information of any
         // nature, ranging from unstructured to structured".
@@ -30,7 +30,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         // Persisted as a bare JsonNode - no surrogate/converter needed. The entire JsonNode family
         // (JsonNode/JsonObject/JsonArray/JsonValue and its concrete subclasses) rides the fallback
         // JSON serializer this solution already registers (OrleansFallbackJsonSerializer.AddJsonSerializer -
-        // see Flow.Silo/Program.cs and ClusterFixture) UNCONDITIONALLY: Orleans's own JsonCodec hard
+        // see Wayfinder.Silo/Program.cs and ClusterFixture) UNCONDITIONALLY: Orleans's own JsonCodec hard
         // -codes native support for the JsonNode family (JsonCodec.IsNativelySupportedType, added by
         // dotnet/orleans PR #9605 fixing #9568) regardless of that registration's isSupported
         // predicate - confirmed empirically by round-tripping JsonNode with a predicate that
@@ -53,7 +53,7 @@ namespace Flow.Grains.Plan.CaseFileItem
         // (JsonGrainStorageSerializer) cannot round-trip JsonNode values: a JsonArray anywhere in
         // this state fails the storage write, which the log-consistency protocol retries forever
         // (the grain call never returns). The dev/test silo configuration therefore pins
-        // MemoryGrainStorage to OrleansGrainStorageSerializer - see Flow.Silo/Program.cs and
+        // MemoryGrainStorage to OrleansGrainStorageSerializer - see Wayfinder.Silo/Program.cs and
         // ClusterFixture's ConfigureMemoryStorage, and the regression pin in
         // JsonNodeOrleansSerializationTests.GrainCall__Given_JsonNodeArgumentWithArray.
         [Id(1)]

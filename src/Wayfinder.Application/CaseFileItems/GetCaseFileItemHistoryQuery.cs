@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
 
-namespace Flow.Application.CaseFileItems
+namespace Wayfinder.Application.CaseFileItems
 {
     // ADO #58 - reads a case-file item's ordered version history. CaseId + CaseFileItemId
     // together address the underlying ICaseFileItemGrain (the same (caseInstanceId, "casefile.

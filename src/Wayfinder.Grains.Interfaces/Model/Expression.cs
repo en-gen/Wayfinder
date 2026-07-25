@@ -1,4 +1,4 @@
-namespace Flow.Grains.Interfaces.Model
+namespace Wayfinder.Grains.Interfaces.Model
 {
     // ADO #72 - OMG CMMN 1.1's tExpression (CMMN11CaseModel.xsd) is mixed="true" with a single
     // "language" attribute; it has NO "body" attribute. Expression.Body (Spec.CMMN.MODEL.cs) is a

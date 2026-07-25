@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Application.Results;
-using Flow.Grains.Interfaces;
+using Wayfinder.Application.Results;
+using Wayfinder.Grains.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Flow.Api.Infrastructure
+namespace Wayfinder.Api.Infrastructure
 {
     // ADO #32/#33 - the single Result -> IActionResult seam every controller action dispatches
     // through. Two concerns, both in one place so no controller re-implements either:

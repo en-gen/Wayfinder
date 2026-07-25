@@ -2,17 +2,17 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Grains.Events;
-using Flow.Grains.Expressions;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.CaseFileItem;
-using Flow.Grains.Plan.CmmnElement;
-using Flow.Grains.Plan.Sentry.Events;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Expressions;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.CmmnElement;
+using Wayfinder.Grains.Plan.Sentry.Events;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 
-namespace Flow.Grains.Plan.Sentry
+namespace Wayfinder.Grains.Plan.Sentry
 {
     /// <summary>
     /// A Sentry may consist of two parts:
@@ -93,7 +93,7 @@ namespace Flow.Grains.Plan.Sentry
     ///
     /// D10 remainder - "no expression-language dispatch": verified still open, NOT closed here.
     /// Expression.Language (5.4.7/Table 5.33) is read and stored on the model but Executable.cs
-    /// (Flow.Grains/Executables/Executable.cs) always evaluates via Jint regardless of its value -
+    /// (Wayfinder.Grains/Executables/Executable.cs) always evaluates via Jint regardless of its value -
     /// no XPath/FEEL/JUEL dispatch exists. This capability lives entirely in ExpressionGrain/
     /// Executable/the Executables/ folder, not in SentryGrain/SentryStore - out of this work item's
     /// explicit scope (ExpressionGrain is consumed, never modified). Documented per this work item's

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans;
 
-namespace Flow.Grains.Plan.PlanItem.Definitions
+namespace Wayfinder.Grains.Plan.PlanItem.Definitions
 {
     [GenerateSerializer]
     public class DefinitionGraphNode

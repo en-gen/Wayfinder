@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Conformance
+namespace Wayfinder.Grains.Tests.Integration.Conformance
 {
     // ADO #21 - conformance scenarios for the §8.4 lifecycle tables (8.5-8.11) and the Table 8.12
     // autoComplete=TRUE branch.

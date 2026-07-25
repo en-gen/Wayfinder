@@ -1,14 +1,14 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Events;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Streams;
 using Quartz;
 
-namespace Flow.Grains.Scheduler
+namespace Wayfinder.Grains.Scheduler
 {
     public class TimerTickJob : IJob
     {

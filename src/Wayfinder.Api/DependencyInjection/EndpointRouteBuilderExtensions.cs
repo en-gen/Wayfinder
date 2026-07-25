@@ -2,9 +2,9 @@ using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
-namespace Flow.Api.DependencyInjection
+namespace Wayfinder.Api.DependencyInjection
 {
-    // ADO #32/#33 - maps everything AddFlowApi registered. Called from Flow.Silo/Startup.cs's
+    // ADO #32/#33 - maps everything AddFlowApi registered. Called from Wayfinder.Silo/Startup.cs's
     // UseEndpoints, alongside the existing /health, /, /cluster MapGet calls (which stay mapped
     // there directly, [AllowAnonymous] - see that file).
     public static class EndpointRouteBuilderExtensions

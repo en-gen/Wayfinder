@@ -2,8 +2,8 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Flow.Api.DependencyInjection;
-using Flow.Api.Infrastructure;
+using Wayfinder.Api.DependencyInjection;
+using Wayfinder.Api.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,12 +13,12 @@ using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 
-namespace Flow.Silo
+namespace Wayfinder.Silo
 {
     // Two endpoint families:
     //
     //   GET /health          - bare liveness probe: 200 once Kestrel is serving requests at
-    //                          all. Backs the container HEALTHCHECK (src/Flow.Silo/Dockerfile).
+    //                          all. Backs the container HEALTHCHECK (src/Wayfinder.Silo/Dockerfile).
     //   GET / and GET /cluster - cluster-status: how many silos the co-hosted Orleans CLIENT
     //                          currently sees as Active, via IManagementGrain.GetHosts. This is
     //                          the crux observability hook for #49's eval stack - curling this
@@ -28,14 +28,14 @@ namespace Flow.Silo
     //                          serve the identical payload; "/" keeps the endpoint reachable at
     //                          the silo's root the way the previous "Hello World!" placeholder
     //                          was, "/cluster" is the more explicit name for the same query.
-    //   /api/v1/...           - the case-operation REST API (work item #32/#33) - Flow.Api's
+    //   /api/v1/...           - the case-operation REST API (work item #32/#33) - Wayfinder.Api's
     //                          controllers/OData routes, mapped via MapFlowApi below.
     //
     // All three diagnostics routes are .AllowAnonymous() - they predate auth (#49) and stay public
     // (a health/cluster probe cannot depend on a caller having a token). Everything under
     // /api/v1/... requires an authenticated, tenant-provisioned caller by default (the fallback
-    // authorization policy set in Flow.Api's AddFlowApi + IdentityContextMiddleware below) - no
-    // [AllowAnonymous] appears on any Flow.Api controller.
+    // authorization policy set in Wayfinder.Api's AddFlowApi + IdentityContextMiddleware below) - no
+    // [AllowAnonymous] appears on any Wayfinder.Api controller.
     //
     // The co-hosted process is BOTH an Orleans silo (UseOrleans in Program.cs) and an Orleans
     // client - Orleans registers a local IClusterClient/IGrainFactory into the SAME DI

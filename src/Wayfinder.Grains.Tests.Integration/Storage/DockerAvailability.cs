@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using Docker.DotNet;
 
-namespace Flow.Grains.Tests.Integration.Storage
+namespace Wayfinder.Grains.Tests.Integration.Storage
 {
     // Shared availability decision for Docker-gated suites (currently just the Azurite-backed
     // journal-storage suite, work item #60), evaluated exactly ONCE per test process and cached.

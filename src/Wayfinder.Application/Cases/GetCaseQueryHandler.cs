@@ -1,13 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
-using Flow.Grains.Interfaces.Plan.Case;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
+using Wayfinder.Grains.Interfaces.Plan.Case;
 using Orleans;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
     // ADO #32 - get handler, lifted from #39's CaseOperations.GetCaseAsync. Reads the case root's
     // snapshot (keyed (caseId, "CPM")). An Orleans grain always "exists" as a virtual actor, so a

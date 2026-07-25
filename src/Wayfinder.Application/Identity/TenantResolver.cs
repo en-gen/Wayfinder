@@ -1,10 +1,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Interfaces.Identity;
 using Orleans;
 
-namespace Flow.Application.Identity
+namespace Wayfinder.Application.Identity
 {
     // ADO #33 - default ITenantResolver: calls IUserIdentityGrain(subject) exactly like the
     // Unit-1 command/query handlers call their grains (constructor-injected IClusterClient - see

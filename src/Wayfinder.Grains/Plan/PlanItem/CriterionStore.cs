@@ -1,8 +1,8 @@
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using Orleans;
 
-namespace Flow.Grains.Plan.PlanItem
+namespace Wayfinder.Grains.Plan.PlanItem
 {
     [GenerateSerializer]
     public class CriterionStore

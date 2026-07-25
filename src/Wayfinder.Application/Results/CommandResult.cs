@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Flow.Application.Results
+namespace Wayfinder.Application.Results
 {
     // ADO #32 - what every ICommandHandler<,> returns: the outcome (Result) plus the value produced
     // on success (e.g. a DeployResult or a CaseView). Value is default(T) for any non-Success status -

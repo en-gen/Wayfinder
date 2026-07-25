@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Interfaces.Identity;
 using Orleans;
 using Orleans.Runtime;
 
-namespace Flow.Grains.Identity
+namespace Wayfinder.Grains.Identity
 {
     // ADO #33 - state for ITenantGrain. Same reasoning as UserIdentityGrainState: plain
     // reference/config data, not an evented aggregate.

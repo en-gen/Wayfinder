@@ -1,4 +1,4 @@
-namespace Flow.Application.Mediator
+namespace Wayfinder.Application.Mediator
 {
     // ADO #32 - the native mediator's read-side marker.
     // ~~~~~

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Flow.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Interfaces.Identity;
 
-namespace Flow.Application.Identity
+namespace Wayfinder.Application.Identity
 {
     // ADO #33 - one user's seed entry within a TenantSeed: the subject (the OIDC/Zitadel "sub"
     // claim) that IUserIdentityGrain is keyed by, plus the internal UserId/Roles it should resolve

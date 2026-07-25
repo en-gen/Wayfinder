@@ -1,16 +1,16 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
-using Flow.Grains.Interfaces.Plan.Case;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
+using Wayfinder.Grains.Interfaces.Plan.Case;
 using Orleans;
-// The Create transition is the DOMAIN enum; aliased to avoid the ambiguity with Flow.Contracts.V1's
+// The Create transition is the DOMAIN enum; aliased to avoid the ambiguity with Wayfinder.Contracts.V1's
 // PlanItemTransition mirror (CaseView is pulled from that same namespace).
-using PlanItemTransition = Flow.Grains.Interfaces.Model.PlanItemTransition;
+using PlanItemTransition = Wayfinder.Grains.Interfaces.Model.PlanItemTransition;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
     // ADO #32 - create handler, lifted from #39's CaseOperations.CreateCaseAsync. Creates a live
     // case instance keyed (newGuid, "CPM") and drives it through Create (Table 8.6 - the

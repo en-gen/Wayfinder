@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Plan.PlanItem.Events
+namespace Wayfinder.Grains.Plan.PlanItem.Events
 {
     // 8.6.4 RepetitionRule
     // ~~~~~

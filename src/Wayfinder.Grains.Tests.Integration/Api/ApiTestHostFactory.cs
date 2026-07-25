@@ -1,8 +1,8 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Api.Controllers;
-using Flow.Api.DependencyInjection;
-using Flow.Api.Infrastructure;
+using Wayfinder.Api.Controllers;
+using Wayfinder.Api.DependencyInjection;
+using Wayfinder.Api.Infrastructure;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -13,13 +13,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
 
-namespace Flow.Grains.Tests.Integration.Api
+namespace Wayfinder.Grains.Tests.Integration.Api
 {
-    // ADO #32/#33 (sub-unit 4) - builds a real ASP.NET Core TestServer wired with Flow.Api's ACTUAL
+    // ADO #32/#33 (sub-unit 4) - builds a real ASP.NET Core TestServer wired with Wayfinder.Api's ACTUAL
     // production composition (AddFlowApi/MapFlowApi - see ServiceCollectionExtensions/
-    // EndpointRouteBuilderExtensions in Flow.Api), but backed by the SAME in-memory Orleans
+    // EndpointRouteBuilderExtensions in Wayfinder.Api), but backed by the SAME in-memory Orleans
     // TestCluster every other suite in this project shares (ClusterFixture) instead of a second
-    // real co-hosted silo (Flow.Silo/Program.cs's UseOrleans, which would mean either a real
+    // real co-hosted silo (Wayfinder.Silo/Program.cs's UseOrleans, which would mean either a real
     // localhost Orleans runtime or real Azure Table clustering just to run this test). This proves
     // the REAL request pipeline end-to-end over HTTP - auth -> the fallback authorization policy ->
     // IdentityContextMiddleware -> ITenantResolver -> CaseRequestContext -> ISender -> the command/
@@ -46,8 +46,8 @@ namespace Flow.Grains.Tests.Integration.Api
                         .ConfigureServices(services =>
                         {
                             // Stands in for what a co-hosted Orleans silo would register
-                            // automatically in production (Flow.Silo/Startup.cs's remarks) - the
-                            // handlers (Flow.Application.Cases.*) only ever ask for IClusterClient.
+                            // automatically in production (Wayfinder.Silo/Startup.cs's remarks) - the
+                            // handlers (Wayfinder.Application.Cases.*) only ever ask for IClusterClient.
                             services.AddSingleton(clusterClient);
 
                             services.AddFlowApi();
@@ -55,9 +55,9 @@ namespace Flow.Grains.Tests.Integration.Api
                             // AddFlowApi's AddControllers() call discovers controllers via the
                             // DEFAULT ApplicationPartManager, which seeds itself from
                             // Assembly.GetEntryAssembly() - under a unit test runner that is the
-                            // test host process, not this project, so Flow.Api's controllers would
+                            // test host process, not this project, so Wayfinder.Api's controllers would
                             // otherwise never be found (a well-known ASP.NET Core testing pitfall,
-                            // not a getFlowApi bug). Explicitly registering Flow.Api's assembly as
+                            // not a getFlowApi bug). Explicitly registering Wayfinder.Api's assembly as
                             // an ApplicationPart is the standard fix - additive to (not a
                             // replacement of) whatever AddFlowApi's own AddControllers() already
                             // registered, since ApplicationPartManager is a singleton every
@@ -79,9 +79,9 @@ namespace Flow.Grains.Tests.Integration.Api
                         })
                         .Configure(app =>
                         {
-                            // Mirrors Flow.Silo/Startup.cs's Configure exactly (see that file's
+                            // Mirrors Wayfinder.Silo/Startup.cs's Configure exactly (see that file's
                             // remarks on ordering) minus the /health, /, /cluster diagnostics
-                            // endpoints, which are Flow.Silo-specific and irrelevant here.
+                            // endpoints, which are Wayfinder.Silo-specific and irrelevant here.
                             app.UseRouting();
                             app.UseAuthentication();
                             app.UseAuthorization();

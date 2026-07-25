@@ -1,9 +1,9 @@
 using System;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
     // ADO #32 - reads a case instance's current state as a CaseView. A case that was never
     // Create()'d comes back as a NotFound QueryResult (an Orleans grain always "exists" as a virtual

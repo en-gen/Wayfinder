@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
-using Flow.Grains.Events;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.Sentry;
-using Flow.Grains.Tests.Integration.SiloFixture;
-using Flow.Grains.Tests.Utils.Helpers;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.Sentry;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
 using Orleans.Streams;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration
+namespace Wayfinder.Grains.Tests.Integration
 {
     // Fix #6 (work item #13): test-only proof of two Orleans stream-semantics assumptions the CMMN
     // engine relies on throughout (durable subscriptions surviving reactivation, and one publish

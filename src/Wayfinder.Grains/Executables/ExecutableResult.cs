@@ -1,6 +1,6 @@
 using Orleans;
 
-namespace Flow.Grains.Executables
+namespace Wayfinder.Grains.Executables
 {
     [GenerateSerializer]
     public class ExecutableResult<TResult>

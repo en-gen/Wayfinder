@@ -1,11 +1,11 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Infrastructure.Quartz;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Services.PlanItemBehaviorConfigurator;
-using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Infrastructure.Quartz;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
+using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,7 +24,7 @@ using Serilog.Events;
 using Serilog.Exceptions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.SiloFixture
+namespace Wayfinder.Grains.Tests.Integration.SiloFixture
 {
     public class ClusterFixture : IDisposable, IAsyncLifetime
     {
@@ -75,7 +75,7 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
             _disposed = true;
         }
 
-        // Mirrors Flow.Silo/Program.cs's ConfigureDevelopmentOrleans + serializer fallback, adapted
+        // Mirrors Wayfinder.Silo/Program.cs's ConfigureDevelopmentOrleans + serializer fallback, adapted
         // to the TestCluster's class-based ISiloConfigurator (TestClusterBuilder has no delegate
         // overload equivalent to ISiloHostBuilder's old ConfigureServices(HostBuilderContext, ...)).
         private class TestSiloConfigurator : ISiloConfigurator
@@ -98,14 +98,14 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
                     jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
 
-                // ADO #33 - see Flow.Silo/Program.cs's ConfigureSharedOrleansProviders remarks:
+                // ADO #33 - see Wayfinder.Silo/Program.cs's ConfigureSharedOrleansProviders remarks:
                 // Orleans's built-in ExceptionCodec only allows exception types whose namespace
                 // matches ExceptionSerializationOptions.SupportedNamespacePrefixes (defaults:
                 // "System"/"Microsoft"/"Azure"), so custom exceptions like CrossTenantAccessException
-                // need "Flow" allow-listed here too - must match the production silo and the client
+                // need "Wayfinder" allow-listed here too - must match the production silo and the client
                 // configurator below identically.
                 silo.Services.Configure<ExceptionSerializationOptions>(
-                    options => options.SupportedNamespacePrefixes.Add("Flow"));
+                    options => options.SupportedNamespacePrefixes.Add("Wayfinder"));
             }
 
             // MemoryGrainStorage's default IGrainStorageSerializer is JsonGrainStorageSerializer -
@@ -118,7 +118,7 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
             // spinning at ~6k scheduler work items/sec; see work item #16). Pinning the storage
             // serializer to OrleansGrainStorageSerializer routes grain-state persistence through
             // the same Orleans serializer used on the wire, which handles the JsonNode family
-            // natively (see JsonNodeOrleansSerializationTests). Must match Flow.Silo/Program.cs's
+            // natively (see JsonNodeOrleansSerializationTests). Must match Wayfinder.Silo/Program.cs's
             // development configuration identically.
             private static void ConfigureMemoryStorage(OptionsBuilder<MemoryGrainStorageOptions> options) =>
                 options.Configure<Serializer>((storageOptions, serializer) =>
@@ -167,12 +167,12 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
                     jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
 
-                // ADO #33 - must match TestSiloConfigurator/Flow.Silo/Program.cs identically (see
+                // ADO #33 - must match TestSiloConfigurator/Wayfinder.Silo/Program.cs identically (see
                 // those remarks): without this, a foreign-tenant call throwing
                 // CrossTenantAccessException fails client-side with CodecNotFoundException instead
                 // of surfacing the exception the grain actually threw.
                 clientBuilder.Services.Configure<ExceptionSerializationOptions>(
-                    options => options.SupportedNamespacePrefixes.Add("Flow"));
+                    options => options.SupportedNamespacePrefixes.Add("Wayfinder"));
             }
         }
     }

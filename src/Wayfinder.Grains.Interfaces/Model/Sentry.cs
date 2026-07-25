@@ -3,7 +3,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
-namespace Flow.Grains.Interfaces.Model
+namespace Wayfinder.Grains.Interfaces.Model
 {
     public partial class Sentry
     {

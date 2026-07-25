@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Clustering
+namespace Wayfinder.Grains.Tests.Integration.Clustering
 {
     // Own collection, deliberately separate from SiloFixture.ClusterCollection and
     // Storage.AzuriteClusterCollection: this fixture's TestCluster runs with

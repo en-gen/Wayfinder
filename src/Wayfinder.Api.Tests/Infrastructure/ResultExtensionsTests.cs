@@ -1,16 +1,16 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Api.Infrastructure;
-using Flow.Application.Results;
-using Flow.Grains.Interfaces;
+using Wayfinder.Api.Infrastructure;
+using Wayfinder.Application.Results;
+using Wayfinder.Grains.Interfaces;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
 
-namespace Flow.Api.Tests.Infrastructure
+namespace Wayfinder.Api.Tests.Infrastructure
 {
-    // ADO #32/#33 - unit coverage for the single Result -> IActionResult seam every Flow.Api
+    // ADO #32/#33 - unit coverage for the single Result -> IActionResult seam every Wayfinder.Api
     // controller dispatches through (see ResultExtensions' remarks): every ResultStatus maps to its
     // documented HTTP status, and a thrown CrossTenantAccessException maps to 404 identically to a
     // genuine not-found - never a status that would let a caller distinguish the two.

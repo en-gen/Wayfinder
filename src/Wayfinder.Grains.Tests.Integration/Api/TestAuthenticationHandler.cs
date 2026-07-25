@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
-namespace Flow.Grains.Tests.Integration.Api
+namespace Wayfinder.Grains.Tests.Integration.Api
 {
     // ADO #32/#33 (sub-unit 4) - stands in for JwtBearer in the full-pipeline isolation suite
     // (see ApiTestHostFactory): stamps a caller-supplied "sub" claim from a plain request header

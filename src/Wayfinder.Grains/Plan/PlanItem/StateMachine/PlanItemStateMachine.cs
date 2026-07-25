@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Stateless;
 
-namespace Flow.Grains.Plan.PlanItem.StateMachine
+namespace Wayfinder.Grains.Plan.PlanItem.StateMachine
 {
     public class PlanItemStateMachine : StateMachine<PlanItemState, PlanItemTransition>, IPlanItemStateMachine
     {

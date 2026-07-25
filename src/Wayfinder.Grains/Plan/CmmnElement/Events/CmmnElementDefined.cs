@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Plan.CmmnElement.Events
+namespace Wayfinder.Grains.Plan.CmmnElement.Events
 {
     [GenerateSerializer]
     public class CmmnElementDefined<TDefinition> : BaseCreated

@@ -1,12 +1,12 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Infrastructure.Quartz;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Services.PlanItemBehaviorConfigurator;
-using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Infrastructure.Quartz;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
+using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -25,7 +25,7 @@ using Serilog.Events;
 using Serilog.Exceptions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
+namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 {
     // ADO #67 - a dedicated, isolated TestCluster (in-memory, no containers - as cheap as
     // SiloFixture.ClusterFixture) that pins RepetitionGuardOptions.MaxRepetitionsPerPlanItem to a

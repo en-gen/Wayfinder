@@ -6,11 +6,11 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using Flow.Grains.Executables;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Model.Interchange;
+using Wayfinder.Grains.Executables;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model.Interchange;
 
-namespace Flow.Grains.Interchange
+namespace Wayfinder.Grains.Interchange
 {
     // ADO #20 - structural .cmmn import/export.
     // ~~~~~
@@ -107,7 +107,7 @@ namespace Flow.Grains.Interchange
                 var namespaces = new XmlSerializerNamespaces();
                 // Empty prefix = default xmlns, matching how real .cmmn files are normally
                 // authored (compare formal-16-12-01.pdf's own examples, and the CasePlanModel
-                // used throughout Flow.Grains.Tests.Integration): everything in a CMMN document
+                // used throughout Wayfinder.Grains.Tests.Integration): everything in a CMMN document
                 // lives in one namespace, so hoisting it to the default avoids a "cmmn:" prefix
                 // on every single element.
                 namespaces.Add(string.Empty, CmmnXml.Namespace);
@@ -230,7 +230,7 @@ namespace Flow.Grains.Interchange
         // reference-equality visited-set.
         private static void ReconcileExpressionText(object root) => Walk(root, new HashSet<object>(ReferenceEqualityComparer.Instance));
 
-        private const string ModelNamespace = "Flow.Grains.Interfaces.Model";
+        private const string ModelNamespace = "Wayfinder.Grains.Interfaces.Model";
 
         private static void Walk(object node, HashSet<object> visited)
         {

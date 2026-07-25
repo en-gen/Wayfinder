@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Streams;
 
-namespace Flow.Grains.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
     public interface IBehaviorHost
     {

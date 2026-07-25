@@ -1,4 +1,4 @@
-namespace Flow.Grains.Interfaces.Plan.CaseFileItem
+namespace Wayfinder.Grains.Interfaces.Plan.CaseFileItem
 {
     // 8.3 - CaseFileItem Lifecycle
     // ~~~~~

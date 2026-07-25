@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Flow.Application.Mediator
+namespace Wayfinder.Application.Mediator
 {
     // ADO #32 - the native ISender implementation.
     // ~~~~~

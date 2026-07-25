@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 
-namespace Flow.Grains.Executables
+namespace Wayfinder.Grains.Executables
 {
     public interface IExecutable
     {

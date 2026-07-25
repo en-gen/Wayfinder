@@ -2,17 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Contracts.V1;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.PlanItem;
+using Wayfinder.Contracts.V1;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.PlanItem;
 using Orleans;
-using ContractPlanItemState = Flow.Contracts.V1.PlanItemState;
-using DomainPlanItemState = Flow.Grains.Interfaces.Model.PlanItemState;
+using ContractPlanItemState = Wayfinder.Contracts.V1.PlanItemState;
+using DomainPlanItemState = Wayfinder.Grains.Interfaces.Model.PlanItemState;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
-    // ADO #32 - projects the rich internal CaseSnapshot down to the wire-shaped Flow.Contracts.V1.
+    // ADO #32 - projects the rich internal CaseSnapshot down to the wire-shaped Wayfinder.Contracts.V1.
     // CaseView, lifted from #39's CaseOperations.BuildCaseViewAsync/CollectPlanItemsAsync. Shared by
     // CreateCaseCommandHandler, TriggerCaseCommandHandler, and GetCaseQueryHandler - the three
     // handlers that hand a live CaseSnapshot back to a caller.
@@ -89,9 +89,9 @@ namespace Flow.Application.Cases
             }
         }
 
-        // The anti-corruption boundary between the domain's PlanItemState (Flow.Grains.Interfaces.
-        // Model) and the wire's PlanItemState (Flow.Contracts.V1) - see Flow.Contracts.V1.
-        // PlanItemState's remarks for why Flow.Contracts does not simply reference the domain enum.
+        // The anti-corruption boundary between the domain's PlanItemState (Wayfinder.Grains.Interfaces.
+        // Model) and the wire's PlanItemState (Wayfinder.Contracts.V1) - see Wayfinder.Contracts.V1.
+        // PlanItemState's remarks for why Wayfinder.Contracts does not simply reference the domain enum.
         // An explicit switch (not a same-ordinal cast) so an unmapped new domain member fails loudly
         // at runtime instead of silently mis-mapping.
         private static ContractPlanItemState ToContract(DomainPlanItemState state) => state switch

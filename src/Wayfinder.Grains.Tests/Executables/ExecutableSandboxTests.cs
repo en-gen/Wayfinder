@@ -1,13 +1,13 @@
 using System;
 using System.Diagnostics;
-using Flow.Grains.Executables;
+using Wayfinder.Grains.Executables;
 using FluentAssertions;
 using Jint.Runtime;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Flow.Grains.Tests.Executables
+namespace Wayfinder.Grains.Tests.Executables
 {
     // Pins the sandbox budgets on the shared Jint engine factory: hostile or runaway
     // expressions must terminate with a Failure result within the configured budgets

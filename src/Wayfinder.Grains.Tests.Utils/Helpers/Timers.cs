@@ -1,10 +1,10 @@
 using System;
 using System.Text;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using NodaTime;
 using NodaTime.Text;
 
-namespace Flow.Grains.Tests.Utils.Helpers
+namespace Wayfinder.Grains.Tests.Utils.Helpers
 {
     public static class Timers
     {

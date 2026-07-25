@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.SiloFixture
+namespace Wayfinder.Grains.Tests.Integration.SiloFixture
 {
     [CollectionDefinition(ClusterCollection.Name)]
     public class ClusterCollection : ICollectionFixture<ClusterFixture>

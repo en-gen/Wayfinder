@@ -1,19 +1,19 @@
 using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Plan.PlanItem.StateMachine;
-using Flow.Grains.Services.PlanItemBehaviorConfigurator;
-using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
+using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Flow.Grains.Tests.Services.PlanItemBehaviorConfigurator
+namespace Wayfinder.Grains.Tests.Services.PlanItemBehaviorConfigurator
 {
     public class PlanItemBehaviorConfiguratorServiceTests
     {

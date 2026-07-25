@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Identity
+namespace Wayfinder.Grains.Interfaces.Identity
 {
     // ADO #33 - what ITenantGrain hands back for a seeded tenant. TenantId is redundant with the
     // grain's own primary key (this.GetPrimaryKey()) but carried on the record anyway so callers

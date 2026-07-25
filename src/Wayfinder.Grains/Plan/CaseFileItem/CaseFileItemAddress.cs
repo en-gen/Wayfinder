@@ -1,4 +1,4 @@
-namespace Flow.Grains.Plan.CaseFileItem
+namespace Wayfinder.Grains.Plan.CaseFileItem
 {
     // Creation surface (work item #16 design decision): CaseFileItem instances are not
     // instantiated top-down from a caseFileModel definition graph the way PlanItems are

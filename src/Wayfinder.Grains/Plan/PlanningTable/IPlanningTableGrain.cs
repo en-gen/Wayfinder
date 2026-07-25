@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
-using Flow.Grains.Plan.CmmnElement;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.CmmnElementGrain;
+using Wayfinder.Grains.Plan.CmmnElement;
 
-namespace Flow.Grains.Plan.PlanningTable
+namespace Wayfinder.Grains.Plan.PlanningTable
 {
     public interface IPlanningTableGrain : ICmmnElementGrain<Interfaces.Model.PlanningTable>
     {

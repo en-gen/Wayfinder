@@ -1,20 +1,20 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Application.Identity;
-using Flow.Grains.Interfaces;
+using Wayfinder.Application.Identity;
+using Wayfinder.Grains.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 
-namespace Flow.Api.Infrastructure
+namespace Wayfinder.Api.Infrastructure
 {
     // ADO #33 - the ONLY place identity enters the system. Sits after UseAuthentication/
-    // UseAuthorization in Flow.Silo/Startup.cs's pipeline: by the time a request reaches here,
+    // UseAuthorization in Wayfinder.Silo/Startup.cs's pipeline: by the time a request reaches here,
     // JwtBearer has already validated the token's signature/issuer/audience/expiry (AddFlowApi), and
     // the fallback authorization policy has already 401'd anything unauthenticated that wasn't
     // explicitly [AllowAnonymous]. This middleware's only job is turning an authenticated caller's
     // "sub" claim into CaseRequestContext (TenantId/UserId/UserRoles) via ITenantResolver - the
-    // single seam Flow.Application.Identity exposes for exactly this (see ITenantResolver's
+    // single seam Wayfinder.Application.Identity exposes for exactly this (see ITenantResolver's
     // remarks). CaseRequestContext rides Orleans's RequestContext (AsyncLocal), so once set here it
     // propagates automatically to every co-hosted grain call this request makes - no further
     // plumbing needed in the Cases command/query handlers (see CaseRequestContextDefaults, deleted

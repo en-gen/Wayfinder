@@ -4,12 +4,12 @@ using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
 
-namespace Flow.Grains.Interfaces.Model.Interchange
+namespace Wayfinder.Grains.Interfaces.Model.Interchange
 {
     // Spec §9.3.1 (Document Structure): "A domain-specific set of Case model elements is
     // interchanged in one or more CMMN files. The root element of each file MUST be
     // <cmmn:definitions>." Shared by every hand-authored type in this folder and by
-    // Flow.Grains/Interchange/CmmnXmlSerializer.cs, so the namespace literal appears exactly
+    // Wayfinder.Grains/Interchange/CmmnXmlSerializer.cs, so the namespace literal appears exactly
     // once outside the XSD-generated Spec.CMMN.MODEL.cs (which, being generated, repeats it
     // per-attribute by construction - see that file for the precedent this folder follows).
     public static class CmmnXml
@@ -116,7 +116,7 @@ namespace Flow.Grains.Interfaces.Model.Interchange
         // so import round-trips "the file didn't say" as null rather than manufacturing a value
         // the file never asserted - CmmnCapabilityLint treats an explicit non-Jint value here as a
         // document-level Degraded finding (see that class's remarks); this engine's own default,
-        // regardless of what this attribute says, is always Flow.Grains.Interfaces.Model.
+        // regardless of what this attribute says, is always Wayfinder.Grains.Interfaces.Model.
         // ExpressionLanguage.Jint (SentryGrain.cs's D10 remarks / ExpressionGrain.BuildExecutable).
         [XmlAttribute("expressionLanguage", DataType = "anyURI")]
         public string ExpressionLanguage { get; set; }

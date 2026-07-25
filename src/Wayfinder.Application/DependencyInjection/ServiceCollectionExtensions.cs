@@ -1,9 +1,9 @@
 using System;
 using System.Linq;
-using Flow.Application.Mediator;
+using Wayfinder.Application.Mediator;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Flow.Application.DependencyInjection
+namespace Wayfinder.Application.DependencyInjection
 {
     // ADO #32 - wires the native mediator into any host's IServiceCollection. A small reflection
     // scan over THIS assembly only - deliberately NOT Scrutor or any other third-party assembly
@@ -21,7 +21,7 @@ namespace Flow.Application.DependencyInjection
             // ADO #33 - the tenant-registry resolver/seeder, additive: nothing calls ITenantResolver
             // yet (sub-unit 3 wires it into an HTTP auth middleware), so this only grows the DI
             // container's service list - it does not change AddFlowApplication's existing behavior
-            // for any of today's callers (CaseCqrsIntegrationTests; a future Flow.Silo host).
+            // for any of today's callers (CaseCqrsIntegrationTests; a future Wayfinder.Silo host).
             services.AddFlowIdentity();
 
             var handlerInterfaceDefinitions = new[] { typeof(ICommandHandler<,>), typeof(IQueryHandler<,>) };

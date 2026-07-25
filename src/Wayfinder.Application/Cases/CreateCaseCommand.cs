@@ -1,8 +1,8 @@
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
     // ADO #32 - creates a new case instance from a previously deployed definition and drives it
     // through the Create transition (Table 8.6 - the CasePlanModel goes straight to Active),

@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Quartz;
 using Quartz.Spi;
 
-namespace Flow.Grains.Infrastructure.Quartz
+namespace Wayfinder.Grains.Infrastructure.Quartz
 {
     public class QuartzJobFactory : IJobFactory
     {

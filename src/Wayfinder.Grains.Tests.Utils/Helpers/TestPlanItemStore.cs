@@ -1,9 +1,9 @@
 using System;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 
-namespace Flow.Grains.Tests.Utils.Helpers
+namespace Wayfinder.Grains.Tests.Utils.Helpers
 {
     public class TestPlanItemStore : PlanItemStore
     {

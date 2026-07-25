@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.Serialization;
 
-namespace Flow.Grains.Interfaces
+namespace Wayfinder.Grains.Interfaces
 {
     // ADO #33 - thrown by CaseGrain's public surface (Trigger/GetSnapshot) when the calling
     // CaseRequestContext.TenantId does not match the case's owning tenant (CaseStore.TenantId,

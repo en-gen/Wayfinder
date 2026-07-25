@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors
 {
     [GenerateSerializer]
     public class Iso8601Snapshot

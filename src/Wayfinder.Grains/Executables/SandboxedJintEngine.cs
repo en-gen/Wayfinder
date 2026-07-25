@@ -1,7 +1,7 @@
 using System;
 using Jint;
 
-namespace Flow.Grains.Executables
+namespace Wayfinder.Grains.Executables
 {
     // Factory for the Jint engine used by all rule/ifPart/timer expression evaluation.
     // Expressions are model-authored (ultimately tenant-supplied) code executing inside

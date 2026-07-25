@@ -3,14 +3,14 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Asp.Versioning;
-using Flow.Api.Infrastructure;
-using Flow.Application.Cases;
-using Flow.Application.Mediator;
-using Flow.Contracts.V1;
+using Wayfinder.Api.Infrastructure;
+using Wayfinder.Application.Cases;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Contracts.V1;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Flow.Api.Controllers
+namespace Wayfinder.Api.Controllers
 {
     // ADO #32 - a plain versioned controller (not OData-flavored - there is no queryable
     // "definitions" entity set, just an import operation), thin over ISender exactly like the other

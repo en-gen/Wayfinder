@@ -1,6 +1,6 @@
 using System;
 
-namespace Flow.Grains.Tests.Integration.Conformance
+namespace Wayfinder.Grains.Tests.Integration.Conformance
 {
     // Structured echo of the spec table/row (or deviation id) a scenario pins, stacked alongside
     // the prose citation every scenario already carries in its own comments/Should().Be(...,

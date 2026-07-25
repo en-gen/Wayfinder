@@ -6,16 +6,16 @@ using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using Flow.Api.DependencyInjection;
-using Flow.Application.Identity;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Infrastructure.Quartz;
-using Flow.Grains.Interfaces.Identity;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Services.PlanItemBehaviorConfigurator;
-using Flow.Grains.Services.PlanItemStateMachineConfigurator;
-using Flow.Silo.Infrastructure.Options;
+using Wayfinder.Api.DependencyInjection;
+using Wayfinder.Application.Identity;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Infrastructure.Quartz;
+using Wayfinder.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
+using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Silo.Infrastructure.Options;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Configuration;
@@ -36,7 +36,7 @@ using Orleans.Clustering.AzureStorage;
 using Orleans.Reminders.AzureStorage;
 using HostBuilderContext = Microsoft.Extensions.Hosting.HostBuilderContext;
 
-namespace Flow.Silo
+namespace Wayfinder.Silo
 {
     public class Program
     {
@@ -198,7 +198,7 @@ namespace Flow.Silo
         // ConfigureDevelopmentOrleans and ConfigureDeployedOrleans differ only in clustering,
         // reminders, and endpoint configuration - see those methods. Behavior-preserving hoist:
         // Development must remain byte-for-byte equivalent to what it registered before this
-        // method existed (same providers, same options) - see Flow.Grains.Tests.Integration's
+        // method existed (same providers, same options) - see Wayfinder.Grains.Tests.Integration's
         // Azurite/journal/stream suites, which pin exactly that.
         private static void ConfigureSharedOrleansProviders(ISiloBuilder silo)
         {
@@ -232,7 +232,7 @@ namespace Flow.Silo
                 // registers exactly that slot (src/Azure/Orleans.Persistence.AzureStorage/Hosting/
                 // AzureBlobSiloBuilderExtensions.cs), which is why it - not a same-named
                 // AddAzureBlobGrainStorage("LogStorage", ...) - is the correct call here. Empirically
-                // confirmed by Flow.Grains.Tests.Integration's Azurite restart-survival suite: state
+                // confirmed by Wayfinder.Grains.Tests.Integration's Azurite restart-survival suite: state
                 // rehydrates from the journal after DeactivateOnIdle, and the blob container actually
                 // holds the grain's blob (see AzuriteJournalStorageTests).
                 .AddAzureBlobGrainStorageAsDefault(ConfigureBlobStorage)
@@ -241,7 +241,7 @@ namespace Flow.Silo
                 .AddMemoryStreams("Default"); // cluster stream provider (replaces removed AddSimpleMessageStreamProvider)
 
             // Fallback serializer for types Orleans's [GenerateSerializer] codegen can't reasonably
-            // cover: the XSD-generated CMMN model (Flow.Grains.Interfaces.Model). Everything else in
+            // cover: the XSD-generated CMMN model (Wayfinder.Grains.Interfaces.Model). Everything else in
             // the solution is swept with [GenerateSerializer] + [Id(n)] and uses the native serializer.
             // See OrleansFallbackJsonSerializer for the shared isSupported predicate/options - the
             // TestCluster silo and client configurators in ClusterFixture must register identically.
@@ -254,12 +254,12 @@ namespace Flow.Silo
             // see CrossTenantAccessException's remarks) only allows exception types whose namespace
             // starts with one of ExceptionSerializationOptions.SupportedNamespacePrefixes
             // (defaults: "System", "Microsoft", "Azure" - a deserialization-gadget safeguard). Every
-            // custom application exception in this solution lives under "Flow", so that prefix is
+            // custom application exception in this solution lives under "Wayfinder", so that prefix is
             // allow-listed once here rather than per-exception-type. The TestCluster silo and client
             // configurators in ClusterFixture must register this identically (same reason as the
             // JSON fallback above).
             silo.Services.Configure<ExceptionSerializationOptions>(
-                options => options.SupportedNamespacePrefixes.Add("Flow"));
+                options => options.SupportedNamespacePrefixes.Add("Wayfinder"));
         }
 
         // Everything here resolves from DI - no hand-constructed clients:
@@ -345,7 +345,7 @@ namespace Flow.Silo
 
         // Real Orleans cluster membership via Azure Table Storage (work item #30) - validated
         // against Azurite's table endpoint in CI/locally (see the clustering integration test in
-        // Flow.Grains.Tests.Integration), a real Azure Storage account table endpoint when
+        // Wayfinder.Grains.Tests.Integration), a real Azure Storage account table endpoint when
         // deployed. Durable reminders ride the same table endpoint (same DI-resolved
         // TableServiceClient, see ConfigureServices' AddTableServiceClient) rather than
         // Development's UseInMemoryReminderService, so scheduled reminders survive a silo
@@ -513,7 +513,7 @@ namespace Flow.Silo
                 .AddQuartz(QuartzSchedulerConfig.Volatile);
 
             // ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth against our
-            // Zitadel + the identity middleware's services). See Flow.Api's AddFlowApi for the full
+            // Zitadel + the identity middleware's services). See Wayfinder.Api's AddFlowApi for the full
             // composition; Startup.cs's Configure maps it (MapFlowApi) and wires the identity
             // middleware into the pipeline.
             services.AddFlowApi();

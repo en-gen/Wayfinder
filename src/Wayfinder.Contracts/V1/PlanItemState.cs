@@ -1,10 +1,10 @@
-namespace Flow.Contracts.V1
+namespace Wayfinder.Contracts.V1
 {
-    // ADO #32 - the wire projection of Flow.Grains.Interfaces.Model.PlanItemState (CMMN 1.1 §8.4.1's
-    // ten plan-item states). A deliberate 1:1 mirror, not a reference to the domain enum: Flow.
-    // Contracts takes no dependency on Flow.Grains/Flow.Grains.Interfaces (see Flow.Contracts.csproj's
-    // remarks), so Flow.Application's handlers map the domain enum to this one explicitly (see
-    // Flow.Application/Cases/CaseViewProjector.cs) rather than this assembly referencing it directly.
+    // ADO #32 - the wire projection of Wayfinder.Grains.Interfaces.Model.PlanItemState (CMMN 1.1 §8.4.1's
+    // ten plan-item states). A deliberate 1:1 mirror, not a reference to the domain enum: Wayfinder.
+    // Contracts takes no dependency on Wayfinder.Grains/Wayfinder.Grains.Interfaces (see Wayfinder.Contracts.csproj's
+    // remarks), so Wayfinder.Application's handlers map the domain enum to this one explicitly (see
+    // Wayfinder.Application/Cases/CaseViewProjector.cs) rather than this assembly referencing it directly.
     public enum PlanItemState
     {
         Uninitialized,

@@ -1,6 +1,6 @@
 using System;
 
-namespace Flow.Grains.Interfaces.Plan.PlanItem
+namespace Wayfinder.Grains.Interfaces.Plan.PlanItem
 {
     [Flags]
     public enum CriterionState

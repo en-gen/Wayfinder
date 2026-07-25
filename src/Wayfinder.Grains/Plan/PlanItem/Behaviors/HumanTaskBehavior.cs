@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.StateMachine;
-using Flow.Grains.Plan.PlanningTable;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Plan.PlanningTable;
 
-namespace Flow.Grains.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
     public class HumanTaskBehavior : TaskBehavior<HumanTask>
     {

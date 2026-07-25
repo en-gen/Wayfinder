@@ -2,7 +2,7 @@ using System;
 using System.Text.Json.Nodes;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.CaseFileItem
+namespace Wayfinder.Grains.Interfaces.Plan.CaseFileItem
 {
     [GenerateSerializer]
     public class CaseFileItemSnapshot

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Flow.Grains.Plan.CmmnElement;
-using Flow.Grains.Plan.Sentry.Events;
+using Wayfinder.Grains.Plan.CmmnElement;
+using Wayfinder.Grains.Plan.Sentry.Events;
 using Orleans;
 
-namespace Flow.Grains.Plan.Sentry
+namespace Wayfinder.Grains.Plan.Sentry
 {
     // D5/D11 - Sentry re-arm semantics (supersedes PR !18's single-OnPart-only,
     // clears-everything IfPartNotSatisfied; see SentryGrain.HandleOnPartOccurred's remarks).

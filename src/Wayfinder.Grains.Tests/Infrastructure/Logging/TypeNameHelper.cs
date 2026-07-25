@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Flow.Grains.Tests.Infrastructure.Logging
+namespace Wayfinder.Grains.Tests.Infrastructure.Logging
 {
     // ported from https://github.com/dotnet/runtime/blob/6072e4d3a7a2a1493f514cdf4be75a3d56580e84/src/libraries/Common/src/Extensions/TypeNameHelper/TypeNameHelper.cs
     internal static class TypeNameHelper

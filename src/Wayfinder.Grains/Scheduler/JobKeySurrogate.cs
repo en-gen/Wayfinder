@@ -1,7 +1,7 @@
 using Orleans;
 using Quartz;
 
-namespace Flow.Grains.Scheduler
+namespace Wayfinder.Grains.Scheduler
 {
     // Quartz.JobKey is a foreign (out-of-our-control) sealed type with no Orleans serializer, but
     // TimerEventSchedulerStore.JobKeys persists it as grain state. Surrogates are the documented

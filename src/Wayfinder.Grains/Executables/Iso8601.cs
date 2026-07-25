@@ -3,7 +3,7 @@ using System.Linq;
 using NodaTime.Text;
 using Orleans;
 
-namespace Flow.Grains.Executables
+namespace Wayfinder.Grains.Executables
 {
     [GenerateSerializer]
     public class Iso8601

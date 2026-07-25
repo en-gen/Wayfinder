@@ -1,11 +1,11 @@
 using System.Linq;
-using Flow.Grains.Interchange;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Model.Interchange;
+using Wayfinder.Grains.Interchange;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model.Interchange;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Interchange
+namespace Wayfinder.Grains.Tests.Interchange
 {
     // ADO #20 - the capability lint is the honesty gate: each test here pins ONE specific,
     // verified runtime gap (see CmmnCapabilityLint's class remarks for the evidence behind each

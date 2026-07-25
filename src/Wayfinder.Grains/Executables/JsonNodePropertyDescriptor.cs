@@ -1,12 +1,12 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Flow.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Infrastructure.Extensions;
 using Jint;
 using Jint.Native;
 using Jint.Runtime.Descriptors;
 
-namespace Flow.Grains.Executables
+namespace Wayfinder.Grains.Executables
 {
     // Jint 4.x made PropertyDescriptor.Value a plain get/set property (no longer virtual), so this
     // can no longer override Value to lazily convert + write back to the underlying node on every

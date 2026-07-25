@@ -1,10 +1,10 @@
 using System.Linq;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using FluentAssertions;
 using FluentAssertions.Primitives;
 using Stateless.Reflection;
 
-namespace Flow.Grains.Tests.Infrastructure.Extensions
+namespace Wayfinder.Grains.Tests.Infrastructure.Extensions
 {
     public static class StateMachineInfoExtensions
     {

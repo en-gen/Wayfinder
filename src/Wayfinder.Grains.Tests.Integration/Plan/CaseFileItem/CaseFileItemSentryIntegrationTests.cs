@@ -1,20 +1,20 @@
 using System;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.Case;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.Sentry;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.Case;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.Sentry;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
 using Xunit;
-using CaseModel = Flow.Grains.Interfaces.Model.Case;
-using SentryModel = Flow.Grains.Interfaces.Model.Sentry;
+using CaseModel = Wayfinder.Grains.Interfaces.Model.Case;
+using SentryModel = Wayfinder.Grains.Interfaces.Model.Sentry;
 
-namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
+namespace Wayfinder.Grains.Tests.Integration.Plan.CaseFileItem
 {
     // 8.3 CaseFileItem Lifecycle - the D2 unlock, proven end-to-end.
     // ~~~~~
@@ -34,7 +34,7 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
     // addresses StageBehavior.Define()/CreateChild would have used, following the precedent
     // PlanItemGrainTests.cs already established of driving PlanItemGrain instances directly. That
     // instantiation gap has since been closed (CasePlanModelBehavior now drives child creation on
-    // Create, and the Conformance suite under Flow.Grains.Tests.Integration/Conformance exercises
+    // Create, and the Conformance suite under Wayfinder.Grains.Tests.Integration/Conformance exercises
     // the full ICaseGrain.Create()/Trigger() path end to end), but these tests are kept as a
     // targeted, low-level check of one thing: does a CaseFileItem transition reach an
     // already-subscribed sentry and activate an already-waiting plan item.
@@ -302,7 +302,7 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
             await timerPlanItemGrain.Trigger(PlanItemTransition.Create);
 
             var beforeSnapshot = await timerPlanItemGrain.GetSnapshot();
-            var beforeBehavior = (Flow.Grains.Interfaces.Plan.PlanItem.Behaviors.TimerEventListenerBehaviorSnapshot)beforeSnapshot.BehaviorExtension;
+            var beforeBehavior = (Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors.TimerEventListenerBehaviorSnapshot)beforeSnapshot.BehaviorExtension;
             beforeBehavior.TimerStart.Should().BeNull("the CaseFileItemStartTrigger has not occurred yet");
 
             var caseFileItemGrain = _clusterClient.GetCaseFileItem(caseInstanceId, caseFileItemId);
@@ -312,7 +312,7 @@ namespace Flow.Grains.Tests.Integration.Plan.CaseFileItem
                 async () =>
                 {
                     var snapshot = await timerPlanItemGrain.GetSnapshot();
-                    var behavior = (Flow.Grains.Interfaces.Plan.PlanItem.Behaviors.TimerEventListenerBehaviorSnapshot)snapshot.BehaviorExtension;
+                    var behavior = (Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors.TimerEventListenerBehaviorSnapshot)snapshot.BehaviorExtension;
                     return behavior.TimerStart.HasValue;
                 },
                 TimeSpan.FromSeconds(10));

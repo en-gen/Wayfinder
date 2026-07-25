@@ -2,19 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using AutoFixture.Xunit2;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Plan.Case;
-using Flow.Grains.Plan.Case.Events;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
-using Flow.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Plan.Case;
+using Wayfinder.Grains.Plan.Case.Events;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.Case
+namespace Wayfinder.Grains.Tests.Plan.Case
 {
     public class CaseStoreTests
     {

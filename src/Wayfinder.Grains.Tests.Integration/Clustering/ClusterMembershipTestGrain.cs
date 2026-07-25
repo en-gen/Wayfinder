@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 
-namespace Flow.Grains.Tests.Integration.Clustering
+namespace Wayfinder.Grains.Tests.Integration.Clustering
 {
     public interface IClusterMembershipTestGrain : IGrainWithIntegerKey
     {

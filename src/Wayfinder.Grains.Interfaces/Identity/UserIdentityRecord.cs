@@ -1,13 +1,13 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Identity
+namespace Wayfinder.Grains.Interfaces.Identity
 {
     // ADO #33 - the tenant-registry projection of a resolved identity: what IUserIdentityGrain
-    // hands back to a caller (Flow.Application's ITenantResolver today; a future HTTP auth
-    // middleware, sub-unit 3). Deliberately NOT the same type as Flow.Application's
+    // hands back to a caller (Wayfinder.Application's ITenantResolver today; a future HTTP auth
+    // middleware, sub-unit 3). Deliberately NOT the same type as Wayfinder.Application's
     // ResolvedIdentity - this is the grain-layer DTO, kept free of any app-layer concerns so
-    // Flow.Grains.Interfaces stays the thin contract Flow.Application projects from (mirrors
+    // Wayfinder.Grains.Interfaces stays the thin contract Wayfinder.Application projects from (mirrors
     // CaseSnapshot -> CaseView via CaseViewProjector).
     [GenerateSerializer]
     public class UserIdentityRecord

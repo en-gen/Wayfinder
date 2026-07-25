@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Identity
+namespace Wayfinder.Grains.Interfaces.Identity
 {
     // ADO #33 - the tenant registry's subject -> identity lookup. Keyed by the bare OIDC/Zitadel
     // "sub" claim string (IGrainWithStringKey), so the key IS the subject - no compound key, no

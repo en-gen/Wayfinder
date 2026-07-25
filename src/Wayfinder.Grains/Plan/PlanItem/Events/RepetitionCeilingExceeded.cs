@@ -1,8 +1,8 @@
 using System;
-using Flow.Grains.Plan.CmmnElement.Events;
+using Wayfinder.Grains.Plan.CmmnElement.Events;
 using Orleans;
 
-namespace Flow.Grains.Plan.PlanItem.Events
+namespace Wayfinder.Grains.Plan.PlanItem.Events
 {
     // ADO #67 - Case.Flow ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
     // ~~~~~

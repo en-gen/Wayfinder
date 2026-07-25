@@ -1,6 +1,6 @@
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 
-namespace Flow.Grains.Plan
+namespace Wayfinder.Grains.Plan
 {
     public interface IBehaviorStore
     {

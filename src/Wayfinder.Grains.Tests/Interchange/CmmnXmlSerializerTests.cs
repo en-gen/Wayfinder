@@ -1,13 +1,13 @@
 using System.Linq;
 using System.Reflection;
-using Flow.Grains.Interchange;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Model.Interchange;
+using Wayfinder.Grains.Interchange;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model.Interchange;
 using FluentAssertions;
 using FluentAssertions.Equivalency;
 using Xunit;
 
-namespace Flow.Grains.Tests.Interchange
+namespace Wayfinder.Grains.Tests.Interchange
 {
     // ADO #20 - CmmnXmlSerializer: malformed-XML error surfacing, and the round-trip fidelity
     // acceptance bar (import(export(import(x))) structurally equals import(x)).

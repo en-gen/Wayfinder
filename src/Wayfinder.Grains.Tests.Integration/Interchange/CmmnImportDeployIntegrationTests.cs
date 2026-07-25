@@ -3,18 +3,18 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interchange;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interchange;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Interchange
+namespace Wayfinder.Grains.Tests.Integration.Interchange
 {
     // ADO #20 - THE FLAGSHIP: a .cmmn XML FILE runs end-to-end.
     // ~~~~~

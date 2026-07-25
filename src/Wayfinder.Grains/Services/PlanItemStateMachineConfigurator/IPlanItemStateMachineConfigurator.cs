@@ -1,7 +1,7 @@
-using Flow.Grains.Plan;
-using Flow.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Plan;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 
-namespace Flow.Grains.Services.PlanItemStateMachineConfigurator
+namespace Wayfinder.Grains.Services.PlanItemStateMachineConfigurator
 {
     public interface IPlanItemStateMachineConfigurator
     {

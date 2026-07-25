@@ -2,16 +2,16 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Asp.Versioning;
-using Flow.Api.Infrastructure;
-using Flow.Application.CaseFileItems;
-using Flow.Application.Cases;
-using Flow.Application.Mediator;
-using Flow.Contracts.V1;
+using Wayfinder.Api.Infrastructure;
+using Wayfinder.Application.CaseFileItems;
+using Wayfinder.Application.Cases;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Contracts.V1;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 
-namespace Flow.Api.Controllers
+namespace Wayfinder.Api.Controllers
 {
     // ADO #32/#33 - the case-operation surface, thin over ISender. A deliberate mix of plain and
     // OData-flavored actions on one controller (matching the resource, not the routing style):
@@ -64,7 +64,7 @@ namespace Flow.Api.Controllers
         // documented OData-style "cases({key})" URL shape this controller's own remarks describe
         // (caught by MultiTenantIsolationApiTests, the first suite to exercise this route over
         // real HTTP rather than by calling the controller method directly - see
-        // Flow.Api.Tests/Controllers/CasesControllerTests.cs, which never routes a real request).
+        // Wayfinder.Api.Tests/Controllers/CasesControllerTests.cs, which never routes a real request).
         [HttpGet("~/api/v{version:apiVersion}/cases({key})")]
         [EnableQuery]
         public async Task<IActionResult> Get(Guid key, CancellationToken cancellationToken)

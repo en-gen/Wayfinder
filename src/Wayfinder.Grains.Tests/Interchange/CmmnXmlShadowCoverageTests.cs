@@ -6,12 +6,12 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
-using Flow.Grains.Interchange;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interchange;
+using Wayfinder.Grains.Interfaces.Model;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Interchange
+namespace Wayfinder.Grains.Tests.Interchange
 {
     // ADO #20 - structural regression guard for the XML shadow-property mechanism.
     // ~~~~~

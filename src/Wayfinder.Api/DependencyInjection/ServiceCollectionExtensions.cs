@@ -1,8 +1,8 @@
 using System;
 using Asp.Versioning;
-using Flow.Api.Infrastructure;
-using Flow.Api.Infrastructure.Options;
-using Flow.Application.DependencyInjection;
+using Wayfinder.Api.Infrastructure;
+using Wayfinder.Api.Infrastructure.Options;
+using Wayfinder.Application.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OData;
@@ -10,11 +10,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Flow.Api.DependencyInjection
+namespace Wayfinder.Api.DependencyInjection
 {
-    // ADO #32/#33 - the Flow.Api plug-in seam, same Add{X}/Use{X} convention Flow.Application's
+    // ADO #32/#33 - the Wayfinder.Api plug-in seam, same Add{X}/Use{X} convention Wayfinder.Application's
     // AddFlowApplication established: explicit composition, no reflection/module system beyond the
-    // handler-assembly scan AddFlowApplication already does on its own. Flow.Silo/Program.cs calls
+    // handler-assembly scan AddFlowApplication already does on its own. Wayfinder.Silo/Program.cs calls
     // AddFlowApi() once from ConfigureServices; Startup.cs's Configure calls MapFlowApi (see
     // EndpointRouteBuilderExtensions) from inside UseEndpoints.
     public static class ServiceCollectionExtensions
@@ -25,7 +25,7 @@ namespace Flow.Api.DependencyInjection
 
             // The CQRS core (ISender + every command/query handler) plus the identity/tenant-
             // registry seam (ITenantResolver) IdentityContextMiddleware depends on - see
-            // Flow.Application.DependencyInjection.IdentityServiceCollectionExtensions.AddFlowIdentity,
+            // Wayfinder.Application.DependencyInjection.IdentityServiceCollectionExtensions.AddFlowIdentity,
             // called transitively from here.
             services.AddFlowApplication();
 
@@ -37,7 +37,7 @@ namespace Flow.Api.DependencyInjection
                     .Expand());
 
             // ADO #32 - URL-segment versioning (api/v1/..., additive toward a future v2). See
-            // Flow.Api.csproj's remarks for why this is plain Asp.Versioning.Mvc/.ApiExplorer rather
+            // Wayfinder.Api.csproj's remarks for why this is plain Asp.Versioning.Mvc/.ApiExplorer rather
             // than Asp.Versioning.OData (no stable net10 release of the latter yet).
             services
                 .AddApiVersioning(options =>
@@ -63,7 +63,7 @@ namespace Flow.Api.DependencyInjection
 
             // Fallback policy: every endpoint requires an authenticated caller unless it opts out
             // with [AllowAnonymous] - only /health, /, /cluster, and the OpenAPI doc endpoint do
-            // (see Flow.Silo/Startup.cs).
+            // (see Wayfinder.Silo/Startup.cs).
             services.AddAuthorization(options =>
             {
                 options.FallbackPolicy = new AuthorizationPolicyBuilder()
@@ -77,7 +77,7 @@ namespace Flow.Api.DependencyInjection
         // ADO #33 - single trusted issuer (our Zitadel) via JwtBearer. Authority/Audience are never
         // hardcoded - both are bound from the "Auth:Zitadel" configuration section (env-overridable
         // via AUTH__ZITADEL__AUTHORITY / AUTH__ZITADEL__AUDIENCE), resolved from DI the same way
-        // Flow.Silo/Program.cs's ConfigureBlobStorage/ConfigureClustering resolve their own options
+        // Wayfinder.Silo/Program.cs's ConfigureBlobStorage/ConfigureClustering resolve their own options
         // dependencies (an OptionsBuilder<TOptions>.Configure<TDep> overload, not a hand-rolled
         // IConfiguration read) - consistent house style for "config-shaped, DI-resolved" options.
         private static void AddAuthentication(IServiceCollection services)

@@ -3,16 +3,16 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Api.Infrastructure;
-using Flow.Application.Identity;
-using Flow.Grains.Interfaces;
+using Wayfinder.Api.Infrastructure;
+using Wayfinder.Application.Identity;
+using Wayfinder.Grains.Interfaces;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Moq;
 using Xunit;
 
-namespace Flow.Api.Tests.Infrastructure
+namespace Wayfinder.Api.Tests.Infrastructure
 {
     // ADO #33 - the identity middleware is the ONLY place identity enters the system (see that
     // type's remarks); these tests exercise it directly against a bare DefaultHttpContext and a

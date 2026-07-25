@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
-using Flow.Grains.Interfaces.Model.Interchange;
+using Wayfinder.Grains.Interfaces.Model.Interchange;
 
-namespace Flow.Grains.Interfaces.Model
+namespace Wayfinder.Grains.Interfaces.Model
 {
     // ADO #20 - why this file exists.
     // ~~~~~
@@ -69,7 +69,7 @@ namespace Flow.Grains.Interfaces.Model
     //     BuildOverrides;
     //   - the hand-authored Interchange types (Definitions/Import) - authored with concrete
     //     List&lt;T&gt; properties from the start, so they populate without shadows.
-    // Enforced structurally by CmmnXmlShadowCoverageTests (Flow.Grains.Tests/Interchange), which
+    // Enforced structurally by CmmnXmlShadowCoverageTests (Wayfinder.Grains.Tests/Interchange), which
     // re-derives the obligation set by reflection on every run - a regenerated model file or a
     // new partial that adds an XML-visible interface-typed collection without a matching shadow
     // (and BuildOverrides ignore) fails that suite, so this class of bug cannot silently reopen.

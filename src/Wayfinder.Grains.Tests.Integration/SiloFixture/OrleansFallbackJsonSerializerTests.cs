@@ -1,10 +1,10 @@
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.SiloFixture
+namespace Wayfinder.Grains.Tests.Integration.SiloFixture
 {
     // Pinning tests for the polymorphic CMMN model hierarchy through Orleans's actual registered
     // fallback serializer (Microsoft.Orleans.Serialization.SystemTextJson's AddJsonSerializer +

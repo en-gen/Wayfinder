@@ -1,8 +1,8 @@
 using System;
-using Flow.Application.Identity;
+using Wayfinder.Application.Identity;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Flow.Application.DependencyInjection
+namespace Wayfinder.Application.DependencyInjection
 {
     // ADO #33 - the identity/tenant-registry DI seam, a sibling AddFlowApplication calls (see
     // ServiceCollectionExtensions.AddFlowApplication) rather than folding into that method's

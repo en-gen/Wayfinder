@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
 
-namespace Flow.Grains.Plan.PlanItem
+namespace Wayfinder.Grains.Plan.PlanItem
 {
     public interface IPlanItemInternalGrain : IPlanItemGrain
     {

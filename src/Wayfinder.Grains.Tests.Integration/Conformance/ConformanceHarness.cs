@@ -1,18 +1,18 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interchange;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Model.Interchange;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interchange;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model.Interchange;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.PlanItem;
 using Orleans;
 
-namespace Flow.Grains.Tests.Integration.Conformance
+namespace Wayfinder.Grains.Tests.Integration.Conformance
 {
     // ADO #21 - the conformance suite's shared runner.
     // ~~~~~
@@ -62,7 +62,7 @@ namespace Flow.Grains.Tests.Integration.Conformance
             {
                 throw new InvalidOperationException(
                     $"no embedded resource ending in '{fileName}' - is it listed under the " +
-                    "Conformance\\Samples\\*.cmmn EmbeddedResource glob in Flow.Grains.Tests.Integration.csproj?");
+                    "Conformance\\Samples\\*.cmmn EmbeddedResource glob in Wayfinder.Grains.Tests.Integration.csproj?");
             }
 
             using var stream = assembly.GetManifestResourceStream(resourceName);

@@ -1,9 +1,9 @@
 using System;
-using Flow.Grains.Events;
-using Flow.Grains.Interfaces;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Interfaces;
 using Orleans;
 
-namespace Flow.Grains.Plan.Sentry.Events
+namespace Wayfinder.Grains.Plan.Sentry.Events
 {
     // D11 - see SentryStore.Apply(OnPartNotRearmed) for why this clears only the one OnPart that
     // just completed the AND-join (superseding PR !18's IfPartNotSatisfied, which cleared every

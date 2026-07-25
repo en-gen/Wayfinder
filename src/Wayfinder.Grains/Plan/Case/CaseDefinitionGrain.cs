@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Grains.Events;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.Case.Events;
-using Flow.Grains.Plan.PlanItem.Definitions;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.Case.Events;
+using Wayfinder.Grains.Plan.PlanItem.Definitions;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.EventSourcing;
 using Orleans.Runtime;
 
-namespace Flow.Grains.Plan.Case
+namespace Wayfinder.Grains.Plan.Case
 {
     public class CaseDefinitionGrain : JournaledGrain<CaseDefinitionStore>, ICaseDefinitionGrain
     {

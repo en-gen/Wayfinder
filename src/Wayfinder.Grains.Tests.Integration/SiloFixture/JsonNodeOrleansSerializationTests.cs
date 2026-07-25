@@ -1,17 +1,17 @@
 using System;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Serialization;
 using Xunit;
-using CaseFileItemStore = Flow.Grains.Plan.CaseFileItem.CaseFileItemStore;
-using ValueChanged = Flow.Grains.Plan.CaseFileItem.Events.ValueChanged;
+using CaseFileItemStore = Wayfinder.Grains.Plan.CaseFileItem.CaseFileItemStore;
+using ValueChanged = Wayfinder.Grains.Plan.CaseFileItem.Events.ValueChanged;
 
-namespace Flow.Grains.Tests.Integration.SiloFixture
+namespace Wayfinder.Grains.Tests.Integration.SiloFixture
 {
     // Pinning tests for System.Text.Json.Nodes.JsonNode through Orleans's actual registered
     // serializer (see OrleansFallbackJsonSerializerTests for the sibling pinning test covering the
@@ -44,7 +44,7 @@ namespace Flow.Grains.Tests.Integration.SiloFixture
     //    state fails the storage write, which the log-consistency protocol retries indefinitely -
     //    the grain call never returns; observed as a 30s client timeout with the activation
     //    spinning at ~6k scheduler work items/sec). Fixed by pinning MemoryGrainStorage to
-    //    OrleansGrainStorageSerializer in ClusterFixture + Flow.Silo/Program.cs, so storage rides
+    //    OrleansGrainStorageSerializer in ClusterFixture + Wayfinder.Silo/Program.cs, so storage rides
     //    the same Orleans serializer as the wire. GrainCall__Given_JsonNodeArgumentWithArray below
     //    is the regression pin: it hangs, not fails, if storage regresses to the JSON storage
     //    serializer.

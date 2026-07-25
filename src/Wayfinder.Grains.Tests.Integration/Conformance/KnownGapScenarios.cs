@@ -2,13 +2,13 @@ using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Conformance
+namespace Wayfinder.Grains.Tests.Integration.Conformance
 {
     // ADO #21 - QUARANTINED conformance scenarios: spec rows the engine is KNOWN not to honor
     // today. Per this suite's honesty rule (Conformance/COVERAGE.md), these rows are never

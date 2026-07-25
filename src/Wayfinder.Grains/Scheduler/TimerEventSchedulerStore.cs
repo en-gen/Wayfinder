@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Orleans;
 using Quartz;
 
-namespace Flow.Grains.Scheduler
+namespace Wayfinder.Grains.Scheduler
 {
     [GenerateSerializer]
     public class TimerEventSchedulerStore

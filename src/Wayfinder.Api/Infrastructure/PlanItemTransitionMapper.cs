@@ -1,13 +1,13 @@
 using System;
-using ContractsTransition = Flow.Contracts.V1.PlanItemTransition;
-using DomainTransition = Flow.Grains.Interfaces.Model.PlanItemTransition;
+using ContractsTransition = Wayfinder.Contracts.V1.PlanItemTransition;
+using DomainTransition = Wayfinder.Grains.Interfaces.Model.PlanItemTransition;
 
-namespace Flow.Api.Infrastructure
+namespace Wayfinder.Api.Infrastructure
 {
     // ADO #32 - the transport-edge translation TriggerCaseCommand's remarks call for: a
     // TriggerCaseRequest's V1 (wire) transition becomes the domain enum the command carries. An
     // explicit switch (not a blind cast) - the two enums are a deliberate 1:1 mirror today (see
-    // Flow.Contracts.V1.PlanItemTransition's remarks), but a cast would silently keep "working" even
+    // Wayfinder.Contracts.V1.PlanItemTransition's remarks), but a cast would silently keep "working" even
     // if they ever drifted out of lockstep, hiding exactly the bug this mapper exists to catch.
     public static class PlanItemTransitionMapper
     {

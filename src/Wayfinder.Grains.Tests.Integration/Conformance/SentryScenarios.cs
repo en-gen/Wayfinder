@@ -2,13 +2,13 @@ using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Conformance
+namespace Wayfinder.Grains.Tests.Integration.Conformance
 {
     // ADO #21 - conformance scenarios for §8.5 Sentry semantics (satisfaction bullets, AND-join,
     // IfPart over the CaseFile, standalone IfPart, exit criteria) and 8.6.4's sentry-driven

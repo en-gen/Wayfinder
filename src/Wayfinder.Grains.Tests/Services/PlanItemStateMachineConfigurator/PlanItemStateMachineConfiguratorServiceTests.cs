@@ -1,17 +1,17 @@
 using AutoFixture.Xunit2;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Plan.PlanItem.StateMachine;
-using Flow.Grains.Services.PlanItemStateMachineConfigurator;
-using Flow.Grains.Tests.Infrastructure.Extensions;
-using Flow.Grains.Tests.Infrastructure.Logging;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Tests.Infrastructure.Extensions;
+using Wayfinder.Grains.Tests.Infrastructure.Logging;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
-namespace Flow.Grains.Tests.Services.PlanItemStateMachineConfigurator
+namespace Wayfinder.Grains.Tests.Services.PlanItemStateMachineConfigurator
 {
     public class PlanItemStateMachineConfiguratorServiceTests
     {

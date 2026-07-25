@@ -1,7 +1,7 @@
-using Flow.Application.Mediator;
-using Flow.Application.Results;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
     // ADO #32 - imports + deploys a .cmmn XML definition. CaseId, if supplied, becomes the deployed
     // definition's id (ICaseDefinitionGrain's compound key); otherwise a fresh "case-{ShortGuid}"

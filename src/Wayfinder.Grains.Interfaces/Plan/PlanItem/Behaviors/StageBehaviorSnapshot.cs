@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors
 {
     [GenerateSerializer]
     public class StageBehaviorSnapshot

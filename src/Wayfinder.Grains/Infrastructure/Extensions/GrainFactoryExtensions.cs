@@ -1,10 +1,10 @@
 using System;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Plan.CaseFileItem;
-using Flow.Grains.Scheduler;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Plan.CaseFileItem;
+using Wayfinder.Grains.Scheduler;
 using Orleans;
 
-namespace Flow.Grains.Infrastructure.Extensions
+namespace Wayfinder.Grains.Infrastructure.Extensions
 {
     public static class GrainFactoryExtensions
     {

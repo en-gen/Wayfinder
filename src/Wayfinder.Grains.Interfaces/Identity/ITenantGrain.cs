@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Identity
+namespace Wayfinder.Grains.Interfaces.Identity
 {
     // ADO #33 - per-tenant metadata + OIDC config, keyed by TenantId (Guid) itself
     // (IGrainWithGuidKey - a bare tenant id, no compound key, unlike CmmnElementGrain's

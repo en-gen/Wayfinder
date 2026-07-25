@@ -1,7 +1,7 @@
 using System;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 
-namespace Flow.Grains.Tests.Utils.Helpers
+namespace Wayfinder.Grains.Tests.Utils.Helpers
 {
     public static class Rules
     {

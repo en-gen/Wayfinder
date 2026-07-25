@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Storage
+namespace Wayfinder.Grains.Tests.Integration.Storage
 {
     // Opt-in gate for tests that need Docker (currently just the Azurite-backed journal-storage
     // suite, work item #60 - Testcontainers self-provisions Azurite per run). xunit evaluates

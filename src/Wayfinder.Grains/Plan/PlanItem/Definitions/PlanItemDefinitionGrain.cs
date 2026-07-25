@@ -2,10 +2,10 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Orleans;
 
-namespace Flow.Grains.Plan.PlanItem.Definitions
+namespace Wayfinder.Grains.Plan.PlanItem.Definitions
 {
     public class PlanItemDefinitionGrain : Grain<PlanItemDefinitionStore>, IPlanItemDefinitionGrain
     {

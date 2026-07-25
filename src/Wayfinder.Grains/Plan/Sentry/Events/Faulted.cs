@@ -1,9 +1,9 @@
 using System;
-using Flow.Grains.Events;
-using Flow.Grains.Interfaces;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Interfaces;
 using Orleans;
 
-namespace Flow.Grains.Plan.Sentry.Events
+namespace Wayfinder.Grains.Plan.Sentry.Events
 {
     // D10 - see SentryGrain.HandleOnPartOccurred's remarks for when this is raised (an IfPart that
     // could not be evaluated at all, distinct from one that evaluated cleanly to FALSE).

@@ -1,8 +1,8 @@
 using System;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.PlanItem
+namespace Wayfinder.Grains.Interfaces.Plan.PlanItem
 {
     [GenerateSerializer]
     public class PlanItemSnapshot

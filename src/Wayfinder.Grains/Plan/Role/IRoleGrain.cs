@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
+using Wayfinder.Grains.Interfaces.Plan.CmmnElementGrain;
 using Orleans;
 
-namespace Flow.Grains.Plan.Role
+namespace Wayfinder.Grains.Plan.Role
 {
     public interface IRoleGrain : ICmmnElementGrain<Interfaces.Model.Role>
     {

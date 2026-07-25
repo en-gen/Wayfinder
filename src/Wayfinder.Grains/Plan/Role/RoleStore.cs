@@ -1,7 +1,7 @@
-using Flow.Grains.Plan.CmmnElement;
+using Wayfinder.Grains.Plan.CmmnElement;
 using Orleans;
 
-namespace Flow.Grains.Plan.Role
+namespace Wayfinder.Grains.Plan.Role
 {
     [GenerateSerializer]
     public class RoleStore : CmmnElementStore<Interfaces.Model.Role>

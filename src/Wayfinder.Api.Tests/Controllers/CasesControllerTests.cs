@@ -3,20 +3,20 @@ using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Api.Controllers;
-using Flow.Application.CaseFileItems;
-using Flow.Application.Cases;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Contracts.V1;
+using Wayfinder.Api.Controllers;
+using Wayfinder.Application.CaseFileItems;
+using Wayfinder.Application.Cases;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Contracts.V1;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Xunit;
-using DomainTransition = Flow.Grains.Interfaces.Model.PlanItemTransition;
+using DomainTransition = Wayfinder.Grains.Interfaces.Model.PlanItemTransition;
 
-namespace Flow.Api.Tests.Controllers
+namespace Wayfinder.Api.Tests.Controllers
 {
     // ADO #32/#33 - unit-level: a faked ISender in place of the real native mediator, no host/
     // TestServer. Each test proves the controller action builds the RIGHT command/query from its

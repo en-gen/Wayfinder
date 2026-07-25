@@ -1,18 +1,18 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
-using Flow.Grains.Tests.Utils.Helpers;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
 using Xunit;
-using CaseModel = Flow.Grains.Interfaces.Model.Case;
+using CaseModel = Wayfinder.Grains.Interfaces.Model.Case;
 
-namespace Flow.Grains.Tests.Integration.Plan.CasePlanModel
+namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 {
     // D8 remainder - 8.4.1 Case Instance Lifecycle (Tables 8.5/8.6): close, re-activate, and
     // Closed-state immutability, end-to-end through ICaseGrain only.

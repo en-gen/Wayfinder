@@ -1,16 +1,16 @@
 using System;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.CaseFileItem.Events;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.CaseFileItem.Events;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Serialization;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Events
+namespace Wayfinder.Grains.Tests.Integration.Events
 {
     // ADO #59 - proves the wire-safety claim this work item hinges on empirically, rather than by
     // assertion alone: adding new [Id(n)] fields to an already-shipped event type (or to its base

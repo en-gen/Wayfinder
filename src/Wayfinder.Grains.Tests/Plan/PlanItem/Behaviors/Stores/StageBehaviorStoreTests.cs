@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using AutoFixture.Xunit2;
-using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
-using Flow.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors.Stores
+namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors.Stores
 {
     public class StageBehaviorStoreTests
     {

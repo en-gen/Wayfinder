@@ -1,4 +1,4 @@
-namespace Flow.Silo.Infrastructure.Options
+namespace Wayfinder.Silo.Infrastructure.Options
 {
     public class SeqOptions
     {

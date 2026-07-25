@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
 
-namespace Flow.Silo.Infrastructure.Options
+namespace Wayfinder.Silo.Infrastructure.Options
 {
     // ADO #32/#33 (sub-unit 4, P1/First Light) - explicit seed data for the Docker/eval
     // environment ONLY (see Program.cs's SeedEvalIdentityRegistryAsync, gated to
     // HostingEnvironment.EnvironmentName == "Docker" - never Development, never Production).
     // Maps each real Zitadel subject (the token's "sub" claim, minted by the compose Zitadel once
     // its bootstrap org/human users are created - see devops/eval/README.md's manual bootstrap
-    // steps) to a Case.Flow tenant/user/role set via Flow.Application.Identity.IIdentityRegistrySeeder,
+    // steps) to a Case.Flow tenant/user/role set via Wayfinder.Application.Identity.IIdentityRegistrySeeder,
     // the exact seam sub-unit 4's isolation tests also use. Bound from the "EvalIdentity" config
     // section - devops/eval/docker-compose.yml supplies it via EvalIdentity__Tenants__<n>__* env
     // vars (indexed-array binding is native to Microsoft.Extensions.Configuration, no custom code
@@ -30,7 +30,7 @@ namespace Flow.Silo.Infrastructure.Options
 
         // The Zitadel-issued "sub" claim for this tenant's demo user - IdentityContextMiddleware
         // reads this same claim in production; here it is the join key the seeder uses to register
-        // Flow.Application.Identity.UserSeed against Flow.Grains.Interfaces.Identity.IUserIdentityGrain.
+        // Wayfinder.Application.Identity.UserSeed against Wayfinder.Grains.Interfaces.Identity.IUserIdentityGrain.
         public string Subject { get; set; }
 
         public Guid UserId { get; set; }

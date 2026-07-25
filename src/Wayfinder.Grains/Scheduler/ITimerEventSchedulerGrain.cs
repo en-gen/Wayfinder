@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Flow.Grains.Executables;
+using Wayfinder.Grains.Executables;
 using Orleans;
 using Orleans.Runtime;
 
-namespace Flow.Grains.Scheduler
+namespace Wayfinder.Grains.Scheduler
 {
     public interface ITimerEventSchedulerGrain : IGrainWithGuidKey, IRemindable
     {

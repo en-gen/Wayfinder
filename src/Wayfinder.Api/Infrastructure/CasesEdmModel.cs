@@ -1,8 +1,8 @@
-using Flow.Contracts.V1;
+using Wayfinder.Contracts.V1;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 
-namespace Flow.Api.Infrastructure
+namespace Wayfinder.Api.Infrastructure
 {
     // ADO #32/#33 - the OData EDM model backing GET /api/v1/cases({id})'s [EnableQuery]
     // ($select/$expand) support and the "trigger" bound action's self-description. CaseView has no

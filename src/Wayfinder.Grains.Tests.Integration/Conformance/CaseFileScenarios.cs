@@ -1,13 +1,13 @@
 using System;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.CaseFileItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.CaseFileItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Conformance
+namespace Wayfinder.Grains.Tests.Integration.Conformance
 {
     // ADO #21 - conformance scenarios for §8.3's CaseFileItem lifecycle (Tables 8.1/8.2): the
     // operations are distinct standardEvents that drive sentries distinctly, and delete is

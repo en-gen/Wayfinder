@@ -1,15 +1,15 @@
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Flow.Grains.Tests.Integration.Storage;
+using Wayfinder.Grains.Tests.Integration.Storage;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Clustering
+namespace Wayfinder.Grains.Tests.Integration.Clustering
 {
-    // Crux validation for work item #30's deployed-cluster path (Flow.Silo/Program.cs
+    // Crux validation for work item #30's deployed-cluster path (Wayfinder.Silo/Program.cs
     // ConfigureDeployedOrleans): proves UseAzureStorageClustering actually forms a REAL Orleans
     // cluster via Azure Table membership (Azurite's table endpoint here / a real Azure Storage
     // account table endpoint when deployed), not merely that it compiles or starts a single silo.

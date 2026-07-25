@@ -2,15 +2,15 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Application.Mediator;
-using Flow.Application.Results;
-using Flow.Grains.Interchange;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.Case;
+using Wayfinder.Application.Mediator;
+using Wayfinder.Application.Results;
+using Wayfinder.Grains.Interchange;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
 using Orleans;
 
-namespace Flow.Application.Cases
+namespace Wayfinder.Application.Cases
 {
     // ADO #32 - deploy handler, lifted from #39's CaseOperations.DeployDefinitionAsync. The proven
     // front door: CmmnXmlSerializer.Import -> CmmnCapabilityLint -> ToDeployableCase ->

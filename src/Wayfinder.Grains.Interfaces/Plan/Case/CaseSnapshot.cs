@@ -1,10 +1,10 @@
 using System;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Interfaces.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.Case
+namespace Wayfinder.Grains.Interfaces.Plan.Case
 {
     [GenerateSerializer]
     public class CaseSnapshot

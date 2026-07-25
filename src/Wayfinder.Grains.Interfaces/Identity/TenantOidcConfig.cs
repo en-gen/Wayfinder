@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Identity
+namespace Wayfinder.Grains.Interfaces.Identity
 {
     // ADO #33 - a tenant's own OIDC/SSO federation config, held so a future per-tenant SSO
     // federation feature (#74) is purely additive: ITenantGrain already has a place to hold
@@ -10,7 +10,7 @@ namespace Flow.Grains.Interfaces.Identity
     // but seedable/gettable now so #74 only has to add validation logic against an existing field,
     // not a new grain method. ClaimMappings is a plain Dictionary<string,string> (both Orleans's
     // native codegen and the reflection-JSON fallback round-trip it fine) rather than
-    // System.Text.Json.Nodes - see Flow.Silo/Program.cs's GrainStorageSerializer remarks for why
+    // System.Text.Json.Nodes - see Wayfinder.Silo/Program.cs's GrainStorageSerializer remarks for why
     // JsonNode values are the thing to avoid in [PersistentState] state.
     [GenerateSerializer]
     public class TenantOidcConfig

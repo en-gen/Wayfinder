@@ -1,16 +1,16 @@
 using System;
 using AutoFixture.Xunit2;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Behaviors.Stores;
-using Flow.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using FluentAssertions;
 using FluentAssertions.Common;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.PlanItem
+namespace Wayfinder.Grains.Tests.Plan.PlanItem
 {
     public class PlanItemStoreTests
     {

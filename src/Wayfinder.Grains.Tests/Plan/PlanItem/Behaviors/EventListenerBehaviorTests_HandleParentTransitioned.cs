@@ -1,17 +1,17 @@
 using System.Reflection;
 using System.Threading.Tasks;
-using Flow.Grains.Events;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Tests.Utils.Helpers;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Moq;
 using Orleans.Streams;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 {
     public partial class EventListenerBehaviorTests
     {

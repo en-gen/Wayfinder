@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using Flow.Grains.Plan.Case.Events;
-using Flow.Grains.Plan.PlanItem.Definitions;
+using Wayfinder.Grains.Plan.Case.Events;
+using Wayfinder.Grains.Plan.PlanItem.Definitions;
 using Orleans;
 
-namespace Flow.Grains.Plan.Case
+namespace Wayfinder.Grains.Plan.Case
 {
     [GenerateSerializer]
     public class CaseDefinitionStore : BaseStore

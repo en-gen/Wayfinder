@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Application.Cases;
-using Flow.Grains.Interfaces.Plan.Case;
+using Wayfinder.Application.Cases;
+using Wayfinder.Grains.Interfaces.Plan.Case;
 using Orleans;
 
-namespace Flow.Application.CaseFileItems
+namespace Wayfinder.Application.CaseFileItems
 {
     // ADO #58 - case-file item reads must honor the exact same tenant/existence isolation as a
     // current-value (case) read (see ADO #33/CaseTenantIsolationIntegrationTests). A CaseFileItem

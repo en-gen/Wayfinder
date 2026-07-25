@@ -1,10 +1,10 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Interfaces.Identity;
 using Orleans;
 using Orleans.Runtime;
 
-namespace Flow.Grains.Identity
+namespace Wayfinder.Grains.Identity
 {
     // ADO #33 - state for IUserIdentityGrain. A plain [GenerateSerializer] class (not a
     // JournaledGrain event/view pair) - the registry is reference/config data seeded explicitly
@@ -30,7 +30,7 @@ namespace Flow.Grains.Identity
 
     // ADO #33 - the tenant registry's subject -> identity grain. Backed by
     // [PersistentState(_, "Default")] against whatever the host registered as its DEFAULT grain
-    // storage (AddAzureBlobGrainStorageAsDefault in Flow.Silo/Program.cs;
+    // storage (AddAzureBlobGrainStorageAsDefault in Wayfinder.Silo/Program.cs;
     // AddMemoryGrainStorageAsDefault in ClusterFixture's TestSiloConfigurator) - the SAME storage
     // slot CmmnElementGrain's journaled state ultimately lands in
     // (see Program.cs's ConfigureSharedOrleansProviders remarks for why "Default" is the right

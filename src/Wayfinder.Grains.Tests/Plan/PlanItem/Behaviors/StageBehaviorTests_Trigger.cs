@@ -1,18 +1,18 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Tests.Utils.Helpers;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Moq;
 using Orleans;
 using Xunit;
 
-namespace Flow.Grains.Tests.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 {
     // Table 8.12 - Stage instance termination criteria (8.6.1), manual-completion gate (D4).
     // ~~~~~

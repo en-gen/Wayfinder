@@ -1,11 +1,11 @@
 using System;
-using Flow.Api.Infrastructure;
+using Wayfinder.Api.Infrastructure;
 using FluentAssertions;
 using Xunit;
-using ContractsTransition = Flow.Contracts.V1.PlanItemTransition;
-using DomainTransition = Flow.Grains.Interfaces.Model.PlanItemTransition;
+using ContractsTransition = Wayfinder.Contracts.V1.PlanItemTransition;
+using DomainTransition = Wayfinder.Grains.Interfaces.Model.PlanItemTransition;
 
-namespace Flow.Api.Tests.Infrastructure
+namespace Wayfinder.Api.Tests.Infrastructure
 {
     public class PlanItemTransitionMapperTests
     {

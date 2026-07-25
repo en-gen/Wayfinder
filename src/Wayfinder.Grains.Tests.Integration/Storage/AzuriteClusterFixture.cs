@@ -3,7 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +23,7 @@ using Serilog.Exceptions;
 using Testcontainers.Azurite;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Storage
+namespace Wayfinder.Grains.Tests.Integration.Storage
 {
     // Self-contained fixture for the Azurite restart-survival suite (work item #54, Testcontainers-
     // provisioned per work item #60). Deliberately does not touch SiloFixture.ClusterFixture:
@@ -45,7 +45,7 @@ namespace Flow.Grains.Tests.Integration.Storage
         // (Azure/Azurite#2562, #2564, #2626).
         private const string AzuriteImage = "mcr.microsoft.com/azure-storage/azurite:3.35.0";
 
-        // Parity with Flow.Silo by value: the test assembly has no reference to the silo
+        // Parity with Wayfinder.Silo by value: the test assembly has no reference to the silo
         // project, so these mirror AzureOptions.StorageSectionKey and
         // nameof(AzureOptions.StorageOptions.CaseStateContainer). The registration path built
         // from them (TestSiloConfigurator below) must match Program.cs exactly.
@@ -120,7 +120,7 @@ namespace Flow.Grains.Tests.Integration.Storage
             builder.Options.ServiceId = "Case.Flow";
 
             // Hierarchical keys land in each silo's IConfiguration as the same Azure:Storage
-            // section shape Flow.Silo reads from appsettings.Development.json, so the
+            // section shape Wayfinder.Silo reads from appsettings.Development.json, so the
             // configurator below can consume it through the identical registration path.
             builder.Properties[StorageSectionKey + ":connectionString"] = _connectionString;
             builder.Properties[CaseStateContainerKey] = ContainerName;
@@ -169,7 +169,7 @@ namespace Flow.Grains.Tests.Integration.Storage
 
         // Mirrors ClusterFixture.TestSiloConfigurator except the journaled-grain storage slot:
         // AddAzureBlobGrainStorageAsDefault (Azurite) in place of AddMemoryGrainStorageAsDefault.
-        // See Flow.Silo/Program.cs ConfigureDevelopmentOrleans for the citation establishing that
+        // See Wayfinder.Silo/Program.cs ConfigureDevelopmentOrleans for the citation establishing that
         // the "AsDefault" slot - not a same-named "LogStorage" registration - is what
         // [LogConsistencyProvider("LogStorage")] grains with no [StorageProvider] attribute
         // actually resolve.
@@ -184,7 +184,7 @@ namespace Flow.Grains.Tests.Integration.Storage
                 // per TestClusterBuilder.Properties's own doc comment ("Configuration values which
                 // will be provided to the silos and clients created by this builder").
                 //
-                // This block is the Flow.Silo/Program.cs ConfigureServices registration path,
+                // This block is the Wayfinder.Silo/Program.cs ConfigureServices registration path,
                 // byte-for-byte except the container name source (IConfiguration key rather than
                 // IOptionsMonitor<AzureOptions> - the silo's options type isn't referenced here):
                 // section-shaped client registration, explicit UseCredential fallback, and the
@@ -217,7 +217,7 @@ namespace Flow.Grains.Tests.Integration.Storage
                     jsonSerializerOptions: OrleansFallbackJsonSerializer.Options()));
             }
 
-            // Same wiring as Flow.Silo/Program.cs ConfigureBlobStorage and must match it - see
+            // Same wiring as Wayfinder.Silo/Program.cs ConfigureBlobStorage and must match it - see
             // there for the shipped-bits citations (grain-storage serializer default
             // determination, AzureBlobStorageOptions.BuildContainerFactory /
             // IBlobContainerFactory contract) and the JsonNode journal-state rationale (work
@@ -252,7 +252,7 @@ namespace Flow.Grains.Tests.Integration.Storage
             }
         }
 
-        // Mirror of Flow.Silo/Program.cs CaseStateContainerFactory (the test assembly has no
+        // Mirror of Wayfinder.Silo/Program.cs CaseStateContainerFactory (the test assembly has no
         // reference to the silo project) - must match it: routes Orleans' journaled-grain
         // persistence onto the named case-state BlobContainerClient registered above.
         // InitializeAsync mirrors DefaultBlobContainerFactory's create-if-not-exists behavior;
@@ -275,7 +275,7 @@ namespace Flow.Grains.Tests.Integration.Storage
 
         // TestCluster's in-process client independently validates serializer coverage for every
         // type reachable from grain interfaces (see ClusterFixture's identical comment) - this
-        // suite's test grain is CMMN-free, but the client still loads Flow.Grains.Interfaces.Model
+        // suite's test grain is CMMN-free, but the client still loads Wayfinder.Grains.Interfaces.Model
         // types transitively, so the same fallback registration is required here too.
         private class TestClientConfigurator : IClientBuilderConfigurator
         {

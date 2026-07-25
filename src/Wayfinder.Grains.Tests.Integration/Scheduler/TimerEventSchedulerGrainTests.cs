@@ -2,13 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
-using Flow.Grains.Events;
-using Flow.Grains.Executables;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Scheduler;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Executables;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Scheduler;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using NodaTime;
 using NodaTime.Text;
@@ -17,7 +17,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Scheduler
+namespace Wayfinder.Grains.Tests.Integration.Scheduler
 {
 
     [Collection(ClusterCollection.Name)]

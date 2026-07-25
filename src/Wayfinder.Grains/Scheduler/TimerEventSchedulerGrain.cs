@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Flow.Grains.Executables;
+using Wayfinder.Grains.Executables;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Quartz;
 using Quartz.Impl.Triggers;
 
-namespace Flow.Grains.Scheduler
+namespace Wayfinder.Grains.Scheduler
 {
     public class TimerEventSchedulerGrain : Grain<TimerEventSchedulerStore>, ITimerEventSchedulerGrain
     {

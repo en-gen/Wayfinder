@@ -1,9 +1,9 @@
 using System;
-using Flow.Grains.Plan;
-using Flow.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Plan;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 using Microsoft.Extensions.Logging;
 
-namespace Flow.Grains.Services.PlanItemStateMachineConfigurator
+namespace Wayfinder.Grains.Services.PlanItemStateMachineConfigurator
 {
     public class PlanItemStateMachineConfiguratorService : IPlanItemStateMachineConfigurator
     {

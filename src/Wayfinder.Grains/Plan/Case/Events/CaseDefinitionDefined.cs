@@ -1,9 +1,9 @@
 using System;
-using Flow.Grains.Plan.CmmnElement.Events;
-using Flow.Grains.Plan.PlanItem.Definitions;
+using Wayfinder.Grains.Plan.CmmnElement.Events;
+using Wayfinder.Grains.Plan.PlanItem.Definitions;
 using Orleans;
 
-namespace Flow.Grains.Plan.Case.Events
+namespace Wayfinder.Grains.Plan.Case.Events
 {
     [GenerateSerializer]
     public class CaseDefinitionDefined : BaseCreated

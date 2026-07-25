@@ -8,12 +8,12 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Application.Identity;
-using Flow.Contracts.V1;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Identity;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Application.Identity;
+using Wayfinder.Contracts.V1;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Identity;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,13 +21,13 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
-using CaseFileItemModel = Flow.Grains.Interfaces.Model.CaseFileItem;
+using CaseFileItemModel = Wayfinder.Grains.Interfaces.Model.CaseFileItem;
 
-namespace Flow.Grains.Tests.Integration.Api
+namespace Wayfinder.Grains.Tests.Integration.Api
 {
     // ADO #32/#33 (sub-unit 4, P0) - proves tenant isolation through the REAL pipeline (auth ->
     // IdentityContextMiddleware -> ITenantResolver -> CaseRequestContext -> grain enforcement),
-    // exercised over actual HTTP against Flow.Api's real controllers/OData/versioning, not just at
+    // exercised over actual HTTP against Wayfinder.Api's real controllers/OData/versioning, not just at
     // the grain layer (see CaseTenantIsolationIntegrationTests, which is the grain-level defense in
     // depth this suite proves is actually WIRED UP end to end) or the application layer
     // (CaseCqrsIntegrationTests). See ApiTestHostFactory for how the host is composed and

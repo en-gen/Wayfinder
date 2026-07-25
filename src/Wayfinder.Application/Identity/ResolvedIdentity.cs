@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 
-namespace Flow.Application.Identity
+namespace Wayfinder.Application.Identity
 {
     // ADO #33 - the app-layer result of resolving a token subject against the tenant registry.
-    // Deliberately a distinct type from Flow.Grains.Interfaces.Identity.UserIdentityRecord (the
-    // grain-layer DTO): Flow.Application projects the grain contract into its own shape, same
+    // Deliberately a distinct type from Wayfinder.Grains.Interfaces.Identity.UserIdentityRecord (the
+    // grain-layer DTO): Wayfinder.Application projects the grain contract into its own shape, same
     // layering CaseViewProjector uses for CaseSnapshot -> CaseView. This is the single seam a
     // future HTTP auth middleware (sub-unit 3) calls to populate CaseRequestContext
     // (TenantId/UserId/UserRoles) from an authenticated caller's subject.

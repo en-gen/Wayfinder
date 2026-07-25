@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using System.Xml.Serialization;
 
-namespace Flow.Grains.Interfaces.Model
+namespace Wayfinder.Grains.Interfaces.Model
 {
     // The XSD-generated CMMN model (Spec.CMMN.MODEL.cs) is a polymorphic hierarchy: PlanItemDefinition
     // -> Stage/HumanTask/Milestone/..., CmmnElement -> (nearly everything), etc. System.Text.Json does
@@ -14,7 +14,7 @@ namespace Flow.Grains.Interfaces.Model
     // as the abstract/base type (e.g. PlanItemDefinition) deserializes back as that declared type,
     // silently losing the concrete subtype identity that PlanItemBehaviorConfiguratorService's type
     // dispatch (and Sentry OnPart matching) depends on. That exact failure mode is why the old
-    // Newtonsoft registration used TypeNameHandling.Auto (see git history of Flow.Silo/Program.cs).
+    // Newtonsoft registration used TypeNameHandling.Auto (see git history of Wayfinder.Silo/Program.cs).
     //
     // Rather than hand-maintaining a parallel [JsonDerivedType] list (56 types across the model, several
     // multi-level), this resolver derives the derived-type closure for each polymorphic base type by

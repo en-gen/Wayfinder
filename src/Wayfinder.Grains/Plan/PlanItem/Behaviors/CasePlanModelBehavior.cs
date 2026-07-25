@@ -1,10 +1,10 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 using Orleans.Streams;
 
-namespace Flow.Grains.Plan.PlanItem.Behaviors
+namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
     // 8.4.1 - Case Instance Lifecyle
     // ~~~~~

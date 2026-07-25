@@ -1,10 +1,10 @@
 using System;
-using Flow.Grains.Events;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
 using Orleans;
 
-namespace Flow.Grains.Plan.Sentry.Events
+namespace Wayfinder.Grains.Plan.Sentry.Events
 {
     // D5 - see SentryStore's class remarks for what an OccurrenceToken is and why this event now
     // carries one instead of just the OnPart that occurred.

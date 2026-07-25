@@ -1,17 +1,17 @@
 using System;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
-using Flow.Grains.Events;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
 using Orleans.Streams;
 using Xunit;
 
-namespace Flow.Grains.Tests.Integration.Events
+namespace Wayfinder.Grains.Tests.Integration.Events
 {
     // Verifies the concern from work item #13, fix #2: BaseEvent.Occurred is set once at
     // construction (DateTime.UtcNow property initializer, get-only, [Id(0)]) and must survive
@@ -22,7 +22,7 @@ namespace Flow.Grains.Tests.Integration.Events
     // SentrySatisfiedEvent, PlanItemRepetitionCriteriaMetEvent) are never RaiseEvent'd on a
     // JournaledGrain and therefore never replayed from the event-sourced log - they are only ever
     // constructed once and published on an Orleans stream (Host.Publish -> GetCaseEventStream(...)
-    // .OnNextAsync(@event)). Both the production silo (Flow.Silo/Program.cs) and this test cluster
+    // .OnNextAsync(@event)). Both the production silo (Wayfinder.Silo/Program.cs) and this test cluster
     // (ClusterFixture) configure AddMemoryStreams("Default"), which - unlike a raw in-process
     // delegate call - does serialize/deserialize the event through Orleans's codec even though the
     // transport is in-memory. That is the one and only round trip Occurred actually needs to

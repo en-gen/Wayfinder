@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
 
-namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
+namespace Wayfinder.Grains.Services.PlanItemBehaviorConfigurator
 {
     public interface IPlanItemBehaviorConfigurator
     {

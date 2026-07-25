@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Flow.Application.Results
+namespace Wayfinder.Application.Results
 {
     // ADO #32 - the shared shape behind CommandResult<T>/QueryResult<T>: a status, an optional error
     // message (set for any non-Success status), and optional non-fatal warnings (e.g. #20's

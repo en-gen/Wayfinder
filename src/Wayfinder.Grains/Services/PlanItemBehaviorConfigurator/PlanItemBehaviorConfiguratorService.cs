@@ -1,11 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan.PlanItem.Behaviors;
-using Flow.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors;
+using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
 using Microsoft.Extensions.Options;
 
-namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
+namespace Wayfinder.Grains.Services.PlanItemBehaviorConfigurator
 {
     public class PlanItemBehaviorConfiguratorService : IPlanItemBehaviorConfigurator
     {
@@ -14,7 +14,7 @@ namespace Flow.Grains.Services.PlanItemBehaviorConfigurator
         // ADO #67 - Case.Flow ENGINE EXTENSION option (RepetitionGuardOptions), not CMMN spec
         // surface. IOptions<T> parameter defaulted to null (rather than required) so every
         // existing direct `new PlanItemBehaviorConfiguratorService(...)` in the unit test suite
-        // keeps compiling unchanged and gets the generous default; production DI (Flow.Silo/
+        // keeps compiling unchanged and gets the generous default; production DI (Wayfinder.Silo/
         // Program.cs) and the low-ceiling integration fixture both register a real
         // IOptions<RepetitionGuardOptions> and get that value instead.
         private readonly int _repetitionCeiling;

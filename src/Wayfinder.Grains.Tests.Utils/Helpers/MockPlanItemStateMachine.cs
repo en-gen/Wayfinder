@@ -1,13 +1,13 @@
 using System;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Plan;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Plan.PlanItem.StateMachine;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace Flow.Grains.Tests.Utils.Helpers
+namespace Wayfinder.Grains.Tests.Utils.Helpers
 {
     public class MockPlanItemStateMachine : Mock<IPlanItemStateMachine>
     {

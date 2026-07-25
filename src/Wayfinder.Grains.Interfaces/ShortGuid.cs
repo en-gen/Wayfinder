@@ -1,7 +1,7 @@
 using System;
 using Orleans;
 
-namespace Flow.Grains.Interfaces
+namespace Wayfinder.Grains.Interfaces
 {
     /// <summary>
     /// Represents a globally unique identifier (GUID) with a

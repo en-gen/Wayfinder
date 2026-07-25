@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Plan.CmmnElementGrain;
+using Wayfinder.Grains.Interfaces.Plan.CmmnElementGrain;
 
-namespace Flow.Grains.Interfaces.Plan.CaseFileItem
+namespace Wayfinder.Grains.Interfaces.Plan.CaseFileItem
 {
     // 8.3.1 - CaseFileItem operations
     // ~~~~~

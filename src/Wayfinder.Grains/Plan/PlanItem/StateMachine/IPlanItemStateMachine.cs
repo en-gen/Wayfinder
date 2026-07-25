@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Flow.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Model;
 using Stateless;
 using Stateless.Reflection;
 
-namespace Flow.Grains.Plan.PlanItem.StateMachine
+namespace Wayfinder.Grains.Plan.PlanItem.StateMachine
 {
     public interface IPlanItemStateMachine
     {

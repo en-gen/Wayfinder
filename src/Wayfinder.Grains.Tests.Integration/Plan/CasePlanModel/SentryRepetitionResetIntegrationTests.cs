@@ -1,22 +1,22 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Flow.Grains.Events;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Model;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Plan.PlanItem;
-using Flow.Grains.Tests.Integration.SiloFixture;
-using Flow.Grains.Tests.Utils.Helpers;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
 using Orleans.Streams;
 using Xunit;
-using CaseModel = Flow.Grains.Interfaces.Model.Case;
-using SentryModel = Flow.Grains.Interfaces.Model.Sentry;
+using CaseModel = Wayfinder.Grains.Interfaces.Model.Case;
+using SentryModel = Wayfinder.Grains.Interfaces.Model.Sentry;
 
-namespace Flow.Grains.Tests.Integration.Plan.CasePlanModel
+namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 {
     // D5 - the flagship test for the sentry-repetition-reset fix.
     // ~~~~~

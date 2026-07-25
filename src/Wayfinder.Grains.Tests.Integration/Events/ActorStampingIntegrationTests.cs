@@ -2,24 +2,24 @@ using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Flow.Grains.Events;
-using Flow.Grains.Infrastructure.Extensions;
-using Flow.Grains.Interfaces;
-using Flow.Grains.Interfaces.Plan.Case;
-using Flow.Grains.Plan.Case.Events;
-using Flow.Grains.Plan.CaseFileItem.Events;
-using Flow.Grains.Plan.PlanItem.Events;
-using Flow.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Events;
+using Wayfinder.Grains.Infrastructure.Extensions;
+using Wayfinder.Grains.Interfaces;
+using Wayfinder.Grains.Interfaces.Plan.Case;
+using Wayfinder.Grains.Plan.Case.Events;
+using Wayfinder.Grains.Plan.CaseFileItem.Events;
+using Wayfinder.Grains.Plan.PlanItem.Events;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Orleans;
 using Xunit;
-using CaseFileItemModel = Flow.Grains.Interfaces.Model.CaseFileItem;
-using CaseModel = Flow.Grains.Interfaces.Model.Case;
-using PlanItemState = Flow.Grains.Interfaces.Model.PlanItemState;
-using PlanItemTransition = Flow.Grains.Interfaces.Model.PlanItemTransition;
-using StageModel = Flow.Grains.Interfaces.Model.Stage;
+using CaseFileItemModel = Wayfinder.Grains.Interfaces.Model.CaseFileItem;
+using CaseModel = Wayfinder.Grains.Interfaces.Model.Case;
+using PlanItemState = Wayfinder.Grains.Interfaces.Model.PlanItemState;
+using PlanItemTransition = Wayfinder.Grains.Interfaces.Model.PlanItemTransition;
+using StageModel = Wayfinder.Grains.Interfaces.Model.Stage;
 
-namespace Flow.Grains.Tests.Integration.Events
+namespace Wayfinder.Grains.Tests.Integration.Events
 {
     // ADO #59 - end-to-end proof that CmmnElementGrain.RaiseEvent's shadowed stamping (Events.
     // ActorStamping, applied from CaseRequestContext) actually reaches a real, journaled event
@@ -154,7 +154,7 @@ namespace Flow.Grains.Tests.Integration.Events
             var @case = new CaseModel
             {
                 Id = caseDefinitionId,
-                CaseRoles = new Flow.Grains.Interfaces.Model.CaseRoles(),
+                CaseRoles = new Wayfinder.Grains.Interfaces.Model.CaseRoles(),
                 CasePlanModel = new StageModel { Id = Scope }
             };
 

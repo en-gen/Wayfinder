@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 
-namespace Flow.Grains.Interfaces.Plan.CmmnElementGrain
+namespace Wayfinder.Grains.Interfaces.Plan.CmmnElementGrain
 {
     public interface ICmmnElementGrain<in TDefinition> : IGrainWithGuidCompoundKey
         where TDefinition : Model.CmmnElement

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Flow.Grains.Interfaces.Model
+namespace Wayfinder.Grains.Interfaces.Model
 {
     public partial class Case : IBehaviorDefinition
     {
