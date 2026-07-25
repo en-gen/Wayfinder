@@ -74,7 +74,15 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
                     ["ElementInstanceId"] = (string)planItemInstanceId
                 });
 
-            await Task.Delay(TimeSpan.FromSeconds(4));
+            // Poll for the expected tick count instead of a bare fixed sleep - a slow CI box no
+            // longer risks failing on too FEW ticks just because the fixed window was too short.
+            // The Quartz schedule is bounded (R{expectedTicks - 1}), so once it reaches
+            // expectedTicks it should never grow further; the short settle delay afterward keeps
+            // the original test's ability to still catch a bug that fires MORE than expected -
+            // asserting immediately on the instant the count first hits expectedTicks would give
+            // an over-firing bug no chance to be observed before the assertion runs.
+            await WaitUntilAsync(() => ticks.Count >= expectedTicks, TimeSpan.FromSeconds(15));
+            await Task.Delay(TimeSpan.FromSeconds(2));
 
             ticks.Should().HaveCount(expectedTicks);
         }

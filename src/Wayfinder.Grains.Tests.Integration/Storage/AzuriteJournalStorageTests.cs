@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Azure.Storage.Blobs;
 using FluentAssertions;
 using Orleans;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Integration.Storage
@@ -46,9 +47,13 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
 
             // DeactivateOnIdle forces the next call onto a fresh activation, which must
             // rehydrate state from the configured IGrainStorage (Azure Blob) rather than
-            // finding it still resident in memory - this is the restart-survival gate.
+            // finding it still resident in memory - this is the restart-survival gate. A fixed
+            // sleep here is a correctness risk, not just a flake risk: if it were ever too short,
+            // the grain would still be resident and GetState() below would read it WITHOUT the
+            // rehydrate-from-blob path this test exists to prove - a silent false pass. Poll the
+            // management grain instead so we only proceed once the activation has actually gone.
             await grain.DeactivateNow();
-            await Task.Delay(TimeSpan.FromMilliseconds(250)); // let deactivation complete before reactivating
+            await WaitForFullDeactivation(grain, TimeSpan.FromSeconds(15));
 
             var stateAfterReactivate = await grain.GetState();
 
@@ -95,9 +100,32 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
             {
                 await grain.SetDocument(document);
                 await grain.DeactivateNow();
-                await Task.Delay(TimeSpan.FromMilliseconds(250)); // let deactivation complete before reactivating
+                await WaitForFullDeactivation(grain, TimeSpan.FromSeconds(15));
                 return await grain.GetState();
             }
+        }
+
+        // Deterministic replacement for a fixed post-deactivate sleep: polls the cluster's
+        // IManagementGrain (same grain TimerEventSchedulerGrainTests.ForceActivationCollection
+        // already uses) until it reports no activation address for this grain, i.e. deactivation
+        // has actually completed - rather than guessing at how long that takes. Without this, the
+        // very next call could land on the still-resident activation and silently pass without
+        // ever exercising the rehydrate-from-blob path the test exists to prove.
+        private async Task WaitForFullDeactivation(IAddressable grain, TimeSpan timeout)
+        {
+            var managementGrain = _clusterClient.GetGrain<IManagementGrain>(0);
+            var deadline = DateTime.UtcNow + timeout;
+
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await managementGrain.GetActivationAddress(grain) is null) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(100)); // 100ms matches every other poll helper in this suite
+            }
+
+            (await managementGrain.GetActivationAddress(grain)).Should().BeNull(
+                "the grain must have fully deactivated before the next call forces reactivation - " +
+                "otherwise this test's rehydrate-from-blob proof would be reading a still-resident " +
+                "in-memory activation instead");
         }
 
         // Belt-and-braces: prove the journal actually lands in Azurite blob storage, not a

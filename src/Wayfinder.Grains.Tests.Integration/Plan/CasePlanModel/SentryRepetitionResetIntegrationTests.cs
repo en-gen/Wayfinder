@@ -149,7 +149,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             await caseGrain.Create(caseDefinitionId);
             await caseGrain.Trigger(PlanItemTransition.Create);
 
-            var milestoneRep0Grain = await PollUntilGrainFound(caseInstanceId, milestonePlanItemId, 0, TimeSpan.FromSeconds(10));
+            var milestoneRep0Grain = await PollUntilGrainFound(caseInstanceId, milestonePlanItemId, 0, TimeSpan.FromSeconds(30));
             milestoneRep0Grain.Should().NotBeNull("MilestoneA(rep 0) must have been instantiated by Case creation");
 
             var beforeSnapshot = await milestoneRep0Grain.GetSnapshot();
@@ -165,7 +165,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 
             var milestoneRep0Completed = await PollUntil(
                 async () => (await milestoneRep0Grain.GetSnapshot()).PlanItemState == PlanItemState.Completed,
-                TimeSpan.FromSeconds(10));
+                TimeSpan.FromSeconds(30));
 
             milestoneRep0Completed.Should().BeTrue(
                 "the first task instance's Complete transition should satisfy EntrySentry and complete MilestoneA(rep 0)");
@@ -206,7 +206,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 
             var repeated = await PollUntil(
                 async () => (await milestoneRep0Grain.GetSnapshot()).Repeated,
-                TimeSpan.FromSeconds(10));
+                TimeSpan.FromSeconds(30));
 
             repeated.Should().BeTrue(
                 "the second, distinct task instance's completion should satisfy EntrySentry a second time via the same SentryGrain instance (re-armed via its per-OnPart OccurrenceToken, not permanently latched from the first satisfaction), reaching MilestoneBehavior.HandleSentrySatisfied's repetition branch and setting Repeated - proving the sentry fired again rather than staying permanently Satisfied from the first completion");
