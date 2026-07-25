@@ -1,0 +1,145 @@
+# Case.Flow CD — build and publish the Wayfinder.Silo container image.
+#
+# Fills the "planned, never authored" ADO Case.Wayfinder.CD slot (see
+# devops/deploy/templates/README.md) with a GitHub-native equivalent, scoped
+# to exactly what that README describes: build the Orleans silo image and
+# publish it, versioned from GitVersion. No deploy-to-Azure steps here -
+# there is no Azure environment to deploy to yet; that's a separate,
+# not-yet-built work item. This workflow's job ends the moment the image is
+# in the registry.
+#
+# GitFlow: `develop` publishes a prerelease image (e.g. 1.0.0-develop.6),
+# `main` publishes a release image (e.g. 1.0.0) and additionally moves the
+# `latest` tag. Registry is GitHub Container Registry - the natural choice
+# for a GitHub repo, and GITHUB_TOKEN is sufficient to push (no PAT/secret
+# to provision) given the job is granted `packages: write` below.
+#
+# Versioning reuses ci.yml's GitVersion step verbatim (same
+# dotnet-tool-install approach, same output names) rather than a second
+# mechanism - see that file for the fuller rationale on dotnet-tool-install
+# over the gittools/actions marketplace action.
+
+name: CD
+
+on:
+  push:
+    branches: [develop, main]
+    # Only files that actually end up in the image (or affect how it's
+    # built/versioned) trigger a rebuild+republish - Wayfinder.Silo's own
+    # ProjectReferences (Wayfinder.Grains, Wayfinder.Grains.Interfaces), the repo-root
+    # files the Dockerfile COPYs in explicitly, and this workflow itself.
+    paths:
+      - src/Wayfinder.Silo/**
+      - src/Wayfinder.Grains/**
+      - src/Wayfinder.Grains.Interfaces/**
+      - global.json
+      - Directory.Build.props
+      - nuget.config
+      - GitVersion.yml
+      - .github/workflows/cd.yml
+  workflow_dispatch: # manual rehearsal / re-publish
+
+permissions:
+  contents: read
+  packages: write
+
+# One publish per branch at a time; a second push queues behind the first
+# rather than racing it or cancelling it - cancelling mid-push could leave
+# the registry with a half-pushed manifest or a `latest` pointer that lands
+# out of order. Matches the same pattern in en-gen/OhData's docs.yml/publish.yml.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  HUSKY: 0 # skip git hook installation in CI (Husky hook lives on another branch)
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }} # -> ghcr.io/en-gen/wayfinder
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # GitVersion needs full history
+          fetch-tags: true # ...and tags (Case.Flow-<version> release tags)
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Identical to ci.yml's GitVersion step - see there for the full
+      # rationale (why dotnet-tool-install over the gittools/actions
+      # marketplace action, why the full output-name list). Kept as a
+      # literal duplicate rather than factored into a composite/reusable
+      # workflow for now: both workflows are new and unproven, and sharing
+      # them prematurely would make a first-run failure harder to isolate
+      # to one workflow or the other.
+      - name: Run GitVersion
+        id: gitversion
+        shell: pwsh
+        run: |
+          dotnet tool install --global GitVersion.Tool --version 6.*
+          $toolPath = Join-Path $env:HOME '.dotnet/tools/dotnet-gitversion'
+          $json = & $toolPath /output json
+          if ($LASTEXITCODE -ne 0) { Write-Error "GitVersion failed:`n$json"; exit 1 }
+          Write-Host ($json -join "`n")
+          $gv = ($json -join "`n") | ConvertFrom-Json
+
+          $names = @(
+              'Major', 'Minor', 'Patch',
+              'MajorMinorPatch', 'SemVer', 'FullSemVer',
+              'AssemblySemVer', 'AssemblySemFileVer', 'InformationalVersion',
+              'BuildMetaData', 'PreReleaseLabel', 'PreReleaseNumber',
+              'BranchName', 'Sha', 'ShortSha'
+          )
+          foreach ($n in $names) {
+              $value = $gv.$n
+              if ($null -eq $value) { $value = '' }
+              "$n=$value" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
+              Write-Host "GitVersion.$n = $value"
+          }
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Tags: the GitVersion SemVer (1.0.0-develop.6 on develop, 1.0.0 on
+      # main), the short commit SHA (sha-<7 chars>), and - main only - a
+      # moving `latest`. docker/metadata-action also derives the standard
+      # OCI labels (org.opencontainers.image.version/revision/created/...)
+      # from these, picked up below via steps.meta.outputs.labels.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.gitversion.outputs.SemVer }}
+            type=sha
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      # Build context MUST be the repository root, not src/Wayfinder.Silo/ - the
+      # Dockerfile's own header comment explains why (its ProjectReferences
+      # pull in sibling projects Wayfinder.Grains/Wayfinder.Grains.Interfaces, and its
+      # restore/build also need repo-root global.json/Directory.Build.props/
+      # nuget.config). Verified against devops/eval/docker-compose.yml,
+      # which builds this same image with `context: ../..` from inside
+      # devops/eval/ - i.e. the repo root, just expressed relative to a
+      # different working directory than this workflow's default ('.').
+      - name: Build and push Wayfinder.Silo image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Wayfinder.Silo/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
