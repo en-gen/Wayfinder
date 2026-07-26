@@ -169,7 +169,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
                     .AddMemoryGrainStorageAsDefault(ConfigureMemoryStorage) // grain state
                     .AddLogStorageBasedLogConsistencyProvider() // journaled grain
                     .AddMemoryGrainStorage("PubSubStore", ConfigureMemoryStorage) // stream storage
-                    .AddMemoryStreams("Default", IntegrationTestStreamConfiguration.Configure) // cluster stream provider
+                    .AddMemoryStreams("Default") // cluster stream provider
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
