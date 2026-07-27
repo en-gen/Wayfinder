@@ -45,34 +45,40 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
             stateBeforeDeactivate.Counter.Should().Be(7);
             stateBeforeDeactivate.LastLabel.Should().Be("second");
 
+            var activationIdBeforeDeactivate = await grain.GetActivationId();
+
             // DeactivateOnIdle forces the next call onto a fresh activation, which must
             // rehydrate state from the configured IGrainStorage (Azure Blob) rather than
             // finding it still resident in memory - this is the restart-survival gate. A fixed
             // sleep (or a timing-budget poll) here is a correctness risk, not just a flake risk:
             // if it were ever too short, the grain would still be resident and GetState() below
             // would read it WITHOUT the rehydrate-from-blob path this test exists to prove - a
-            // silent false pass. ForceActivationCollection(TimeSpan.Zero) is the deterministic
-            // replacement (issue #154 - same IManagementGrain the suite already uses for this in
+            // silent false pass. ForceActivationCollection(TimeSpan.Zero) forces the collector
+            // sweep (same IManagementGrain the suite already uses for this in
             // TimerEventSchedulerGrainTests): DeactivateNow already requested deactivation via
-            // DeactivateOnIdle, so the activation is idle, and ForceActivationCollection's Task
-            // represents the collector sweep actually completing (its own doc comment: "a Task
-            // representing the work performed"), not a fire-and-forget signal - so by the time it
-            // returns, the idle activation is already gone, with no dependence on CPU
-            // scheduling/contention the way a fixed sleep or a poll budget would have.
+            // DeactivateOnIdle, so the activation is idle and eligible for the zero-age-limit
+            // sweep.
             await grain.DeactivateNow();
             var managementGrain = _clusterClient.GetGrain<IManagementGrain>(0);
             await managementGrain.ForceActivationCollection(TimeSpan.Zero);
 
-            // Single, non-polling confirmation - not a timing budget - that the activation is
-            // actually gone: if this ever failed it would mean the ForceActivationCollection
-            // contract above doesn't hold, which is worth failing loud on rather than silently
-            // reading a resident activation.
-            (await managementGrain.GetActivationAddress(grain)).Should().BeNull(
-                "the grain must have fully deactivated before the next call forces reactivation - " +
-                "otherwise this test's rehydrate-from-blob proof would be reading a still-resident " +
-                "in-memory activation instead");
-
             var stateAfterReactivate = await grain.GetState();
+
+            // Issue #154: proving the reactivation actually happened via
+            // IManagementGrain.GetActivationAddress is itself flaky - the grain directory is
+            // eventually consistent, so it can still report the (already-gone) old activation's
+            // address for a window after ForceActivationCollection's Task has completed, and a
+            // zero-tolerance BeNull() assertion loses that race under CI load. GetActivationId()
+            // sidesteps the directory entirely: _activationId is a fresh Guid assigned once per
+            // grain-instance construction (see AzuriteJournalTestGrain) and is never part of the
+            // journaled state, so it can only change if this call landed on a genuinely NEW
+            // activation. Either the id changed (real reactivation - the rehydrate-from-blob path
+            // below was actually exercised) or it didn't (still resident - fail loud, exactly the
+            // silent false pass this test guards against) - there is no eventual-consistency
+            // window either way.
+            var activationIdAfterReactivate = await grain.GetActivationId();
+            activationIdAfterReactivate.Should().NotBe(activationIdBeforeDeactivate,
+                "GetState must have run on a FRESH activation that rehydrated from blob, not the still-resident one");
 
             stateAfterReactivate.Counter.Should().Be(7, "state must rehydrate from blob storage, not memory, after deactivation");
             stateAfterReactivate.LastLabel.Should().Be("second");
@@ -117,19 +123,23 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
             {
                 await grain.SetDocument(document);
 
+                var activationIdBeforeDeactivate = await grain.GetActivationId();
+
                 // See the deterministic-deactivation remarks on the other test above (issue
-                // #154): DeactivateNow + ForceActivationCollection(TimeSpan.Zero) replaces a
-                // timing-budget poll with the collector sweep's own completion signal.
+                // #154): DeactivateNow + ForceActivationCollection(TimeSpan.Zero) forces the
+                // collector sweep; GetActivationId (not the eventually-consistent grain
+                // directory) is what proves it actually landed on a fresh activation.
                 await grain.DeactivateNow();
                 var managementGrain = _clusterClient.GetGrain<IManagementGrain>(0);
                 await managementGrain.ForceActivationCollection(TimeSpan.Zero);
 
-                (await managementGrain.GetActivationAddress(grain)).Should().BeNull(
-                    "the grain must have fully deactivated before the next call forces reactivation - " +
-                    "otherwise this test's rehydrate-from-blob proof would be reading a still-resident " +
-                    "in-memory activation instead");
+                var state = await grain.GetState();
 
-                return await grain.GetState();
+                var activationIdAfterReactivate = await grain.GetActivationId();
+                activationIdAfterReactivate.Should().NotBe(activationIdBeforeDeactivate,
+                    "GetState must have run on a FRESH activation that rehydrated from blob, not the still-resident one");
+
+                return state;
             }
         }
 
