@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.12 autoComplete=TRUE, vacuous satisfaction over zero
+  children (#180).
+  ~~~~~
+  Table 8.12, autoComplete=TRUE column: "There are no Active children, AND all required children
+  are in {Disabled, Completed, Terminated, Failed}." StageEmpty declares NO <planItem> children at
+  all and no <planningTable> - both conjuncts are satisfied VACUOUSLY (universally-quantified over
+  an empty set), so per the spec text alone, activating StageEmpty must complete it immediately,
+  with no external Complete trigger and no child ever transitioning. #180 was exactly this case
+  wedged Active forever, because completion was evaluated only reactively, from a child's own
+  transition - a childless Stage never produces one. This sample proves the shape survives
+  CmmnXmlSerializer.Import/CmmnCapabilityLint/ToDeployableCase round-trip (an empty <stage> element
+  is ordinary, unremarkable CMMN XML - ICollection<PlanItem> just has zero entries).
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://wayfinder/conformance/lifecycle-empty-stage-autocomplete"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleEmptyStageAutoCompletesVacuously"
+             name="LifecycleEmptyStageAutoCompletesVacuouslySample"
+             exporter="Wayfinder conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleEmptyStageAutoCompletesVacuouslyCase" name="LifecycleEmptyStageAutoCompletesVacuouslyCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageEmpty" name="PlanItemStageEmpty" definitionRef="StageEmpty"/>
+      <stage id="StageEmpty" name="StageEmpty" autoComplete="true"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

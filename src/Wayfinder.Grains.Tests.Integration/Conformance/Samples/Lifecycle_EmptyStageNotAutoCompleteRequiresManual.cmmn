@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.12 autoComplete=FALSE, zero children, negative direction
+  of the #180 fix.
+  ~~~~~
+  StageEmpty declares NO <planItem> children and no <planningTable>, same shape as
+  Lifecycle_EmptyStageAutoCompletesVacuously.cmmn, but autoComplete="false". Table 8.12's
+  autoComplete=FALSE column requires EXPLICIT completion (the Manual Completion OR-branch,
+  StageBehavior.ManualCompletionCriteriaSatisfied/Trigger's override) - a Stage in this mode must
+  NOT complete itself just because it happens to have zero children. The #180 fix
+  (StageBehavior.HandleEnterActiveFromStart) is gated on PlanItemDefinition.AutoComplete
+  specifically so this case is untouched; this sample pins that the gate holds the OTHER
+  direction, not just the one the original bug report exercised.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://wayfinder/conformance/lifecycle-empty-stage-not-autocomplete"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleEmptyStageNotAutoCompleteRequiresManual"
+             name="LifecycleEmptyStageNotAutoCompleteRequiresManualSample"
+             exporter="Wayfinder conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleEmptyStageNotAutoCompleteRequiresManualCase" name="LifecycleEmptyStageNotAutoCompleteRequiresManualCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStageEmpty" name="PlanItemStageEmpty" definitionRef="StageEmpty"/>
+      <stage id="StageEmpty" name="StageEmpty" autoComplete="false"/>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>
