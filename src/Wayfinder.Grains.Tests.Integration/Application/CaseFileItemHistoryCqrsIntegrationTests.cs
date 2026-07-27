@@ -41,7 +41,7 @@ namespace Wayfinder.Grains.Tests.Integration.Application
 
             _rootProvider = new ServiceCollection()
                 .AddSingleton(_clusterClient)
-                .AddFlowApplication()
+                .AddWayfinderApplication()
                 .BuildServiceProvider();
         }
 

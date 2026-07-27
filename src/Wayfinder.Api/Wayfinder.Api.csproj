@@ -19,7 +19,7 @@
   <ItemGroup>
     <!-- ADO #32/#33 - OData query support ($select/$expand) on the case-read surface. Pinned to the
          latest STABLE 9.x release: Microsoft.AspNetCore.OData's own net10-targeted line (10.0.x) is
-         still preview-only as of this writing (10.0.0-preview.2) - see AddFlowApi's remarks for the
+         still preview-only as of this writing (10.0.0-preview.2) - see AddWayfinderApi's remarks for the
          full reasoning. 9.4.1 targets net8.0 per its own dependency group, but ASP.NET Core's public
          surface (IActionFilter, ODataOptions, [EnableQuery], etc.) that this package binds against
          has been stable/additive since net8, so it loads and runs correctly on net10 - the same

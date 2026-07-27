@@ -9,11 +9,11 @@
   trigger from the scenario itself.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-non-blocking-task"
+             targetNamespace="http://wayfinder/conformance/lifecycle-non-blocking-task"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleNonBlockingTask"
              name="LifecycleNonBlockingTaskSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="LifecycleNonBlockingTaskCase" name="LifecycleNonBlockingTaskCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">

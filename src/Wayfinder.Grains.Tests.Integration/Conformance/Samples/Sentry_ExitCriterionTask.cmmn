@@ -9,11 +9,11 @@
   ExitSentry, which must terminate TaskA without any Case-worker trigger.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/sentry-exit-criterion-task"
+             targetNamespace="http://wayfinder/conformance/sentry-exit-criterion-task"
              expressionLanguage="expression://lang/jint"
              id="Definitions_SentryExitCriterionTask"
              name="SentryExitCriterionTaskSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="SentryExitCriterionTaskCase" name="SentryExitCriterionTaskCase">

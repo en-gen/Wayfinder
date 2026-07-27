@@ -444,7 +444,7 @@ namespace Wayfinder.Silo
         {
             services.Configure<AzureOptions>(context.Configuration.GetSection(AzureOptions.ConfigKey));
 
-            // ADO #67 - Case.Flow ENGINE EXTENSION option, not CMMN spec surface. Bound from an
+            // ADO #67 - Wayfinder ENGINE EXTENSION option, not CMMN spec surface. Bound from an
             // optional config section (GetSection, not GetRequiredSection - an absent/empty
             // section leaves RepetitionGuardOptions.MaxRepetitionsPerPlanItem at its generous
             // built-in default) so operators can lower the ceiling without a code change, but
@@ -513,10 +513,10 @@ namespace Wayfinder.Silo
                 .AddQuartz(QuartzSchedulerConfig.Volatile);
 
             // ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth against our
-            // Zitadel + the identity middleware's services). See Wayfinder.Api's AddFlowApi for the full
-            // composition; Startup.cs's Configure maps it (MapFlowApi) and wires the identity
+            // Zitadel + the identity middleware's services). See Wayfinder.Api's AddWayfinderApi for the full
+            // composition; Startup.cs's Configure maps it (MapWayfinderApi) and wires the identity
             // middleware into the pipeline.
-            services.AddFlowApi();
+            services.AddWayfinderApi();
         }
     }
 }

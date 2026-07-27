@@ -310,7 +310,7 @@ namespace Wayfinder.Grains.Tests.Infrastructure.Mapping
             snapshot.ParentSuspendState.Should().Be(PlanItemState.Active);
 
             // Custom logic under test: PlanItemStore.BehaviorExtension is a polymorphic object
-            // (StageBehaviorStore here) that CaseFlowProfile.MapBehaviorStore used to route by
+            // (StageBehaviorStore here) that WayfinderProfile.MapBehaviorStore used to route by
             // runtime type; SnapshotMapper.MapBehaviorExtension must route it identically.
             snapshot.BehaviorExtension.Should().BeOfType<StageBehaviorSnapshot>();
             var behaviorSnapshot = (StageBehaviorSnapshot)snapshot.BehaviorExtension;
@@ -417,7 +417,7 @@ namespace Wayfinder.Grains.Tests.Infrastructure.Mapping
 
             snapshot.Definition.Should().BeSameAs(store.Definition);
 
-            // Custom logic under test: CaseFlowProfile mapped CasePlanModel from
+            // Custom logic under test: WayfinderProfile mapped CasePlanModel from
             // src.PlanItemDefinition (declared type PlanItemDefinition, runtime type Stage).
             snapshot.CasePlanModel.Should().BeSameAs(store.PlanItemDefinition)
                 .And.BeSameAs(stage);

@@ -4,7 +4,7 @@
 # #49's cluster-status curl walkthrough exercises cluster formation. Unlike that walkthrough, this
 # script needs a real Zitadel-issued bearer token as input - Zitadel's FIRSTINSTANCE_* bootstrap
 # (docker-compose.yml) only gets as far as one org + one service-account machine key
-# automatically; it does NOT create the Case.Flow project/API application, a second org for
+# automatically; it does NOT create the Wayfinder project/API application, a second org for
 # tenant B, or human/service users with a token you can hand this script. See
 # devops/eval/README.md's "Authenticated API walkthrough (First Light)" section for the manual
 # one-time bootstrap steps that produce TENANT_A_TOKEN (and, optionally, TENANT_B_TOKEN).
@@ -25,7 +25,7 @@ set -euo pipefail
 
 SILO_URL="${SILO_URL:-http://localhost:8081}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CMMN_SAMPLE="$REPO_ROOT/src/Flow.Grains.Tests.Integration/Interchange/Samples/MilestoneSentryCase.cmmn"
+CMMN_SAMPLE="$REPO_ROOT/src/Wayfinder.Grains.Tests.Integration/Interchange/Samples/MilestoneSentryCase.cmmn"
 
 if [[ -z "${TENANT_A_TOKEN:-}" ]]; then
   echo "TENANT_A_TOKEN is required - see devops/eval/README.md's manual bootstrap steps for how to obtain one." >&2

@@ -35,7 +35,7 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
             var builder = new TestClusterBuilder();
 
             builder.Options.ClusterId = "integration";
-            builder.Options.ServiceId = "Case.Flow";
+            builder.Options.ServiceId = "Wayfinder";
 
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
             builder.AddClientBuilderConfigurator<TestClientConfigurator>();

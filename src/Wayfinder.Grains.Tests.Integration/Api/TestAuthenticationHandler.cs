@@ -14,8 +14,8 @@ namespace Wayfinder.Grains.Tests.Integration.Api
     // instead of validating a real Zitadel-signed bearer token, so a test can act as tenant A's
     // user vs tenant B's user without minting real JWTs. Registered as its OWN scheme
     // (ApiTestHostFactory repoints AuthenticationOptions.DefaultScheme at it) rather than replacing
-    // AddFlowApi's "Bearer"/JwtBearer registration in place - both schemes end up registered, but
-    // only this one is ever selected, so AddFlowApi's production authentication wiring is never
+    // AddWayfinderApi's "Bearer"/JwtBearer registration in place - both schemes end up registered, but
+    // only this one is ever selected, so AddWayfinderApi's production authentication wiring is never
     // touched by this test-only type. Downstream of authentication, everything is the real
     // production pipeline: the fallback authorization policy (RequireAuthenticatedUser) does not
     // care which scheme authenticated the caller, and IdentityContextMiddleware reads the "sub"
@@ -47,7 +47,7 @@ namespace Wayfinder.Grains.Tests.Integration.Api
                 return Task.FromResult(AuthenticateResult.NoResult());
             }
 
-            // Deliberately literal "sub" (no ClaimTypes remap) - matches AddFlowApi's
+            // Deliberately literal "sub" (no ClaimTypes remap) - matches AddWayfinderApi's
             // JwtBearerOptions.MapInboundClaims = false, which IdentityContextMiddleware relies on
             // to read the claim back out under the same literal name.
             var claims = new[] { new Claim("sub", subjectValues.ToString()) };

@@ -4,7 +4,7 @@ using Orleans;
 
 namespace Wayfinder.Grains.Plan.PlanItem.Events
 {
-    // ADO #67 - Case.Flow ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
+    // ADO #67 - Wayfinder ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
     // ~~~~~
     // Raised on the Stage/CasePlanModel instance (Host, in StageBehavior.HandleChildRepeated)
     // that refused to spawn one more repetition of RepeatingPlanItemDefinitionId because

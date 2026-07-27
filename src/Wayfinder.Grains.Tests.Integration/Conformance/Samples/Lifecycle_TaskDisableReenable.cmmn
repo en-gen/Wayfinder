@@ -11,11 +11,11 @@
   parent mid-scenario).
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-task-disable-reenable"
+             targetNamespace="http://wayfinder/conformance/lifecycle-task-disable-reenable"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleTaskDisableReenable"
              name="LifecycleTaskDisableReenableSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="LifecycleTaskDisableReenableCase" name="LifecycleTaskDisableReenableCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">

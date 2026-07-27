@@ -22,15 +22,15 @@
   so each lint rule keeps its own minimal, single-defect fixture.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             xmlns:tns="http://case.flow/samples/rich"
-             xmlns:flow="http://case.flow/ext"
-             targetNamespace="http://case.flow/samples/rich"
+             xmlns:tns="http://wayfinder/samples/rich"
+             xmlns:flow="http://wayfinder/ext"
+             targetNamespace="http://wayfinder/samples/rich"
              expressionLanguage="expression://lang/jint"
              id="Definitions_Rich"
              name="RichSample"
-             exporter="Case.Flow sample author"
+             exporter="Wayfinder sample author"
              exporterVersion="1.0"
-             author="Case.Flow test suite"
+             author="Wayfinder test suite"
              creationDate="2026-01-01T00:00:00Z"
              flow:origin="test-suite">
   <caseFileItemDefinition id="CFID_1" name="RichItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified">
@@ -46,7 +46,7 @@
       </caseFileItem>
     </caseFileModel>
     <casePlanModel id="RichCPM" name="RichCPM" autoComplete="true" flow:tier="gold">
-      <extensionElements><flow:audit xmlns:flow="http://case.flow/ext" level="verbose"/></extensionElements>
+      <extensionElements><flow:audit xmlns:flow="http://wayfinder/ext" level="verbose"/></extensionElements>
       <planItem id="PI_Human" name="PI_Human" definitionRef="RichHumanTask">
         <entryCriterion id="EC_1" sentryRef="RichSentry"/>
         <exitCriterion id="PIExit_1" sentryRef="RichSentry"/>
@@ -126,7 +126,7 @@
     <input id="DIn_1" name="decisionIn"/>
     <output id="DOut_1" name="decisionOut"/>
   </decision>
-  <extensionElements><flow:settings xmlns:flow="http://case.flow/ext" retention="30d"/></extensionElements>
+  <extensionElements><flow:settings xmlns:flow="http://wayfinder/ext" retention="30d"/></extensionElements>
   <relationship id="Rel_1" type="traces" direction="Forward">
     <source>tns:RichCase</source>
     <target>tns:Process_1</target>

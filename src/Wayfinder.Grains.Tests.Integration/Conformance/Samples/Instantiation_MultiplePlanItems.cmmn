@@ -8,11 +8,11 @@
   first - MilestoneA and TaskA are both declared directly under Stage.PlanItems.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/instantiation-multiple-plan-items"
+             targetNamespace="http://wayfinder/conformance/instantiation-multiple-plan-items"
              expressionLanguage="expression://lang/jint"
              id="Definitions_InstantiationMultiplePlanItems"
              name="InstantiationMultiplePlanItemsSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="InstantiationMultiplePlanItemsCase" name="InstantiationMultiplePlanItemsCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">

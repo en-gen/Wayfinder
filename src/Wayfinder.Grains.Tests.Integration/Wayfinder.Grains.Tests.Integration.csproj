@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <!-- ADO #32/#33 (sub-unit 4) - the full-pipeline multi-tenant isolation HTTP suite (Api/) wires
-         Wayfinder.Api's real AddFlowApi()/MapFlowApi() composition onto a Microsoft.AspNetCore.TestHost
+         Wayfinder.Api's real AddWayfinderApi()/MapWayfinderApi() composition onto a Microsoft.AspNetCore.TestHost
          TestServer, so this project needs the ASP.NET Core shared framework directly (same reason
          Wayfinder.Api/Wayfinder.Api.Tests declare it: HttpContext/IActionResult/routing/middleware types).
          Same "class library depends on the shared framework directly" pattern as those projects. -->
@@ -72,11 +72,11 @@
 
   <ItemGroup>
     <!-- ADO #32/#33 (sub-unit 4) - the full-pipeline isolation suite (Api/) composes the REAL
-         Wayfinder.Api HTTP surface (AddFlowApi/MapFlowApi) over ClusterFixture's TestCluster - see that
+         Wayfinder.Api HTTP surface (AddWayfinderApi/MapWayfinderApi) over ClusterFixture's TestCluster - see that
          folder's ApiTestHostFactory. -->
     <ProjectReference Include="..\Wayfinder.Api\Wayfinder.Api.csproj" />
     <!-- ADO #32 - the CQRS core under test: the Application/ suite dispatches the case commands/
-         queries through the real ISender (AddFlowApplication) over the in-memory ClusterFixture,
+         queries through the real ISender (AddWayfinderApplication) over the in-memory ClusterFixture,
          asserting the Wayfinder.Contracts.V1 projections come back correct. -->
     <ProjectReference Include="..\Wayfinder.Application\Wayfinder.Application.csproj" />
     <ProjectReference Include="..\Wayfinder.Contracts\Wayfinder.Contracts.csproj" />

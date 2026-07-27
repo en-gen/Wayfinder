@@ -15,11 +15,11 @@
   the observed failure mode and evidence.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/knowngap-nested-definition-declaration"
+             targetNamespace="http://wayfinder/conformance/knowngap-nested-definition-declaration"
              expressionLanguage="expression://lang/jint"
              id="Definitions_KnownGapNestedDefinitionDeclaration"
              name="KnownGapNestedDefinitionDeclarationSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="KnownGapNestedDefinitionDeclarationCase" name="KnownGapNestedDefinitionDeclarationCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">

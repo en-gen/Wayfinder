@@ -9,11 +9,11 @@
   itself, not an explicitly-authored rule.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-manual-activation-default"
+             targetNamespace="http://wayfinder/conformance/lifecycle-manual-activation-default"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleManualActivationDefault"
              name="LifecycleManualActivationDefaultSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="LifecycleManualActivationDefaultCase" name="LifecycleManualActivationDefaultCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">

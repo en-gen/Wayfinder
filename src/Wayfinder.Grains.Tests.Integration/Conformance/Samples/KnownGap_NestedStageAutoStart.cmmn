@@ -17,11 +17,11 @@
   KnownGapScenarios.cs for the observed stack and evidence.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/knowngap-nested-stage-auto-start"
+             targetNamespace="http://wayfinder/conformance/knowngap-nested-stage-auto-start"
              expressionLanguage="expression://lang/jint"
              id="Definitions_KnownGapNestedStageAutoStart"
              name="KnownGapNestedStageAutoStartSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="KnownGapNestedStageAutoStartCase" name="KnownGapNestedStageAutoStartCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">

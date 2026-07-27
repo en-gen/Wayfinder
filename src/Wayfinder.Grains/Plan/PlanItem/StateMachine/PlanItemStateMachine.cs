@@ -55,7 +55,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.StateMachine
             // TaskScheduler.Current (the activation's single-threaded ActivationTaskScheduler,
             // captured by the runtime for the duration of this grain turn) to bring every
             // unconfigured `await` continuation back to the activation thread - the same
-            // mechanism that makes ordinary Case.Flow grain code (which never uses
+            // mechanism that makes ordinary Wayfinder grain code (which never uses
             // ConfigureAwait(false)) safe. ConfigureAwait(false) opts OUT of that capture:
             // once ANY awaited step between the reentrant FireAsync(Start) call and the later
             // dequeue-and-run of that Start trigger genuinely suspends (Host.ConfirmEvents,

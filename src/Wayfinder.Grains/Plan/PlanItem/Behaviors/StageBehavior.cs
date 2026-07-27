@@ -37,7 +37,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // test suite keeps compiling against the generous default without modification - only
         // production DI and tests specifically targeting the ceiling need to pass it explicitly.
         // See HandleChildRepeated for enforcement and RepetitionGuardOptions for the full
-        // rationale (Case.Flow ENGINE EXTENSION, not CMMN spec surface).
+        // rationale (Wayfinder ENGINE EXTENSION, not CMMN spec surface).
         private readonly int _repetitionCeiling;
 
         public StageBehavior(
@@ -597,7 +597,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
             var nextRepetition = @event.CurrentRepetition + 1;
 
-            // ADO #67 - Case.Flow ENGINE EXTENSION (RepetitionGuardOptions), NOT CMMN spec
+            // ADO #67 - Wayfinder ENGINE EXTENSION (RepetitionGuardOptions), NOT CMMN spec
             // surface.
             // ~~~~~
             // 8.6.4 imposes no upper bound on how many times a repeating item may re-spawn - see
@@ -616,7 +616,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             if (nextRepetition >= _repetitionCeiling)
             {
                 Host.LogWithContext(logger => logger.LogError(
-                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | repetition ceiling {Ceiling} reached for child {ChildElementDefinitionId} (refusing repetition {NextRepetition}) - this is a Case.Flow engine safety extension (#67), not CMMN 1.1 spec behavior. Faulting this container instead of spawning further instances.",
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | repetition ceiling {Ceiling} reached for child {ChildElementDefinitionId} (refusing repetition {NextRepetition}) - this is a Wayfinder engine safety extension (#67), not CMMN 1.1 spec behavior. Faulting this container instead of spawning further instances.",
                     Host.Definition.GetType().Name,
                     PlanItemDefinition.GetType().Name,
                     Host.Scope,

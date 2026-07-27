@@ -13,21 +13,21 @@ using Microsoft.IdentityModel.Tokens;
 namespace Wayfinder.Api.DependencyInjection
 {
     // ADO #32/#33 - the Wayfinder.Api plug-in seam, same Add{X}/Use{X} convention Wayfinder.Application's
-    // AddFlowApplication established: explicit composition, no reflection/module system beyond the
-    // handler-assembly scan AddFlowApplication already does on its own. Wayfinder.Silo/Program.cs calls
-    // AddFlowApi() once from ConfigureServices; Startup.cs's Configure calls MapFlowApi (see
+    // AddWayfinderApplication established: explicit composition, no reflection/module system beyond the
+    // handler-assembly scan AddWayfinderApplication already does on its own. Wayfinder.Silo/Program.cs calls
+    // AddWayfinderApi() once from ConfigureServices; Startup.cs's Configure calls MapWayfinderApi (see
     // EndpointRouteBuilderExtensions) from inside UseEndpoints.
     public static class ServiceCollectionExtensions
     {
-        public static IServiceCollection AddFlowApi(this IServiceCollection services)
+        public static IServiceCollection AddWayfinderApi(this IServiceCollection services)
         {
             if (services is null) throw new ArgumentNullException(nameof(services));
 
             // The CQRS core (ISender + every command/query handler) plus the identity/tenant-
             // registry seam (ITenantResolver) IdentityContextMiddleware depends on - see
-            // Wayfinder.Application.DependencyInjection.IdentityServiceCollectionExtensions.AddFlowIdentity,
+            // Wayfinder.Application.DependencyInjection.IdentityServiceCollectionExtensions.AddWayfinderIdentity,
             // called transitively from here.
-            services.AddFlowApplication();
+            services.AddWayfinderApplication();
 
             services
                 .AddControllers()
@@ -56,7 +56,7 @@ namespace Wayfinder.Api.DependencyInjection
 
             // net10's built-in Microsoft-owned OpenAPI document generator (Microsoft.AspNetCore.
             // OpenApi) - the doc endpoint itself is mapped [AllowAnonymous] in
-            // EndpointRouteBuilderExtensions.MapFlowApi.
+            // EndpointRouteBuilderExtensions.MapWayfinderApi.
             services.AddOpenApi();
 
             AddAuthentication(services);

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace Wayfinder.Application.Identity
 {
-    // ADO #33 - server-side resolution of a token's subject into Case.Flow's internal identity
+    // ADO #33 - server-side resolution of a token's subject into Wayfinder's internal identity
     // (TenantId/UserId/UserRoles - see Wayfinder.Grains.Interfaces.CaseRequestContext). This is the
     // seam sub-unit 3's HTTP auth middleware calls after authenticating a caller, to turn the
     // token's "sub" claim into the CaseRequestContext values every grain call already relies on.

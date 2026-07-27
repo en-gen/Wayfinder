@@ -115,7 +115,7 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
             var builder = new TestClusterBuilder();
 
             builder.Options.ClusterId = "azurite-integration";
-            builder.Options.ServiceId = "Case.Flow";
+            builder.Options.ServiceId = "Wayfinder";
 
             // Hierarchical keys land in each silo's IConfiguration as the same Azure:Storage
             // section shape Wayfinder.Silo reads from appsettings.Development.json, so the

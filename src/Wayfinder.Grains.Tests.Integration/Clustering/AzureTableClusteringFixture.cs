@@ -102,7 +102,7 @@ namespace Wayfinder.Grains.Tests.Integration.Clustering
             var builder = new TestClusterBuilder(InitialSilosCount);
 
             builder.Options.ClusterId = "azure-table-clustering-integration";
-            builder.Options.ServiceId = "Case.Flow";
+            builder.Options.ServiceId = "Wayfinder";
 
             // The knob that actually matters here: TestClusterBuilder defaults
             // UseTestClusterMembership to true (TestCluster's own in-memory dev membership
