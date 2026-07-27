@@ -19,6 +19,17 @@ namespace Wayfinder.Grains.Tests.Utils.Helpers
             Body = "false"
         };
 
+        // Distinct Id/Body from the other fixtures purely so Moq setups keyed on
+        // (ContextRef, Condition) equality can't accidentally match a different rule's
+        // expression - the Body itself is never actually executed by unit tests using this
+        // fixture, which stub IExpressionGrain.ExecuteAsBool directly with a Failure(...) result.
+        public static readonly Expression ErroringExpression = new Expression
+        {
+            Id = Guid.NewGuid().ToString(),
+            Language = ExpressionLanguage.Jint,
+            Body = "undefined.explode()"
+        };
+
         public static readonly RequiredRule IsRequiredRule = new RequiredRule
         {
             Id = Guid.NewGuid().ToString(),
@@ -31,6 +42,13 @@ namespace Wayfinder.Grains.Tests.Utils.Helpers
             Id = Guid.NewGuid().ToString(),
             Name = $"{nameof(NotRequiredRule)}",
             Condition = FalsyExpression
+        };
+
+        public static readonly RequiredRule ErroringRequiredRule = new RequiredRule
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = $"{nameof(ErroringRequiredRule)}",
+            Condition = ErroringExpression
         };
 
         public static readonly RepetitionRule IsRepeatableRule = new RepetitionRule
@@ -61,6 +79,13 @@ namespace Wayfinder.Grains.Tests.Utils.Helpers
             Condition = FalsyExpression
         };
 
+        public static readonly ManualActivationRule ErroringManualActivationRule = new ManualActivationRule
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = $"{nameof(ErroringManualActivationRule)}",
+            Condition = ErroringExpression
+        };
+
         public static readonly ApplicabilityRule IsApplicable = new ApplicabilityRule
         {
             Id = Guid.NewGuid().ToString(),
@@ -73,6 +98,13 @@ namespace Wayfinder.Grains.Tests.Utils.Helpers
             Id = Guid.NewGuid().ToString(),
             Name = $"{nameof(NotApplicable)}",
             Condition = FalsyExpression
+        };
+
+        public static readonly ApplicabilityRule ErroringApplicabilityRule = new ApplicabilityRule
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = $"{nameof(ErroringApplicabilityRule)}",
+            Condition = ErroringExpression
         };
     }
 }

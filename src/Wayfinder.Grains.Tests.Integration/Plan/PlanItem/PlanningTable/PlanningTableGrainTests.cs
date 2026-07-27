@@ -116,6 +116,48 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
                 .BeEmpty();
         }
 
+        // #158 companion (identical-twin defect in PlanningTableGrain.EvaluateApplicabilityRule):
+        // ApplicabilityRule's spec default is TRUE (5.36), and Rules.ErroringApplicabilityRule's
+        // condition genuinely throws in the real Jint engine here (integration, not mocked) rather
+        // than evaluating to false - on the unfixed `?.Value ?? true` this passed anyway by
+        // coincidence for the SAME defaultResult=true reason ManualActivationRule's did NOT: here
+        // the bug's fail-CLOSED direction (default(bool) == false) actively fights a TRUE default,
+        // so an erroring rule wrongly excluded the item. This pins that ValueOr(true) now wins.
+        [Theory, AutoData]
+        public async Task GetPlannableItems__Given_Defined__When_ApplicabilityRuleErrors__Then_ReturnItem
+            (string caseDefinitionId, Guid caseInstanceId)
+        {
+            var expectedResult = new DiscretionaryItem
+            {
+                ApplicabilityRuleRefs = new[]
+                {
+                    Rules.ErroringApplicabilityRule.Id
+                }
+            };
+
+            var definition = new Interfaces.Model.PlanningTable
+            {
+                ApplicabilityRules =
+                {
+                    Rules.ErroringApplicabilityRule
+                },
+                TableItems =
+                {
+                    expectedResult
+                }
+            };
+
+            var subject = _clusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+
+            await subject.Define(caseDefinitionId, definition);
+
+            var result = await subject.GetPlannableItems();
+
+            result.Should()
+                .ContainSingle("an erroring ApplicabilityRule must fall back to its spec default of TRUE, not be silently excluded")
+                .And.Contain(expectedResult);
+        }
+
         [Theory, AutoData]
         public async Task GetPlannableItems__Given_Defined__When_NestedPlanningTable__Then_ReturnItem
             (string caseDefinitionId, Guid caseInstanceId)

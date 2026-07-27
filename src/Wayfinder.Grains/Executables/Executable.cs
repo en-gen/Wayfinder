@@ -93,10 +93,11 @@ namespace Wayfinder.Grains.Executables
             }
             catch (Exception e)
             {
+                var message = ErrorMessageFor(e);
                 _logger.LogError(e, "unable to evaluate expression: {Expression} → {ErrorMessage}",
                     _expression,
-                    e.Message);
-                return ExecutableResult<string>.Failure(e.Message);
+                    message);
+                return ExecutableResult<string>.Failure(message);
             }
         }
 
@@ -111,11 +112,21 @@ namespace Wayfinder.Grains.Executables
             }
             catch (Exception e)
             {
+                var message = ErrorMessageFor(e);
                 _logger.LogError(e, "unable to evaluate expression: {Expression} → {ErrorMessage}",
                     _expression,
-                    e.Message);
-                return ExecutableResult<bool>.Failure(e.Message);
+                    message);
+                return ExecutableResult<bool>.Failure(message);
             }
         }
+
+        // #158 follow-up - Jint throws (e.g. `throw new Error()`, `throw ''`) can carry a blank
+        // Exception.Message. ExecutableResult.IsError is now a stored flag rather than derived from
+        // Message (so a blank message still reports as an error - see ExecutableResult's remarks),
+        // but a blank Message would still leave the RuleEvaluated audit trail silent about what
+        // actually happened. Fall back to the exception's type name so Message is never blank on a
+        // genuine failure.
+        private static string ErrorMessageFor(Exception e) =>
+            string.IsNullOrWhiteSpace(e.Message) ? e.GetType().Name : e.Message;
     }
 }
