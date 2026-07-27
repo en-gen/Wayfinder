@@ -271,7 +271,7 @@ Azurite/mssql/redis (the Linux Cosmos emulator container is heavy and known-flak
 comparison would have to run against a real (throwaway) Cosmos account and is out of scope for
 a repeatable local/CI harness; it's noted here rather than silently dropped. A synthetic
 workload driver — issuing the #35 target shape (10,000 concurrent cases × 50 plan items) through
-`Flow.Application`'s CQRS command surface (the native-mediator `AddFlowApplication` entry point
+`Wayfinder.Application`'s CQRS command surface (the native-mediator `AddWayfinderApplication` entry point
 from work item #32, already the intended app-facing seam) against whichever fixture is under
 test — would record: sustained throughput before the provider starts returning 503/throttle
 responses, p50/p99 command latency, error/retry counts, and (for the SQL challenger

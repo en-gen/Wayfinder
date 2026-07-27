@@ -57,7 +57,7 @@ namespace Wayfinder.Grains.Tests.Integration.Api
                             // Assembly.GetEntryAssembly() - under a unit test runner that is the
                             // test host process, not this project, so Wayfinder.Api's controllers would
                             // otherwise never be found (a well-known ASP.NET Core testing pitfall,
-                            // not a getFlowApi bug). Explicitly registering Wayfinder.Api's assembly as
+                            // not an AddWayfinderApi bug). Explicitly registering Wayfinder.Api's assembly as
                             // an ApplicationPart is the standard fix - additive to (not a
                             // replacement of) whatever AddWayfinderApi's own AddControllers() already
                             // registered, since ApplicationPartManager is a singleton every

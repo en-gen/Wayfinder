@@ -10,7 +10,7 @@ using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
 
 namespace Wayfinder.Grains.Infrastructure.Mapping
 {
-    // Hand-written replacement for the AutoMapper WayfinderProfile (removed: license + CVE
+    // Hand-written replacement for the AutoMapper CaseFlowProfile (removed: license + CVE
     // exposure, see work item #50). The mapping surface is small and fixed-shape, so this is
     // maintained by hand rather than via a mapping library. Each ToSnapshot() mirrors exactly
     // the member-for-member behavior AutoMapper's convention-based mapping produced, including
@@ -148,7 +148,7 @@ namespace Wayfinder.Grains.Infrastructure.Mapping
             };
         }
 
-        // Mirrors WayfinderProfile.MapBehaviorStore: PlanItemStore.BehaviorExtension is a
+        // Mirrors CaseFlowProfile.MapBehaviorStore: PlanItemStore.BehaviorExtension is a
         // polymorphic object (StageBehaviorStore | TimerEventListenerBehaviorStore | null)
         // depending on which PlanItemDefinition kind defined the PlanItem.
         private static object MapBehaviorExtension(object behaviorExtension)
