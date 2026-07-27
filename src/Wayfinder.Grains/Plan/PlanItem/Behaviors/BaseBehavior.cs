@@ -287,7 +287,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         //
         // discard: true only for the FIRST evaluation (HandleEnterAvailableFromCreate, on the
         // Create -> Available transition) - the rule is still evaluated (so a malformed
-        // expression still surfaces as a Fault, same as any other evaluation) and a
+        // expression's error is still recorded on the RepetitionRuleEvaluated audit event's Error
+        // field, same as any other evaluation - see EvaluateRule below; #158: rules evaluate while
+        // this item is Available, where PlanItemTransition.Fault is not a permitted transition, so
+        // the CanFire(Fault)/FireAsync(Fault) attempt there is currently a no-op at every real call
+        // site and the error surfaces only as that string, not as a state transition) and a
         // RepetitionRuleEvaluated is still raised for audit purposes, but flagged so
         // PlanItemStore/CaseStore do not let its Result update the persisted Repeatable flag, and
         // the boolean this method returns MUST NOT be acted on by the discarding caller. Every
@@ -312,7 +316,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 ruleResult = await Host.GrainFactory.GetGrain<IExpressionGrain>(Host.CaseInstanceId)
                     .ExecuteAsBool(rule.ContextRef, rule.Condition);
             }
-            var result = ruleResult?.Value ?? defaultResult;
+            // #158 - ExecutableResult<bool>.Failure(...) leaves Value at default(bool) == false,
+            // which is NOT the same thing as "the expression evaluated to false": a non-null,
+            // erroring result must not win a `?? defaultResult` coalesce on Value, since Value is
+            // never actually null on failure. Check IsError explicitly so an erroring expression
+            // falls back to the caller's spec-mandated default (e.g. TRUE for ManualActivationRule)
+            // instead of silently resolving to false.
+            var result = ruleResult == null || ruleResult.IsError ? defaultResult : ruleResult.Value;
 
             var @event = Activator.CreateInstance<TEvent>();
             @event.Result = result;
