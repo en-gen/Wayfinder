@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #21 conformance scenario - Table 8.12 autoComplete=TRUE with zero fixed PlanItems and a
+  non-null PlanningTable (#180 follow-up).
+  ~~~~~
+  StagePlanningOnly declares NO <planItem> children - every child it could ever have is
+  discretionary (planned at a Case worker's run-time discretion, 5.4.9.2/8.7) - but DOES declare a
+  <planningTable> with one <discretionaryItem>. Table 8.12's autoComplete=TRUE column carries no
+  "no DiscretionaryItems pending" term at all (that conjunct exists ONLY in the autoComplete=FALSE
+  column's Branch 1 - StageBehavior.HandleChildTransitioned's noDiscretionaryItemsPending check),
+  so an autoComplete=TRUE Stage completes vacuously here exactly as it would with no PlanningTable
+  at all: "no Active children" and "all required children terminal" are both trivially true over
+  the empty set of INSTANTIATED children, and a PlanningTable's un-planned DiscretionaryItems are
+  not part of that column's criteria. This is a deliberate reading, pinned so a future
+  run-time-planning API (selecting DiscretionaryItemA into the plan) has a documented baseline to
+  design against, not an accidental gap.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://wayfinder/conformance/lifecycle-stage-all-discretionary-autocomplete"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_LifecycleStageAllDiscretionaryAutoCompletes"
+             name="LifecycleStageAllDiscretionaryAutoCompletesSample"
+             exporter="Wayfinder conformance suite"
+             exporterVersion="1.0">
+  <case id="LifecycleStageAllDiscretionaryAutoCompletesCase" name="LifecycleStageAllDiscretionaryAutoCompletesCase">
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemStagePlanningOnly" name="PlanItemStagePlanningOnly" definitionRef="StagePlanningOnly"/>
+      <stage id="StagePlanningOnly" name="StagePlanningOnly" autoComplete="true">
+        <planningTable>
+          <discretionaryItem id="DiscItem_1" name="DiscretionaryTaskA" definitionRef="DiscretionaryTaskA"/>
+        </planningTable>
+        <humanTask id="DiscretionaryTaskA" name="DiscretionaryTaskA" isBlocking="false"/>
+      </stage>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

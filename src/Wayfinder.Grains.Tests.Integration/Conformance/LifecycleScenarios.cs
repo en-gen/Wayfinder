@@ -338,5 +338,133 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             reactivatedCase.PlanItemState.Should().Be(PlanItemState.Active,
                 "Table 8.6 (re-activate): Failed -> Active once the failure is resolved");
         }
+
+        // Table 8.12, autoComplete=TRUE column: "There are no Active children, AND all required
+        // children are in {Disabled, Completed, Terminated, Failed}." Both conjuncts are satisfied
+        // VACUOUSLY over the empty set for a Stage with no <planItem> children and no
+        // <planningTable> at all - StageBehavior.HandleChildTransitioned evaluated this exclusively
+        // in reaction to a child's own terminal transition, so a childless Stage (which produces
+        // zero such transitions) sat Active forever (#180). Fixed by StageBehavior.
+        // HandleEnterActiveFromStart evaluating the same shared predicate once, inline, right after
+        // its (here empty) child fan-out completes.
+        //
+        // Graduated from a standalone repro test (originally
+        // Plan/CasePlanModel/Repro/Issue180_EmptyStageCompletionIntegrationTests.cs) into this
+        // suite once the shape was confirmed to round-trip through CmmnXmlSerializer/
+        // CmmnCapabilityLint/ToDeployableCase like any other sample - an empty <stage> element is
+        // ordinary CMMN XML, nothing about it needed special-casing.
+        [Fact]
+        [ConformanceCitation("Table 8.12 / autoComplete=TRUE, vacuous zero-children satisfaction (#180)")]
+        public async Task StageCompletion__Given_AutoCompleteStageWithZeroPlanItems__Then_CompletesVacuously()
+        {
+            var deployed = await _harness.DeployAndCreate("Lifecycle_EmptyStageAutoCompletesVacuously.cmmn");
+
+            var stageGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemStageEmpty", deployed.Scope);
+
+            (await stageGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Enabled,
+                "Table 5.51: StageEmpty declares no ManualActivationRule, so it waits Enabled for a Case worker");
+
+            var stageSnapshot = await stageGrain.Trigger(PlanItemTransition.ManualStart);
+
+            // Deliberately BeOneOf(Active, Completed), not a hard Completed assertion: with the
+            // current fix, PlanItemGrain.Trigger awaits the behavior's ENTIRE transition cascade
+            // (Stateless chains every OnEntryFromAsync synchronously) before taking the snapshot it
+            // returns, so a genuinely childless Stage's vacuous completion happens to be observable
+            // INLINE, in this same call - but that inline timing is an implementation detail of
+            // today's fix (HandleEnterActiveFromStart evaluating synchronously), not something
+            // Table 8.12 itself mandates. A correct engine that instead completed via a
+            // self-published follow-up event would still be correct, and must not fail this
+            // assertion; the PollUntil below is the real, timing-independent proof.
+            stageSnapshot.PlanItemState.Should().BeOneOf(PlanItemState.Active, PlanItemState.Completed);
+
+            var completed = await ConformanceHarness.PollUntil(
+                async () => (await stageGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
+
+            completed.Should().BeTrue(
+                "Table 8.12 autoComplete=TRUE is satisfied vacuously by a Stage with zero children - " +
+                "if completion were only ever evaluated from inside HandleChildTransitioned (issue #180), " +
+                "a Stage that creates no children could never trigger that evaluation and would be wedged Active forever");
+        }
+
+        // Table 8.12, autoComplete=FALSE column: requires EXPLICIT completion (the Manual
+        // Completion OR-branch, StageBehavior.ManualCompletionCriteriaSatisfied/Trigger's
+        // override) - unlike the autoComplete=TRUE case above, a Stage in this mode must NOT
+        // complete itself just because it happens to have zero children. The #180 fix gates its
+        // new inline completion check on PlanItemDefinition.AutoComplete specifically so this
+        // shape is untouched; this scenario pins that the gate holds in both directions, not just
+        // the one the original bug report exercised.
+        //
+        // Deliberately NOT a sleep-then-assert-it-hasn't-happened test (a fixed window is silently
+        // permissive: it can pass merely because nothing had run yet, proving nothing about
+        // whether it ever WOULD run). No timing window is needed at all here: the fix gates its
+        // eager completion check on AutoComplete synchronously, before anything async happens - for
+        // an autoComplete=FALSE Stage that check is skipped in the very same call, so the state
+        // Trigger(ManualStart) returns is deterministically still Active, not a race to be won. The
+        // real proof this isn't wedged in some NEW bad way instead is a positive synchronization
+        // point: an explicit manual Trigger(Complete) immediately afterward must still succeed
+        // (Table 8.12's Manual Completion branch - requiredChildrenTerminal over an empty child set
+        // - is vacuously satisfied too), proving the Stage is legitimately open for completion, it
+        // just does not complete itself.
+        [Fact]
+        [ConformanceCitation("Table 8.12 / autoComplete=FALSE requires explicit completion, zero children (#180 follow-up)")]
+        public async Task StageCompletion__Given_NotAutoCompleteStageWithZeroPlanItems__Then_DoesNotAutoCompleteButManualSucceeds()
+        {
+            var deployed = await _harness.DeployAndCreate("Lifecycle_EmptyStageNotAutoCompleteRequiresManual.cmmn");
+
+            var stageGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemStageEmpty", deployed.Scope);
+
+            (await stageGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Enabled,
+                "Table 5.51: StageEmpty declares no ManualActivationRule, so it waits Enabled for a Case worker");
+
+            var stageSnapshot = await stageGrain.Trigger(PlanItemTransition.ManualStart);
+            stageSnapshot.PlanItemState.Should().Be(PlanItemState.Active,
+                "autoComplete=FALSE requires explicit completion (Table 8.12's Manual Completion " +
+                "branch) - an empty Stage must not auto-complete just because it has zero children");
+
+            var afterManualComplete = await stageGrain.Trigger(PlanItemTransition.Complete);
+            afterManualComplete.PlanItemState.Should().Be(PlanItemState.Completed,
+                "the Stage was never wedged - Table 8.12's Manual Completion branch is vacuously " +
+                "satisfied by zero required children, so an explicit Trigger(Complete) succeeds " +
+                "immediately");
+        }
+
+        // Table 8.12, autoComplete=TRUE column, follow-up: the column carries NO "no
+        // DiscretionaryItems pending" term at all - that conjunct exists only in the
+        // autoComplete=FALSE column's Branch 1 (StageBehavior.HandleChildTransitioned's
+        // noDiscretionaryItemsPending check). StagePlanningOnly has zero fixed <planItem> children
+        // - every child it could ever have is discretionary (5.4.9.2/8.7 - never auto-instantiated)
+        // - plus a <planningTable> with one un-planned <discretionaryItem>. It completes exactly as
+        // vacuously as a Stage with no PlanningTable at all: the #180 fix's gate checks only
+        // AutoComplete and !PlanItems.Any(), deliberately NOT PlanningTable, because adding a
+        // PlanningTable conjunct there would reintroduce a second, divergent definition of
+        // "complete" alongside the shared predicate the fix exists to centralize. Pinned so a
+        // future run-time-planning API (selecting DiscretionaryTaskA into the plan) has a
+        // documented, deliberate baseline to design against, not an accidental gap.
+        [Fact]
+        [ConformanceCitation("Table 8.12 / autoComplete=TRUE has no DiscretionaryItems conjunct - all-discretionary Stage completes vacuously (#180 follow-up)")]
+        public async Task StageCompletion__Given_AutoCompleteStageWithOnlyDiscretionaryItems__Then_CompletesVacuously()
+        {
+            var deployed = await _harness.DeployAndCreate("Lifecycle_StageAllDiscretionaryAutoCompletes.cmmn");
+
+            var stageGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemStagePlanningOnly", deployed.Scope);
+
+            (await stageGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Enabled,
+                "Table 5.51: StagePlanningOnly declares no ManualActivationRule, so it waits Enabled for a Case worker");
+
+            var stageSnapshot = await stageGrain.Trigger(PlanItemTransition.ManualStart);
+            stageSnapshot.PlanItemState.Should().BeOneOf(PlanItemState.Active, PlanItemState.Completed);
+
+            var completed = await ConformanceHarness.PollUntil(
+                async () => (await stageGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
+
+            completed.Should().BeTrue(
+                "Table 8.12's autoComplete=TRUE column has no 'no DiscretionaryItems pending' term " +
+                "(that conjunct exists only in the autoComplete=FALSE column's Branch 1) - a Stage " +
+                "with zero fixed PlanItems and an un-planned PlanningTable completes exactly as " +
+                "vacuously as one with no PlanningTable at all");
+        }
     }
 }

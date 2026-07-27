@@ -215,6 +215,64 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 .Select(x => CreateChild(x)));
 
             await Host.ConfirmEvents();
+
+            // #180 - Table 8.12 completion is otherwise evaluated EXCLUSIVELY from
+            // HandleChildTransitioned, gated on an actual child PlanItemTransitionedEvent
+            // arriving. A Stage with zero PlanItems makes the Task.WhenAll fan-out above a no-op
+            // over an empty sequence, so no child transition ever happens and that evaluation
+            // would never run - an autoComplete=TRUE empty Stage (which satisfies "no Active
+            // children, all required children terminal" VACUOUSLY, over the empty set) would sit
+            // Active forever. Evaluate once here instead, for exactly that shape.
+            //
+            // PlanningTable is irrelevant to this gate, deliberately: Table 8.12's
+            // autoComplete=TRUE column carries no "no DiscretionaryItems pending" term at all -
+            // that conjunct exists ONLY in the autoComplete=FALSE column's Branch 1
+            // (HandleChildTransitioned's noDiscretionaryItemsPending, below). A Stage with zero
+            // PlanItems and a non-null PlanningTable (every child it could ever have is
+            // discretionary) completes here exactly as vacuously as one with no PlanningTable at
+            // all - do NOT add a PlanningTable check to this condition; doing so would carve out
+            // an autoComplete=TRUE exception Table 8.12 never states, and would reintroduce a
+            // second, divergent definition of "complete" at exactly the seam TryAutoComplete
+            // exists to prevent. See Conformance/LifecycleScenarios.cs's
+            // StageCompletion__Given_AutoCompleteStageWithOnlyDiscretionaryItems__… for the
+            // scenario pinning this reading.
+            //
+            // Ordering (why this is safe): this call sits AFTER the fan-out's Task.WhenAll and
+            // AFTER Host.ConfirmEvents(), i.e. only once every child this activation will ever
+            // synchronously create has actually been created (CreateChild's ChildCreated event
+            // is applied to StageStore.Children synchronously via RaiseEvent, well before this
+            // line runs) - never before, so a Stage that legitimately has children can never be
+            // observed here as if it had none.
+            //
+            // Gated on !PlanItemDefinition.PlanItems.Any() (not just "re-run the same check
+            // Branch handles"): this is the one piece of information HandleChildTransitioned
+            // can never have, and it is what makes this call safe against the sharpest adjacent
+            // hazard - a repeating child. A PlanItem with a RepetitionRule is NOT absent from
+            // PlanItemDefinition.PlanItems; its repetition-0 instance IS created by the fan-out
+            // above like any other child, so a Stage with such a PlanItem always has
+            // PlanItems.Any() == true and this block never runs for it at all. Whether that
+            // repetition-0 child happens to reach a terminal state synchronously within the
+            // fan-out (and whether its own next-repetition spawn - published asynchronously via
+            // PlanItemRepetitionCriteriaMetEvent, see BaseBehavior.TryRepeatOnCompleteOrTerminate
+            // - has been observed by this Stage yet) is completely irrelevant here, because this
+            // branch is unreachable whenever PlanItems is non-empty. That pre-existing
+            // interaction between HandleChildTransitioned's own reactive evaluation and a
+            // not-yet-delivered repetition event is unchanged by this fix either way.
+            //
+            // Gated on PlanItemDefinition.AutoComplete too: autoComplete=FALSE requires EXPLICIT
+            // completion (Table 8.12's Manual Completion branch, enforced by
+            // ManualCompletionCriteriaSatisfied/Trigger's override below) - an empty
+            // autoComplete=FALSE Stage must NOT auto-complete just because it happens to have no
+            // children, so this call is skipped entirely for that combination and the Stage
+            // waits, exactly as it does today, for an external Trigger(Complete).
+            //
+            // Reuses TryAutoComplete - the exact predicate-and-act HandleChildTransitioned's own
+            // AutoComplete branch calls - so the two call sites can never drift onto different
+            // definitions of "complete".
+            if (PlanItemDefinition.AutoComplete && !PlanItemDefinition.PlanItems.Any())
+            {
+                await TryAutoComplete(await GetChildSnapshots());
+            }
         }
 
         protected override async Task HandleSentrySatisfied(SentrySatisfiedEvent @event, StreamSequenceToken token = null)
@@ -469,15 +527,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             {
                 if (PlanItemDefinition.AutoComplete)
                 {
-                    // ...There are no Active children
-                    if (childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
-                        // ... all required children are in {Disabled, Completed, Terminated, Failed}
-                        childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal()) &&
-                        StateMachine.CanFire(PlanItemTransition.Complete))
-                    {
-                        Host.RaiseEvent(new AutoCompleteCriteriaMet());
-                        await StateMachine.FireAsync(PlanItemTransition.Complete);
-                    }
+                    await TryAutoComplete(childSnapshots);
                 }
                 // Branch 1: ...There are no Active children AND all children (not just required
                 // ones) are in {Disabled, Completed, Terminated, Failed} AND there are no
@@ -506,6 +556,40 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         await StateMachine.FireAsync(PlanItemTransition.Complete);
                     }
                 }
+            }
+        }
+
+        // Table 8.12 - Stage instance termination criteria, autoComplete = TRUE column:
+        // "There are no Active children, AND all required (requiredRule evaluates to TRUE)
+        // children are in {Disabled, Completed, Terminated, Failed}." Factored out of
+        // HandleChildTransitioned (#180) so it has exactly one definition, called from two
+        // places that must never be allowed to drift onto different notions of "complete":
+        //   - HandleChildTransitioned itself, reactively, on every terminal child transition
+        //     (the pre-existing path, only reachable once at least one child exists to
+        //     transition);
+        //   - HandleEnterActiveFromStart, once, for the zero-PlanItems case that would
+        //     otherwise never produce a child transition to react to at all (see that method's
+        //     remarks for why it is safe to call this from there).
+        // Takes the already-fetched snapshots rather than re-fetching: HandleChildTransitioned
+        // already has a live set for its own UserCompletable check just above; HandleEnterActive
+        // FromStart fetches its own (necessarily empty, in the only shape it calls this for).
+        //
+        // Named Try*, not Evaluate* (unlike EvaluateManualActivationRule/EvaluateRequiredRule/
+        // EvaluateRepetitionRule, this file's existing Evaluate* family - all side-effect-free
+        // Task<bool> predicates): this method both evaluates the predicate AND fires the
+        // transition when it holds, mirroring the file's own evaluate-and-act precedent,
+        // BaseBehavior.TryRepeatOnCompleteOrTerminate. Calling it "Evaluate*" would read as a pure
+        // query and risk a future caller assuming it is safe to call speculatively.
+        private async Task TryAutoComplete(PlanItemSnapshot[] childSnapshots)
+        {
+            // ...There are no Active children
+            if (childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
+                // ... all required children are in {Disabled, Completed, Terminated, Failed}
+                childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal()) &&
+                StateMachine.CanFire(PlanItemTransition.Complete))
+            {
+                Host.RaiseEvent(new AutoCompleteCriteriaMet());
+                await StateMachine.FireAsync(PlanItemTransition.Complete);
             }
         }
 
