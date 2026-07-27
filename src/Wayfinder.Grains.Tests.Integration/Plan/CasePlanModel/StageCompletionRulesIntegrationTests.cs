@@ -92,9 +92,19 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 
             await CompleteTask(setup.RequiredTaskGrain);
 
-            // absence assertion: give the child-transitioned stream time to deliver, then confirm
-            // the automatic branch did NOT fire
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            // ADO #174 - positive sync point instead of a fixed sleep: StageBehavior.
+            // HandleChildTransitioned unconditionally raises+confirms UserCompletableCriteriaMet
+            // (latching PlanItemSnapshot.UserCompletable) once the required children are terminal,
+            // strictly BEFORE it evaluates Table 8.12's Branch 1 auto-complete criteria, in the same
+            // method invocation - so once UserCompletable reads true, the automatic branch's
+            // decision for THIS child-transitioned event has already been made, however long
+            // delivery of that event to the stage grain took.
+            var userCompletableLatched = await PollUntil(
+                async () => (await setup.StageGrain.GetSnapshot()).UserCompletable,
+                TimeSpan.FromSeconds(10));
+            userCompletableLatched.Should().BeTrue(
+                "the required task's completion must have been fully processed by the stage before the automatic branch's decision can be trusted");
+
             (await setup.StageGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
                 "Branch 1 requires ALL children terminal - the Enabled non-required task must block automatic completion");
 
@@ -119,7 +129,13 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 
             await CompleteTask(setup.RequiredTaskGrain);
 
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            // ADO #174 - same positive sync point as the sibling NonRequiredEnabled test above.
+            var userCompletableLatched = await PollUntil(
+                async () => (await setup.StageGrain.GetSnapshot()).UserCompletable,
+                TimeSpan.FromSeconds(10));
+            userCompletableLatched.Should().BeTrue(
+                "the required task's completion must have been fully processed by the stage before the automatic branch's decision can be trusted");
+
             (await setup.StageGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
                 "the automatic branch must not fire while any child is Active");
 
@@ -151,10 +167,20 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         {
             var setup = await CreateCaseWithStage(autoComplete: false, discretionaryItem: true);
 
-            await CompleteTask(setup.RequiredTaskGrain);
+            // ADO #174 - Optional completed FIRST, Required LAST (order does not matter to the
+            // business rule under test - both must simply end up terminal): UserCompletableCriteriaMet
+            // latches the FIRST time the required children are seen terminal, so completing
+            // RequiredTaskGrain last is what makes its completion the fresh, still-to-happen signal
+            // the poll below waits on, rather than a latch that already flipped true earlier.
             await CompleteTask(setup.OptionalTaskGrain);
+            await CompleteTask(setup.RequiredTaskGrain);
 
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            var userCompletableLatched = await PollUntil(
+                async () => (await setup.StageGrain.GetSnapshot()).UserCompletable,
+                TimeSpan.FromSeconds(10));
+            userCompletableLatched.Should().BeTrue(
+                "the required task's completion must have been fully processed by the stage before the automatic branch's decision can be trusted");
+
             (await setup.StageGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
                 "Branch 1 requires 'there are no DiscretionaryItems' - an unplanned discretionary item must block automatic completion");
 
