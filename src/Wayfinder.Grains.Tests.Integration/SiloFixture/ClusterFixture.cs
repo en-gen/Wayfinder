@@ -19,9 +19,6 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Exceptions;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Integration.SiloFixture
@@ -92,7 +89,7 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(ConfigureLogging);
+                    .ConfigureLogging(IntegrationTestLogging.Configure);
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
@@ -134,23 +131,6 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .AddQuartz(QuartzSchedulerConfig.Volatile);
             }
 
-            private static void ConfigureLogging(ILoggingBuilder logging)
-            {
-                var levelSwitch = new LoggingLevelSwitch
-                {
-                    MinimumLevel = LogEventLevel.Debug
-                };
-
-                logging.AddSerilog(new LoggerConfiguration()
-                    .MinimumLevel.ControlledBy(levelSwitch)
-                    .Enrich.FromLogContext()
-                    .Enrich.WithExceptionDetails()
-                    .WriteTo.Seq(
-                        "http://localhost:5341",
-                        controlLevelSwitch: levelSwitch
-                    )
-                    .CreateLogger());
-            }
         }
 
         // TestCluster's in-process client independently validates serializer coverage for every

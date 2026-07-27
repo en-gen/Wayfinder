@@ -1,9 +1,9 @@
 name: CodeQL
 
 # Static security analysis. NOTE: code scanning is only available on public repositories
-# or with GitHub Advanced Security. While this repository is private on the Free plan this
-# workflow will run the build but fail to upload results — that is expected, and it starts
-# working the moment the repository goes public.
+# or with GitHub Advanced Security. This repository is public, so results upload normally;
+# if it is ever made private without Advanced Security, this workflow will still run the
+# build but fail to upload results until it goes public again (or Advanced Security is added).
 
 on:
   push:

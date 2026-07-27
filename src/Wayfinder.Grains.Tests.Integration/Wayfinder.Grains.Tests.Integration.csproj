@@ -94,4 +94,15 @@
     <EmbeddedResource Include="Conformance\Samples\*.cmmn" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Issue #153/#154: the real root cause of the suite's CI flakiness was 2-vCPU
+         oversubscription - 4 xUnit collections (4 TestClusters, 2 silos each) with xUnit's
+         default of running 2 collections concurrently meant up to 4 silos plus the Azurite
+         container fighting over 2 cores. parallelizeTestCollections: false keeps only one
+         TestCluster live at a time so each silo actually gets both cores. Must be copied next to
+         the test assembly (xunit picks up xunit.runner.json from the assembly's own directory) -
+         verified present in bin/Release/net10.0 after build. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

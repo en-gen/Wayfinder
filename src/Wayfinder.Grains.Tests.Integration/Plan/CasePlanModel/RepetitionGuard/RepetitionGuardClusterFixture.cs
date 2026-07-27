@@ -3,7 +3,9 @@ using System.Net;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Infrastructure.Extensions;
 using Wayfinder.Grains.Infrastructure.Quartz;
+using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.Case;
 using Wayfinder.Grains.Plan.PlanItem.Behaviors;
 using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
 using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
@@ -20,10 +22,8 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Exceptions;
 using Xunit;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 
 namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 {
@@ -49,7 +49,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 
         private bool _disposed = false;
 
-        public Task InitializeAsync()
+        public async Task InitializeAsync()
         {
             var builder = new TestClusterBuilder();
 
@@ -64,7 +64,72 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
 
             ClusterClient = Cluster.Client;
 
-            return Task.CompletedTask;
+            // Issue #153: this fixture is the sole test in its own TestCluster (see the class
+            // remarks on why it can't share ClusterFixture/ClusterCollection), so unlike every
+            // other integration test it never gets the first-hit JIT/serializer/streaming-path
+            // warm-up amortized across other tests in the collection - the timed test below would
+            // otherwise pay that cold-start cost on top of the O(ceiling) sequential stream hops
+            // it is already measuring, on every single run. Run the exact same spawn->complete->
+            // re-spawn->breach->fault cascade once here, through a throwaway case (its own tenant,
+            // definition id and instance id - never referenced by the real test, so there is no
+            // shared-state or id-collision risk), so those first-hit costs are already paid before
+            // the timed assertion starts. Best-effort: if the warm-up itself fails or times out,
+            // swallow it rather than fail fixture setup over what is purely a priming step - the
+            // real test still exercises and asserts on the cascade regardless.
+            try
+            {
+                await WarmUpRepetitionCascadeAsync();
+            }
+            catch (Exception)
+            {
+                // Best-effort warm-up only - see remarks above.
+            }
+        }
+
+        // See the warm-up remarks in InitializeAsync above. Builds the identical foot-gun shape
+        // RepetitionGuardFootgunIntegrationTests asserts on via the SHARED FootgunCaseBuilder
+        // (issue #153) - not a hand-mirrored copy - so this warm-up can never silently drift out
+        // of sync with (and stop actually warming up the paths exercised by) the real test. Uses
+        // entirely distinct "WarmUp*" ids so it can never interact with the real test's state.
+        private async Task WarmUpRepetitionCascadeAsync()
+        {
+            const string scope = "WarmUpCPM";
+            const string taskDefinitionId = "WarmUpSourceTask";
+            const string taskPlanItemId = "WarmUpPlanItemSource";
+            const string sentinelDefinitionId = "WarmUpSentinelTask";
+            const string sentinelPlanItemId = "WarmUpPlanItemSentinel";
+
+            CaseRequestContext.TenantId = Guid.Parse("00000000-0000-0000-0000-0000000000ff");
+            CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-0000000000fe");
+
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"warmup-case-{Guid.NewGuid()}";
+
+            var @case = FootgunCaseBuilder.BuildFootgunCase(
+                caseDefinitionId, scope, taskDefinitionId, taskPlanItemId, sentinelDefinitionId, sentinelPlanItemId);
+
+            await ClusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = ClusterClient.GetGrain<ICaseGrain>(caseInstanceId, scope);
+            await caseGrain.Create(caseDefinitionId);
+            await caseGrain.Trigger(PlanItemTransition.Create);
+
+            // Bounded, generous wait - matches the real test's own 30s poll budget (see its
+            // remarks: a contended CI runner can push the multi-turn cascade past 15s) so even a
+            // very cold+contended first run fully primes the fault-path tail before returning.
+            // This only needs to pay the first-hit cost, not prove the guard fires correctly (the
+            // real test already asserts that) - if it doesn't settle in time, just move on: the
+            // outer try/catch has nothing to catch here, so simply returning is enough to let the
+            // real test proceed (cold, at worst - never broken).
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+            while (DateTime.UtcNow < deadline)
+            {
+                var snapshot = await caseGrain.GetSnapshot();
+                if (snapshot.PlanItemState == PlanItemState.Failed) return;
+                await Task.Delay(TimeSpan.FromMilliseconds(20));
+            }
         }
 
         public Task DisposeAsync()
@@ -108,7 +173,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(ConfigureLogging);
+                    .ConfigureLogging(IntegrationTestLogging.Configure);
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,
@@ -135,23 +200,6 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
                     .AddQuartz(QuartzSchedulerConfig.Volatile);
             }
 
-            private static void ConfigureLogging(ILoggingBuilder logging)
-            {
-                var levelSwitch = new LoggingLevelSwitch
-                {
-                    MinimumLevel = LogEventLevel.Debug
-                };
-
-                logging.AddSerilog(new LoggerConfiguration()
-                    .MinimumLevel.ControlledBy(levelSwitch)
-                    .Enrich.FromLogContext()
-                    .Enrich.WithExceptionDetails()
-                    .WriteTo.Seq(
-                        "http://localhost:5341",
-                        controlLevelSwitch: levelSwitch
-                    )
-                    .CreateLogger());
-            }
         }
 
         private class TestClientConfigurator : IClientBuilderConfigurator

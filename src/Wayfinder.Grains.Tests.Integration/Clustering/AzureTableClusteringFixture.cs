@@ -17,10 +17,8 @@ using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.TestingHost;
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Exceptions;
 using Testcontainers.Azurite;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Integration.Clustering
@@ -189,7 +187,7 @@ namespace Wayfinder.Grains.Tests.Integration.Clustering
 
                     .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
 
-                    .ConfigureLogging(ConfigureLogging);
+                    .ConfigureLogging(IntegrationTestLogging.Configure);
 
                 // TestCluster's codegen scans every [Alias]-tagged grain interface in this test
                 // assembly when the silo starts - not just the ones this suite's own grain uses -
@@ -206,23 +204,6 @@ namespace Wayfinder.Grains.Tests.Integration.Clustering
                 options.Configure<TableServiceClient>((clusteringOptions, tableServiceClient) =>
                     clusteringOptions.TableServiceClient = tableServiceClient);
 
-            private static void ConfigureLogging(ILoggingBuilder logging)
-            {
-                var levelSwitch = new LoggingLevelSwitch
-                {
-                    MinimumLevel = LogEventLevel.Debug
-                };
-
-                logging.AddSerilog(new LoggerConfiguration()
-                    .MinimumLevel.ControlledBy(levelSwitch)
-                    .Enrich.FromLogContext()
-                    .Enrich.WithExceptionDetails()
-                    .WriteTo.Seq(
-                        "http://localhost:5341",
-                        controlLevelSwitch: levelSwitch
-                    )
-                    .CreateLogger());
-            }
         }
 
         // The client-side counterpart: with UseTestClusterMembership = false, the client can no

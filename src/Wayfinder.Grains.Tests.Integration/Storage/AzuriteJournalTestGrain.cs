@@ -1,3 +1,4 @@
+using System;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Orleans;
@@ -64,6 +65,14 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
         // Forces deactivation so the next call must rehydrate state from the journal -
         // the empirical proof that storage (not just in-memory grain activation) is durable.
         Task DeactivateNow();
+
+        // Issue #154: a per-activation marker that is NOT persisted/journaled (see the
+        // _activationId field remarks below) - lets tests prove a call actually landed on a
+        // FRESH activation (deterministic proof that deactivation actually happened) without
+        // relying on the eventually-consistent grain directory
+        // (IManagementGrain.GetActivationAddress), which does not read-your-writes immediately
+        // after ForceActivationCollection completes.
+        Task<Guid> GetActivationId();
     }
 
     // Same shape as CmmnElementGrain (Wayfinder.Grains/Plan/CmmnElement/CmmnElementGrain.cs):
@@ -73,6 +82,14 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
     [LogConsistencyProvider(ProviderName = "LogStorage")]
     public class AzuriteJournalTestGrain : JournaledGrain<AzuriteJournalTestState>, IAzuriteJournalTestGrain
     {
+        // Issue #154: fresh Guid per activation, deliberately NOT part of AzuriteJournalTestState
+        // (the [GenerateSerializer] journaled state above) or any raised event - only State is
+        // persisted/rehydrated by the log-consistency provider; a plain grain-instance field is
+        // invisible to it. Orleans constructs a brand new instance of this class for every
+        // activation, so this initializer runs exactly once per activation and can never survive
+        // (or be restored across) a deactivation/reactivation cycle the way State does.
+        private readonly Guid _activationId = Guid.NewGuid();
+
         public Task Increment(int amount, string label)
         {
             RaiseEvent(new AzuriteJournalTestEvent { Amount = amount, Label = label });
@@ -92,5 +109,7 @@ namespace Wayfinder.Grains.Tests.Integration.Storage
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
+
+        public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
     }
 }
