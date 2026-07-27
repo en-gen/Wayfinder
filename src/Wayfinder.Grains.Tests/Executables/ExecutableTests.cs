@@ -38,6 +38,26 @@ namespace Wayfinder.Grains.Tests.Executables
             Assert.NotNull(result.Message);
         }
 
+        // #158 follow-up - real Jint throws can carry a BLANK Exception.Message (unlike the
+        // ReferenceError above, which happens to have text). Before this fix, ExecutableResult's
+        // IsError was *derived* from Message (!string.IsNullOrWhiteSpace(Message)), so a blank
+        // message silently reported IsError == false - a genuine failure indistinguishable from
+        // success. IsError is now a flag stored directly by the Failure(...) factory, and a blank
+        // caught-exception message is substituted with the exception's type name so the audit trail
+        // (RuleEvaluated.Error / ApplicabilityRuleEvaluated.Error) is never silently empty either.
+        [Theory]
+        [InlineData("throw new Error()")]
+        [InlineData("throw new Error('')")]
+        [InlineData("throw ''")]
+        public void ExecuteAsBool__When_ExpressionThrowsWithBlankMessage__Then_FailureResultWithIsErrorTrueAndNonBlankMessage(string expression)
+        {
+            var result = CreateSubject(expression).ExecuteAsBool();
+
+            Assert.True(result.IsError);
+            Assert.False(result.Value);
+            Assert.False(string.IsNullOrWhiteSpace(result.Message));
+        }
+
         [Theory]
         [InlineData("'a'", "a")]
         [InlineData("'hello' + ' ' + 'world!'", "hello world!")]

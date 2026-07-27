@@ -81,6 +81,12 @@ namespace Wayfinder.Grains.Plan.PlanningTable
         // to TRUE, then the TableItem is applicable for planning,
         // otherwise it is not. If no ApplicabilityRule is associated
         // with a TableItem, its applicability is considered TRUE.
+        //
+        // #158 - same defect class as BaseBehavior.EvaluateRule: an erroring Condition must fall
+        // back to this rule's spec default (TRUE) via ExecutableResult.ValueOr rather than a bare
+        // `?.Value ?? true`, since Value is never actually null on a Failure result. Here the
+        // consequence was fail-CLOSED (an erroring rule silently dropped the DiscretionaryItem from
+        // the planning table) rather than #158's fail-open, but it's the identical coalesce bug.
         private async Task<bool> EvaluateApplicabilityRule(ApplicabilityRule rule)
         {
             ExecutableResult<bool> ruleResult = null;
@@ -89,7 +95,7 @@ namespace Wayfinder.Grains.Plan.PlanningTable
                 ruleResult = await GrainFactory.GetGrain<IExpressionGrain>(_caseInstanceId)
                     .ExecuteAsBool(rule.ContextRef, rule.Condition);
             }
-            var result = ruleResult?.Value ?? true;
+            var result = ruleResult?.ValueOr(true) ?? true;
 
             RaiseEvent(new ApplicabilityRuleEvaluated
             {

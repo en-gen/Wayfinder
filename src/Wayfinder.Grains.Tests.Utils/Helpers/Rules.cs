@@ -99,5 +99,12 @@ namespace Wayfinder.Grains.Tests.Utils.Helpers
             Name = $"{nameof(NotApplicable)}",
             Condition = FalsyExpression
         };
+
+        public static readonly ApplicabilityRule ErroringApplicabilityRule = new ApplicabilityRule
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = $"{nameof(ErroringApplicabilityRule)}",
+            Condition = ErroringExpression
+        };
     }
 }

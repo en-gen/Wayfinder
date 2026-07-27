@@ -287,16 +287,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         //
         // discard: true only for the FIRST evaluation (HandleEnterAvailableFromCreate, on the
         // Create -> Available transition) - the rule is still evaluated (so a malformed
-        // expression's error is still recorded on the RepetitionRuleEvaluated audit event's Error
-        // field, same as any other evaluation - see EvaluateRule below; #158: rules evaluate while
-        // this item is Available, where PlanItemTransition.Fault is not a permitted transition, so
-        // the CanFire(Fault)/FireAsync(Fault) attempt there is currently a no-op at every real call
-        // site and the error surfaces only as that string, not as a state transition) and a
-        // RepetitionRuleEvaluated is still raised for audit purposes, but flagged so
-        // PlanItemStore/CaseStore do not let its Result update the persisted Repeatable flag, and
-        // the boolean this method returns MUST NOT be acted on by the discarding caller. Every
-        // other call site (entry-criterion OnPart satisfied; the no-entry-criteria Complete/
-        // Terminate re-evaluation above) is a real, actionable evaluation and leaves this false.
+        // expression's error is still recorded on the RepetitionRuleEvaluated audit event, same as
+        // any other evaluation - see EvaluateRule below) and a RepetitionRuleEvaluated is still
+        // raised for audit purposes, but flagged so PlanItemStore/CaseStore do not let its Result
+        // update the persisted Repeatable flag, and the boolean this method returns MUST NOT be
+        // acted on by the discarding caller. Every other call site (entry-criterion OnPart
+        // satisfied; the no-entry-criteria Complete/Terminate re-evaluation above) is a real,
+        // actionable evaluation and leaves this false.
         protected Task<bool> EvaluateRepetitionRule(bool discard = false)
         {
             var itemControl = GetItemControl();
@@ -307,6 +304,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             return EvaluateRule<RepetitionRuleEvaluated>(rule, false, @event => @event.Discard = discard);
         }
 
+        // #158 - a rule with no configured Condition never produces an ExecutableResult
+        // (ruleResult stays null), so ValueOr can't help there - that case falls back to
+        // defaultResult via the `??` below. Once a Condition DID run, ValueOr(defaultResult) is the
+        // one place that decides error-vs-value (see ExecutableResult.ValueOr's remarks: this is
+        // the same shape of coalesce that produced #158 the first time, on Value instead of via
+        // IsError, so callers should route through it rather than hand-rolling `?.Value ?? x`
+        // again). Compare SentryGrain.EvaluateIfPart, which deliberately does NOT use a
+        // caller-supplied default on error - a Sentry's IfPart has no spec-mandated fallback, so it
+        // fails CLOSED (does not fire) instead.
         private async Task<bool> EvaluateRule<TEvent>(IExecutableRule rule, bool defaultResult, Action<TEvent> configureEvent = null)
             where TEvent : RuleEvaluated<bool>
         {
@@ -316,13 +322,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 ruleResult = await Host.GrainFactory.GetGrain<IExpressionGrain>(Host.CaseInstanceId)
                     .ExecuteAsBool(rule.ContextRef, rule.Condition);
             }
-            // #158 - ExecutableResult<bool>.Failure(...) leaves Value at default(bool) == false,
-            // which is NOT the same thing as "the expression evaluated to false": a non-null,
-            // erroring result must not win a `?? defaultResult` coalesce on Value, since Value is
-            // never actually null on failure. Check IsError explicitly so an erroring expression
-            // falls back to the caller's spec-mandated default (e.g. TRUE for ManualActivationRule)
-            // instead of silently resolving to false.
-            var result = ruleResult == null || ruleResult.IsError ? defaultResult : ruleResult.Value;
+            var result = ruleResult?.ValueOr(defaultResult) ?? defaultResult;
 
             var @event = Activator.CreateInstance<TEvent>();
             @event.Result = result;
@@ -331,6 +331,12 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
             Host.RaiseEvent(@event);
 
+            // #158 - rules evaluate while this item is Available, where PlanItemTransition.Fault is
+            // not a permitted transition (see PlanItemStateMachine.ConfigureForStageOrTask), so
+            // CanFire(Fault) is false at every real call site today and this is a no-op: an erroring
+            // expression's Message lands only on the RuleEvaluated audit event raised above, never
+            // as a state transition. Left as-is deliberately - making Fault reachable from Available
+            // is a state-machine semantics change, out of scope here.
             if ((ruleResult?.IsError ?? false) &&
                 StateMachine.CanFire(PlanItemTransition.Fault))
             {
