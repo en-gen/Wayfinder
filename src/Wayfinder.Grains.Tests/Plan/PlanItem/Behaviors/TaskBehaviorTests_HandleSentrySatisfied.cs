@@ -378,6 +378,10 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 });
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ExitCriterionSatisfied>()), Times.Once);
+            // ADO #183 - an ExitCriterion satisfaction must never also raise EntryCriterionSatisfied
+            // (the regression this guards: HandleSentrySatisfied used to raise it unconditionally,
+            // before branching on the criterion's actual type).
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<EntryCriterionSatisfied>()), Times.Never);
             // D10 (Bug #82) - the Exit trigger now carries the firing ExitCriterion's own Id so
             // SentryGrain can match a PlanItemOnPart naming it - see SentryGrain's class remarks.
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit, exitCriterion.Id), Times.Once);
