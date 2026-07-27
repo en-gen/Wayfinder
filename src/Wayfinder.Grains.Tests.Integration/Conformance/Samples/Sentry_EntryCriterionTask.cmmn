@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #183 companion scenario - positive-path proof for the entry-criterion fix.
+  ~~~~~
+  TaskA declares ONLY an entry criterion (no exit criterion at all). Mirrors
+  Sentry_ExitCriterionTask.cmmn's shape (single CaseFileItem-driven Sentry, ManualActivationRule
+  forced FALSE so satisfaction drives straight to Active) but for the entry side, so satisfying
+  EntrySentry must still raise EntryCriterionSatisfied and mark EntryCriterionStore Satisfied -
+  proving the #183 fix (moving Host.RaiseEvent(EntryCriterionSatisfied) inside the
+  `criterion is EntryCriterion` branch in StageBehavior/TaskBehavior.HandleSentrySatisfied) did
+  not over-correct into silently dropping a GENUINE entry-criterion satisfaction.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             targetNamespace="http://wayfinder/conformance/sentry-entry-criterion-task"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_SentryEntryCriterionTask"
+             name="SentryEntryCriterionTaskSample"
+             exporter="Wayfinder conformance suite"
+             exporterVersion="1.0">
+  <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
+  <case id="SentryEntryCriterionTaskCase" name="SentryEntryCriterionTaskCase">
+    <caseFileModel>
+      <caseFileItem id="EntryItem" name="EntryItem" definitionRef="CFID_1" multiplicity="ExactlyOne"/>
+    </caseFileModel>
+    <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">
+      <planItem id="PlanItemA" name="PlanItemA" definitionRef="TaskA">
+        <entryCriterion id="EntryCriterion_1" sentryRef="EntrySentry"/>
+      </planItem>
+      <sentry id="EntrySentry" name="EntrySentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="EntryItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+      </sentry>
+      <humanTask id="TaskA" name="TaskA" isBlocking="true">
+        <defaultControl id="Control_1">
+          <manualActivationRule id="MAR_1">
+            <condition language="expression://lang/jint">false</condition>
+          </manualActivationRule>
+        </defaultControl>
+      </humanTask>
+    </casePlanModel>
+    <caseRoles/>
+  </case>
+</definitions>

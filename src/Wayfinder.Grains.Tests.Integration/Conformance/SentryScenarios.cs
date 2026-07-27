@@ -3,7 +3,9 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
 using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
@@ -158,6 +160,53 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
             terminated.Should().BeTrue(
                 "Table 8.8 (exit): the Task must transition Active -> Terminated when its exit criterion's sentry is satisfied");
+        }
+
+        // ADO #183 companion (positive path): Table 8.7 (entry) + 8.5 sentry semantics - a
+        // GENUINE entry criterion satisfaction must still raise EntryCriterionSatisfied and mark
+        // EntryCriterionStore Satisfied, both in the live projection and in the persisted
+        // journal. #183's fix moved that RaiseEvent inside the `criterion is EntryCriterion`
+        // branch of StageBehavior/TaskBehavior.HandleSentrySatisfied (previously unconditional,
+        // which spuriously journaled it for EXIT criteria too - see
+        // Plan/Sentry/Repro/Issue183_ExitCriterionJournaledAsEntryTests.cs); this scenario pins
+        // that the entry side was not accidentally broken by tightening that condition.
+        [Fact]
+        [ConformanceCitation("Table 8.7 / entry")]
+        [ConformanceCitation("8.5 / sentry satisfaction drives EntryCriterionSatisfied")]
+        public async Task Sentry__Given_TaskEntryCriterion__Then_CaseFileEventSatisfiesEntryAndJournalsEntryCriterionSatisfied()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_EntryCriterionTask.cmmn");
+
+            var taskGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemA", deployed.Scope);
+
+            (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available,
+                "TaskA declares an entry criterion, so it must wait in Available (8.7) until EntrySentry is satisfied");
+            (await taskGrain.GetSnapshot()).EntryCriterionStore.State.Should().Be(CriterionState.Unsatisfied,
+                "EntrySentry has not fired yet");
+
+            var entryItem = _harness.CaseFileItem(deployed.CaseInstanceId, "EntryItem");
+            await entryItem.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "EntryItem" }, JsonNode.Parse("""{"ready": false}"""));
+            await entryItem.Update(JsonNode.Parse("""{"ready": true}"""));
+
+            var active = await ConformanceHarness.PollUntil(
+                async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Active);
+            active.Should().BeTrue(
+                "Table 8.7 (entry) + 8.6.2: the ManualActivationRule's condition evaluates FALSE (mirrors " +
+                "Sentry_ExitCriterionTask.cmmn's own MAR_1), so satisfying the entry criterion transitions " +
+                "TaskA straight from Available to Active via Start");
+
+            var afterSnapshot = await taskGrain.GetSnapshot();
+            afterSnapshot.EntryCriterionStore.State.Should().HaveFlag(CriterionState.Satisfied,
+                "a genuine EntryCriterion satisfaction must still mark EntryCriterionStore Satisfied - the #183 " +
+                "fix must not over-correct into dropping legitimate EntryCriterionSatisfied events");
+
+            var afterEvents = await taskGrain.GetJournaledEvents();
+            afterEvents.OfType<EntryCriterionSatisfied>().Should().HaveCount(1,
+                "the entry criterion was satisfied exactly once, and the event journaled for it must be the " +
+                "correctly-typed EntryCriterionSatisfied - not merely reflected in the in-memory projection");
+            afterEvents.OfType<ExitCriterionSatisfied>().Should().BeEmpty(
+                "TaskA declares no exit criterion at all - no ExitCriterionSatisfied should ever be journaled for it");
         }
 
         // Table 8.8 (exit) for a STAGE: StageA's exit criterion fires from a case-file event and
