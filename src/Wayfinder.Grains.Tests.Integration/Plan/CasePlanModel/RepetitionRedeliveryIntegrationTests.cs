@@ -32,14 +32,16 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
     // stream redelivery looks like to the subscriber - it cannot tell a genuine redelivery from a
     // second identical publish.
     //
-    // Positive synchronization, not a permissive sleep (#174): the test-side publish below is
-    // `await`ed on the SAME stream/subscription mechanism the production Publish call uses -
-    // proven (RepetitionChildConfirmationIntegrationTests / empirical probing during this work)
-    // to reliably drive the subscriber's handler to completion before returning. The immediate
-    // post-publish snapshot is therefore already a real synchronization point, not a guess - but
-    // as defense in depth against that assumption ever being wrong, this ALSO actively polls for
-    // a bounded 5s budget and fails the INSTANT a duplicate ever appears, rather than checking
-    // only once at the end of a blind wait.
+    // Positive synchronization, not a permissive sleep (#174): empirically (probed while
+    // developing this suite), awaiting the test-side publish below does NOT reliably wait for the
+    // subscriber's handler to run, let alone finish - the memory stream provider's producer-side
+    // OnNextAsync was observed returning in single-digit milliseconds regardless of how long the
+    // subscriber actually took. The immediate post-publish snapshot is therefore only a cheap
+    // first check, not a synchronization point on its own. The REAL guarantee here is the active
+    // poll immediately below: it re-checks on a tight cadence for a full 1s budget (short because
+    // this runs on the shared, deliberately-serialized cluster - see #154/#153) and fails the
+    // INSTANT a duplicate would appear, rather than sleeping once and checking only at the end
+    // (the #174 failure shape).
     [Collection(ClusterCollection.Name)]
     public class RepetitionRedeliveryIntegrationTests
     {
@@ -125,15 +127,18 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
                 .GetCaseEventStream<PlanItemRepetitionCriteriaMetEvent>(caseInstanceId, TaskPlanItemId)
                 .OnNextAsync(redeliveredEvent);
 
-            // Positive check immediately after the awaited redelivery publish.
+            // Cheap first check - see class remarks for why this alone is not a synchronization
+            // point (the preceding publish's completion does not guarantee the subscriber ran).
             var snapshotAfterRedelivery = await caseGrain.GetSnapshot();
             AssertNoDuplicate(snapshotAfterRedelivery.BehaviorExtension.Children[TaskPlanItemId]);
 
-            // Defense in depth: actively watch for the entirety of a real budget rather than
-            // trusting a single post-await check - fails the instant a duplicate would appear,
-            // rather than silently tolerating one that shows up moments later (the #174 failure
-            // shape this must not repeat).
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            // The real assertion: actively watch for a full, real 1s budget rather than trusting
+            // a single post-await check - fails the instant a duplicate would appear, rather than
+            // silently tolerating one that shows up moments later (the #174 failure shape). 1s
+            // (not the original 5s) because this cluster is shared and deliberately serialized
+            // across the whole suite (#154/#153) - every second here is paid by every other test
+            // in the collection too.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(1);
             while (DateTime.UtcNow < deadline)
             {
                 var snapshot = await caseGrain.GetSnapshot();

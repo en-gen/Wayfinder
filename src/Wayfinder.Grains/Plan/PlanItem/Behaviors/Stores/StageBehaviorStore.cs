@@ -28,8 +28,22 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
         // DIFFERENT, freshly-minted child instance id - see CreateChild). Durable across
         // deactivation because this is populated via Apply(ChildRepeated), persisted by the same
         // ConfirmEvents() call that now (#160) confirms the rest of the repetition turn.
+        //
+        // Grows by one entry per repetition ever created for this host, unbounded - same growth
+        // shape as Children above (itself already unbounded, in practice capped by
+        // RepetitionGuardOptions.MaxRepetitionsPerPlanItem), accepted for the same reason: pruning
+        // would reopen exactly the redelivery window this guard exists to close for any entry
+        // pruned before a late redelivery of its event finally arrives.
+        //
+        // A repetition already in flight when this field is introduced (i.e. a ChildRepeated
+        // raised by an older binary that never set SourceInstanceId) replays as a null entry on
+        // upgrade, and IsRepetitionRedelivery below treats null as "no id supplied" (never a
+        // match) - so a stream redelivery whose original delivery straddles this upgrade is not
+        // caught by this guard. Acceptable: it is the same gap that existed for every prior
+        // delivery before this fix shipped, not a regression, and it can only affect a delivery
+        // in flight at the moment of upgrade, not steady-state operation.
         [Id(1)]
-        private readonly ISet<string> _repetitionSourceInstanceIds = new HashSet<string>();
+        private readonly ICollection<string> _repetitionSourceInstanceIds = new HashSet<string>();
 
         public bool IsRepetitionRedelivery(string sourceInstanceId) =>
             sourceInstanceId != null && _repetitionSourceInstanceIds.Contains(sourceInstanceId);

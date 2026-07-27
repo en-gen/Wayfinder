@@ -728,6 +728,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // is still Active when the ceiling is hit (Active legally Permits(Fault, Failed) in
             // both ConfigureForStageOrTask and ConfigureForCasePlanModel) - the only always-valid
             // target, and the entity actually responsible for the spawn.
+            // #161 scope note: this ceiling branch deliberately does NOT record the redelivery
+            // guard. A redelivery that lands here re-raises RepetitionCeilingExceeded and
+            // re-attempts Fault (a no-op once already Failed - CanFire(Fault) is false, so it
+            // falls to the plain ConfirmEvents() branch below) - durably-confirmed audit/journal
+            // noise, not a duplicate CHILD, which is the defect #161 closes. Recording the guard
+            // here would mean either reusing ChildRepeated (misleading - no child was created) or
+            // adding a second, differently-named guard event for one rare, already-Faulted-host
+            // edge case; not worth the added surface for a cosmetic duplicate-event concern on a
+            // path that already terminates the container.
             if (nextRepetition >= _repetitionCeiling)
             {
                 Host.LogWithContext(logger => logger.LogError(
@@ -783,15 +792,33 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 nextRepetition,
                 child.Id));
 
+            // #160/#161 ordering - deliberately AFTER CreateChild, not before: RaiseEvent applies
+            // synchronously to TentativeState, so recording the redelivery guard BEFORE the child
+            // actually exists would let a partial CreateChild failure (its own grain calls throw
+            // partway through) leave the guard set with nothing to show for it - the handler
+            // throws, ConfirmEvents never runs, the stream agent's retry-then-redeliver (see the
+            // Bug #62 remarks above) is exactly the recovery path that would otherwise re-create
+            // the child, but IsRepetitionRedelivery would now report a false positive and the
+            // retry would silently no-op. Worst case: the entry-criterion OnPart path already
+            // unsubscribed before publishing, and the no-entry-criteria path's source is already
+            // terminal - neither can ever re-request, so one transient CreateChild failure would
+            // have permanently stopped that repetition. Recording the guard only once the child
+            // demonstrably exists means a genuine partial-failure retry can at worst DUPLICATE
+            // (CreateChild runs again, spawning a second child) rather than silently and
+            // permanently losing the repetition - a visible, recoverable failure mode beats an
+            // invisible, permanent one, and duplication here is a strict subset of the #161 defect
+            // this same guard already closes for the common (fully-succeeded, then redelivered)
+            // case.
+            await CreateChild(child, nextRepetition);
+
             // #160 - SourceInstanceId records this repetition request's idempotency key (see the
             // redelivery guard above) so a later redelivery of the SAME event can recognize
-            // itself and no-op instead of spawning a duplicate child.
+            // itself and no-op instead of spawning a duplicate child. Raised AFTER CreateChild
+            // (see remarks above) and confirmed together with it below.
             Host.RaiseEvent(new ChildRepeated
             {
                 SourceInstanceId = @event.PlanItemInstanceId
             });
-
-            await CreateChild(child, nextRepetition);
 
             // #160 - CreateChild raises ChildCreated (and the ChildRepeated above) on THIS
             // Stage/CasePlanModel's own TentativeState; nothing else in this handler's call chain
