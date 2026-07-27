@@ -228,6 +228,63 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             capturedEvent.Result.Should().BeTrue();
         }
 
+        // #158 companion - RequiredRule's spec default is FALSE (5.5.1: "If this rule is not
+        // present, then it is considered FALSE"), which happens to coincide with
+        // ExecutableResult<bool>'s failure-value default of false. So this call site was never
+        // observably wrong, but the fix in EvaluateRule must take this path via the explicit
+        // IsError check and defaultResult fallback - not via Value coincidentally being false -
+        // so this locks in the intended behavior rather than relying on happenstance.
+        [Theory, AutoData]
+        public async Task EvaluateRequiredRule__Given_Host__When_ConditionErrors__Then_DefaultResultFalse(Guid caseInstanceId)
+        {
+            var planItem = new Interfaces.Model.PlanItem
+            {
+                ItemControl = new PlanItemControl
+                {
+                    RequiredRule = Rules.ErroringRequiredRule
+                }
+            };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost
+                .Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost
+                .Setup(x => x.Definition)
+                .Returns(planItem);
+
+            RequiredRuleEvaluated capturedEvent = null;
+            mockHost
+                .Setup(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()))
+                .Callback<RequiredRuleEvaluated>(x => capturedEvent = x);
+
+            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            mockExpressionGrain
+                .Setup(x => x.ExecuteAsBool(Rules.ErroringRequiredRule.ContextRef, Rules.ErroringRequiredRule.Condition))
+                .Returns(Task.FromResult(ExecutableResult<bool>.Failure("expression blew up")));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory
+                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
+                .Returns(mockExpressionGrain.Object);
+            mockHost
+                .Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
+
+            await subject.EvaluateRequiredRule();
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()), Times.Once);
+            mockHost.Verify(x => x.ConfirmEvents(), Times.Once);
+
+            capturedEvent.Should().NotBeNull();
+            capturedEvent.Result.Should().BeFalse();
+            capturedEvent.Error.Should().Be("expression blew up");
+        }
+
         [Theory, AutoData]
         public async Task EvaluateRepetitionRule__Given_Host__When_NoItemControl__Then_False(Guid caseInstanceId)
         {
@@ -556,6 +613,70 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             capturedEvent.Should().NotBeNull();
             capturedEvent.Result.Should().BeTrue();
+        }
+
+        // #158 - fail-open defect. 5.5.1: "If no ManualActivationRule is specified, then the
+        // default is considered TRUE." When the rule IS specified but its Condition expression
+        // ERRORS (as opposed to evaluating cleanly to false), EvaluateRule must fall back to that
+        // same spec default rather than silently treating the error as a false result -
+        // ExecutableResult<bool>.Failure(...) leaves Value at default(bool) == false, which is a
+        // DIFFERENT thing than "the expression evaluated to false", and must not be allowed to
+        // masquerade as it. On unfixed code this test fails: capturedEvent.Result/the return value
+        // come back False (the ExecutableResult's default(bool)), silently bypassing the manual/
+        // human activation gate described in issue #158.
+        [Theory, AutoData]
+        public async Task EvaluateManualActivationRule__Given_Host__When_ConditionErrors__Then_DefaultResultTrue(Guid caseInstanceId)
+        {
+            var planItem = new Interfaces.Model.PlanItem
+            {
+                ItemControl = new PlanItemControl
+                {
+                    ManualActivationRule = Rules.ErroringManualActivationRule
+                }
+            };
+
+            var mockMachine = new MockPlanItemStateMachine(CreateStore(def: planItem));
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost
+                .Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost
+                .Setup(x => x.Definition)
+                .Returns(planItem);
+
+            ManualActivationRuleEvaluated capturedEvent = null;
+            mockHost
+                .Setup(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()))
+                .Callback<ManualActivationRuleEvaluated>(x => capturedEvent = x);
+
+            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            mockExpressionGrain
+                .Setup(x => x.ExecuteAsBool(Rules.ErroringManualActivationRule.ContextRef, Rules.ErroringManualActivationRule.Condition))
+                .Returns(Task.FromResult(ExecutableResult<bool>.Failure("expression blew up")));
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory
+                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
+                .Returns(mockExpressionGrain.Object);
+            mockHost
+                .Setup(x => x.GrainFactory)
+                .Returns(mockGrainFactory.Object);
+
+            var subject = new BaseBehaviorTestHarness(mockHost.Object, new Milestone(), mockMachine.Object);
+
+            var result = await subject.EvaluateManualActivationRule();
+
+            result.Should().BeTrue(
+                "an erroring expression must fall back to ManualActivationRule's spec default of TRUE, " +
+                "not the ExecutableResult<bool> failure-value default of false - a false result here means " +
+                "the human/manual activation gate is silently bypassed (#158)");
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()), Times.Once);
+
+            capturedEvent.Should().NotBeNull();
+            capturedEvent.Result.Should().BeTrue();
+            capturedEvent.Error.Should().Be("expression blew up");
         }
 
         // 8.6.4 RepetitionRule
