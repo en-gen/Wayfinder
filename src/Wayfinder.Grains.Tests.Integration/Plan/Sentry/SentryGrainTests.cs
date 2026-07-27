@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using Wayfinder.Grains.Infrastructure.Extensions;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
 using Wayfinder.Grains.Plan.Sentry;
+using Wayfinder.Grains.Plan.Sentry.Events;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
@@ -187,9 +189,18 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.Sentry
                     PlanItemState.Available,
                     PlanItemState.Completed));
 
-            var handlerInvoked = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromMilliseconds(500))) == tcs.Task;
+            // ADO #174 - positive sync point instead of a fixed sleep: SentryGrain.HandleOnPartOccurred
+            // unconditionally raises+confirms OnPartOccurred BEFORE it evaluates the IfPart, in the
+            // same method invocation that decides Satisfied vs. OnPartNotRearmed - so once
+            // OnPartOccurred is visible in this grain's own journal, the Satisfied/not-Satisfied
+            // decision for this occurrence has already been made, however long the stream delivery
+            // that got us here took.
+            var onPartRecorded = await JournalPolling.UntilJournaled<OnPartOccurred>(subject.GetJournaledEvents);
+            onPartRecorded.Should().BeTrue("the OnPart's occurrence must be recorded once its transition is processed");
 
-            handlerInvoked.Should().BeFalse("the OnPart occurred but the IfPart evaluates false, so the sentry must not publish SentrySatisfiedEvent");
+            (await subject.GetJournaledEvents()).OfType<Satisfied>().Should().BeEmpty(
+                "the OnPart occurred but the IfPart evaluates false, so the sentry must not become Satisfied");
+            tcs.Task.IsCompleted.Should().BeFalse("the sentry must not publish SentrySatisfiedEvent");
         }
 
         [Theory, AutoData]
@@ -502,7 +513,13 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.Sentry
             var faulted = await Task.WhenAny(faultedTcs.Task, Task.Delay(TimeSpan.FromSeconds(10))) == faultedTcs.Task;
             faulted.Should().BeTrue("the IfPart's ContextRef names a CaseFileItem that was never created, so evaluation should fault and publish SentryFaultedEvent rather than crash the subscription");
 
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            // ADO #174 - no extra sleep needed here (this replaces a trailing 500ms "settle" delay):
+            // HandleCaseWideCaseFileItemTransitioned's fault branch and its Satisfied branch are
+            // mutually exclusive within ONE invocation of this handler for ONE event (the fault
+            // branch returns immediately after publishing), and no further CaseFileItem event
+            // occurs in this test after `faulted` above already proved that single invocation ran
+            // to completion - so satisfiedTcs can never subsequently complete and is safe to assert
+            // immediately.
             satisfiedTcs.Task.IsCompleted.Should().BeFalse("a faulted IfPart evaluation must never be treated as satisfied");
         }
     }

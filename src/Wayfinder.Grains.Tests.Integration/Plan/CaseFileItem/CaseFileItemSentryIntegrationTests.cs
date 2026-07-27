@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Infrastructure.Extensions;
@@ -7,7 +8,9 @@ using Wayfinder.Grains.Interfaces.Model;
 using Wayfinder.Grains.Plan.Case;
 using Wayfinder.Grains.Plan.PlanItem;
 using Wayfinder.Grains.Plan.Sentry;
+using Wayfinder.Grains.Plan.Sentry.Events;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
 using Xunit;
@@ -409,7 +412,15 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CaseFileItem
             // Milestone must stay Available.
             await caseFileItemGrain.Update(JsonNode.Parse("""{"amount": 50}"""));
 
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            // ADO #174 - positive sync point: SentryGrain.HandleOnPartOccurred always raises+
+            // confirms OnPartOccurred before it evaluates the IfPart, in the same invocation that
+            // decides Satisfied vs. OnPartNotRearmed - so once OnPartOccurred is journaled on this
+            // KNOWN sentry address (constructed directly above, unlike the StageBehavior-assigned
+            // random instance ids elsewhere in this suite), the decision for this occurrence is
+            // already final, however long stream delivery took to get here.
+            var onPartRecorded = await JournalPolling.UntilJournaled<OnPartOccurred>(sentryGrain.GetJournaledEvents);
+            onPartRecorded.Should().BeTrue("the OnPart's occurrence must be recorded once the Update transition is processed");
+
             var afterFirstUpdate = await milestoneGrain.GetSnapshot();
             afterFirstUpdate.PlanItemState.Should().Be(PlanItemState.Available,
                 "the OnPart occurred but the IfPart condition (value.amount > 100) is false at amount=50, so the sentry must not be satisfied");
@@ -505,7 +516,12 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CaseFileItem
 
             await caseFileItemGrain.Update(JsonNode.Parse("""{"amount": 150}"""));
 
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            // ADO #174 - same positive sync point as the sibling IfPart-false test above:
+            // OnPartOccurred is unconditionally raised/confirmed before the IfPart is evaluated
+            // (fault or not), on this test's own KNOWN sentry address.
+            var onPartRecorded = await JournalPolling.UntilJournaled<OnPartOccurred>(sentryGrain.GetJournaledEvents);
+            onPartRecorded.Should().BeTrue("the OnPart's occurrence must be recorded once the Update transition is processed");
+
             var afterUpdate = await milestoneGrain.GetSnapshot();
             afterUpdate.PlanItemState.Should().Be(PlanItemState.Available,
                 "the IfPart's contextRef names a CaseFileItem that was never created, so evaluation fails and the sentry must not be satisfied");

@@ -114,6 +114,15 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             await rep0Grain.Trigger(PlanItemTransition.ManualStart);
             await rep0Grain.Trigger(PlanItemTransition.Complete);
 
+            // ADO #174 - Repeated needs no wait at all (not even the scaled window below):
+            // BaseBehavior.TryRepeatOnCompleteOrTerminate is registered as a Complete-transition
+            // entry action, and Trigger() awaits Stateless's entire FireAsync (transition + entry
+            // actions) before returning - so the RepetitionRule re-evaluation, and whether Repeated
+            // gets raised, have already happened, synchronously, by the time this Trigger call
+            // above returns (see the sibling flagship test's identical no-wait assertion of
+            // rep0After.Repeatable/Repeated right after its own Trigger(Complete)).
+            (await rep0Grain.GetSnapshot()).Repeated.Should().BeFalse();
+
             // absence assertion: allow the (hypothetical) repetition event time to propagate,
             // then confirm nothing spawned
             await Task.Delay(TimeSpan.FromMilliseconds(500));
@@ -121,8 +130,6 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             var caseSnapshot = await caseGrain.GetSnapshot();
             caseSnapshot.BehaviorExtension.Children[TaskPlanItemId].Should().HaveCount(1,
                 "a FALSE re-evaluation on Complete must not spawn a repetition");
-
-            (await rep0Grain.GetSnapshot()).Repeated.Should().BeFalse();
         }
 
         private async Task<ICaseGrain> CreateCase(Guid caseInstanceId, RepetitionRule repetitionRule)
