@@ -686,6 +686,30 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 return;
             }
 
+            // #161 - Orleans streams are at-least-once; a redelivered
+            // PlanItemRepetitionCriteriaMetEvent must be a no-op, not a second physical child at
+            // the same repetition index. Ported from SentryStore's OccurrenceToken/IsRedelivery
+            // pattern (D5/D11) rather than inventing a new mechanism - see
+            // StageBehaviorStore.IsRepetitionRedelivery's remarks for why @event.PlanItemInstanceId
+            // (the SOURCE child's own instance id) is a sound, durable idempotency key here: a
+            // specific source instance can request exactly one repetition in its lifetime, so a
+            // second delivery carrying the identical id is necessarily the SAME request
+            // redelivered, never a distinct legitimate repeat (which always arrives from a
+            // different, freshly-minted child instance id). Durable across deactivation because
+            // #160's trailing ConfirmEvents() below now persists the guard along with everything
+            // else this handler raises.
+            if (StageStore.IsRepetitionRedelivery(@event.PlanItemInstanceId))
+            {
+                Host.LogWithContext(logger => logger.LogInformation(
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | ignoring redelivered repetition-criteria-met event from source instance {SourceInstanceId} - a child has already been spawned for it",
+                    Host.Definition.GetType().Name,
+                    PlanItemDefinition.GetType().Name,
+                    Host.Scope,
+                    Host.InstanceId,
+                    @event.PlanItemInstanceId));
+                return;
+            }
+
             var nextRepetition = @event.CurrentRepetition + 1;
 
             // ADO #67 - Wayfinder ENGINE EXTENSION (RepetitionGuardOptions), NOT CMMN spec
@@ -759,9 +783,24 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 nextRepetition,
                 child.Id));
 
-            Host.RaiseEvent(new ChildRepeated());
+            // #160 - SourceInstanceId records this repetition request's idempotency key (see the
+            // redelivery guard above) so a later redelivery of the SAME event can recognize
+            // itself and no-op instead of spawning a duplicate child.
+            Host.RaiseEvent(new ChildRepeated
+            {
+                SourceInstanceId = @event.PlanItemInstanceId
+            });
 
             await CreateChild(child, nextRepetition);
+
+            // #160 - CreateChild raises ChildCreated (and the ChildRepeated above) on THIS
+            // Stage/CasePlanModel's own TentativeState; nothing else in this handler's call chain
+            // confirms them, so without this they would sit unconfirmed indefinitely and be lost
+            // entirely if this activation deactivates before some later, unrelated event on this
+            // same host happens to confirm them (Bug #61 class - see HandleEnterActiveFromStart's
+            // remarks for the same discipline applied to the equivalent first-creation path).
+            // Confirmed once after CreateChild completes, matching that same batching convention.
+            await Host.ConfirmEvents();
         }
 
         private async Task CreateChild(Interfaces.Model.PlanItem child, int repetition = 0)

@@ -168,6 +168,18 @@ namespace Wayfinder.Grains.Plan.PlanItem
             }
         }
 
+        // #161 - same delegation shape as Apply(ChildCreated) above: the redelivery guard's
+        // recorded source-instance-id set lives on the nested StageBehaviorStore, not here.
+        public void Apply(ChildRepeated @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
         public void Apply(TimerStartTriggerOccurred @event)
         {
             Updated = @event.Updated;
