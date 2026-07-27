@@ -43,7 +43,7 @@
 
   <ItemGroup>
     <!-- ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth + the identity
-         middleware). Wired in via AddFlowApi()/MapFlowApi() (see Program.cs/Startup.cs) - Wayfinder.Silo
+         middleware). Wired in via AddWayfinderApi()/MapWayfinderApi() (see Program.cs/Startup.cs) - Wayfinder.Silo
          stays the composition root, Wayfinder.Api stays a plug-in with no knowledge of Orleans hosting. -->
     <ProjectReference Include="..\Wayfinder.Api\Wayfinder.Api.csproj" />
     <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />

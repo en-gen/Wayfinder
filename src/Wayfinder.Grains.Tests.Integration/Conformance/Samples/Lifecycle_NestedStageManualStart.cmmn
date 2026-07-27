@@ -16,11 +16,11 @@
   references) - see KnownGap_NestedDefinitionDeclaration.cmmn for why.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-nested-stage-manual-start"
+             targetNamespace="http://wayfinder/conformance/lifecycle-nested-stage-manual-start"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleNestedStageManualStart"
              name="LifecycleNestedStageManualStartSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="LifecycleNestedStageManualStartCase" name="LifecycleNestedStageManualStartCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">

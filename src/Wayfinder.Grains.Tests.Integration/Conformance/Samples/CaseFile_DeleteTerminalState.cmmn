@@ -8,11 +8,11 @@
   grain's own lifecycle directly.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/casefile-delete-terminal-state"
+             targetNamespace="http://wayfinder/conformance/casefile-delete-terminal-state"
              expressionLanguage="expression://lang/jint"
              id="Definitions_CaseFileDeleteTerminalState"
              name="CaseFileDeleteTerminalStateSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="CaseFileDeleteTerminalStateCase" name="CaseFileDeleteTerminalStateCase">

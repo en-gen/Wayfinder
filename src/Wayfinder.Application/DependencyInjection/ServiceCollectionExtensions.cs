@@ -10,7 +10,7 @@ namespace Wayfinder.Application.DependencyInjection
     // scanner, per ADO #32's scope fence ("everything native").
     public static class ServiceCollectionExtensions
     {
-        public static IServiceCollection AddFlowApplication(this IServiceCollection services)
+        public static IServiceCollection AddWayfinderApplication(this IServiceCollection services)
         {
             if (services is null) throw new ArgumentNullException(nameof(services));
 
@@ -20,9 +20,9 @@ namespace Wayfinder.Application.DependencyInjection
 
             // ADO #33 - the tenant-registry resolver/seeder, additive: nothing calls ITenantResolver
             // yet (sub-unit 3 wires it into an HTTP auth middleware), so this only grows the DI
-            // container's service list - it does not change AddFlowApplication's existing behavior
+            // container's service list - it does not change AddWayfinderApplication's existing behavior
             // for any of today's callers (CaseCqrsIntegrationTests; a future Wayfinder.Silo host).
-            services.AddFlowIdentity();
+            services.AddWayfinderIdentity();
 
             var handlerInterfaceDefinitions = new[] { typeof(ICommandHandler<,>), typeof(IQueryHandler<,>) };
             var assembly = typeof(ServiceCollectionExtensions).Assembly;

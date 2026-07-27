@@ -54,7 +54,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
             var builder = new TestClusterBuilder();
 
             builder.Options.ClusterId = "repetition-guard-integration";
-            builder.Options.ServiceId = "Case.Flow";
+            builder.Options.ServiceId = "Wayfinder";
 
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
             builder.AddClientBuilderConfigurator<TestClientConfigurator>();

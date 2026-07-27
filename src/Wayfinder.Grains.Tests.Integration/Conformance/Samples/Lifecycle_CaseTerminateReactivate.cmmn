@@ -9,11 +9,11 @@
   child.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-case-terminate-reactivate"
+             targetNamespace="http://wayfinder/conformance/lifecycle-case-terminate-reactivate"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleCaseTerminateReactivate"
              name="LifecycleCaseTerminateReactivateSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="LifecycleCaseTerminateReactivateCase" name="LifecycleCaseTerminateReactivateCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="false">

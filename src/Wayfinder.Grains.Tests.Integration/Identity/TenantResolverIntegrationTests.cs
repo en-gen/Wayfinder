@@ -18,7 +18,7 @@ namespace Wayfinder.Grains.Tests.Integration.Identity
     // throws), and confirm both registry grains persist across a forced deactivation/reactivation
     // - i.e. they are genuinely backed by the default grain storage, not just in-memory activation
     // state. Composes the Application layer exactly like CaseCqrsIntegrationTests does (register
-    // the fixture's co-hosted Orleans client, let AddFlowApplication/AddFlowIdentity wire the
+    // the fixture's co-hosted Orleans client, let AddWayfinderApplication/AddWayfinderIdentity wire the
     // resolver/seeder) - nothing here touches CaseRequestContext or the existing Unit-1 handlers,
     // this suite is purely additive.
     [Collection(ClusterCollection.Name)]
@@ -33,7 +33,7 @@ namespace Wayfinder.Grains.Tests.Integration.Identity
 
             _rootProvider = new ServiceCollection()
                 .AddSingleton(_clusterClient)
-                .AddFlowApplication()
+                .AddWayfinderApplication()
                 .BuildServiceProvider();
         }
 

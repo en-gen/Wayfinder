@@ -8,7 +8,7 @@ namespace Wayfinder.Silo.Infrastructure.Options
     // HostingEnvironment.EnvironmentName == "Docker" - never Development, never Production).
     // Maps each real Zitadel subject (the token's "sub" claim, minted by the compose Zitadel once
     // its bootstrap org/human users are created - see devops/eval/README.md's manual bootstrap
-    // steps) to a Case.Flow tenant/user/role set via Wayfinder.Application.Identity.IIdentityRegistrySeeder,
+    // steps) to a Wayfinder tenant/user/role set via Wayfinder.Application.Identity.IIdentityRegistrySeeder,
     // the exact seam sub-unit 4's isolation tests also use. Bound from the "EvalIdentity" config
     // section - devops/eval/docker-compose.yml supplies it via EvalIdentity__Tenants__<n>__* env
     // vars (indexed-array binding is native to Microsoft.Extensions.Configuration, no custom code

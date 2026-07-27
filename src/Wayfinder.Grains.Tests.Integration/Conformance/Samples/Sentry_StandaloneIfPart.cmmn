@@ -10,11 +10,11 @@
   that unrelated ItemB event is what actually fires the sentry.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/sentry-standalone-ifpart"
+             targetNamespace="http://wayfinder/conformance/sentry-standalone-ifpart"
              expressionLanguage="expression://lang/jint"
              id="Definitions_SentryStandaloneIfPart"
              name="SentryStandaloneIfPartSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="SentryStandaloneIfPartCase" name="SentryStandaloneIfPartCase">

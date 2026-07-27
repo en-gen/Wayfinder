@@ -1,4 +1,4 @@
-# GitVersion configuration for Case.Flow (GitVersion 6.x).
+# GitVersion configuration for Wayfinder (GitVersion 6.x).
 #
 # Baseline: 1.0.0. No release tags exist yet, so `next-version` floors every
 # computation at 1.0.0 — all pre-GA builds are previews of 1.0.0:

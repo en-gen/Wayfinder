@@ -10,7 +10,7 @@ namespace Wayfinder.Api.Infrastructure
 {
     // ADO #33 - the ONLY place identity enters the system. Sits after UseAuthentication/
     // UseAuthorization in Wayfinder.Silo/Startup.cs's pipeline: by the time a request reaches here,
-    // JwtBearer has already validated the token's signature/issuer/audience/expiry (AddFlowApi), and
+    // JwtBearer has already validated the token's signature/issuer/audience/expiry (AddWayfinderApi), and
     // the fallback authorization policy has already 401'd anything unauthenticated that wasn't
     // explicitly [AllowAnonymous]. This middleware's only job is turning an authenticated caller's
     // "sub" claim into CaseRequestContext (TenantId/UserId/UserRoles) via ITenantResolver - the
@@ -51,7 +51,7 @@ namespace Wayfinder.Api.Infrastructure
                 return;
             }
 
-            // MapInboundClaims = false (set on JwtBearerOptions in AddFlowApi) keeps the token's
+            // MapInboundClaims = false (set on JwtBearerOptions in AddWayfinderApi) keeps the token's
             // "sub" claim literally named "sub" - no legacy ClaimTypes.NameIdentifier remap to
             // second-guess here.
             var subject = context.User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;

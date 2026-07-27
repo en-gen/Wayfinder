@@ -10,11 +10,11 @@
   transitions directly. autoComplete=false keeps the Case Active when MilestoneA terminates.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-milestone"
+             targetNamespace="http://wayfinder/conformance/lifecycle-milestone"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleMilestone"
              name="LifecycleMilestoneSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="LifecycleMilestoneCase" name="LifecycleMilestoneCase">

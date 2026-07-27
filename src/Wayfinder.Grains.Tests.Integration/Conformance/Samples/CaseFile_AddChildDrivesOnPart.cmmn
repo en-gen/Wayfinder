@@ -9,11 +9,11 @@
   are declared as two independent, non-nested caseFileItem elements.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/casefile-addchild-drives-onpart"
+             targetNamespace="http://wayfinder/conformance/casefile-addchild-drives-onpart"
              expressionLanguage="expression://lang/jint"
              id="Definitions_CaseFileAddChildDrivesOnPart"
              name="CaseFileAddChildDrivesOnPartSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="CaseFileAddChildDrivesOnPartCase" name="CaseFileAddChildDrivesOnPartCase">

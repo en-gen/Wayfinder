@@ -16,11 +16,11 @@
   (5.4.3) - see KnownGap_NestedDefinitionDeclaration.cmmn.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/sentry-exit-criterion-stage"
+             targetNamespace="http://wayfinder/conformance/sentry-exit-criterion-stage"
              expressionLanguage="expression://lang/jint"
              id="Definitions_SentryExitCriterionStage"
              name="SentryExitCriterionStageSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="SentryExitCriterionStageCase" name="SentryExitCriterionStageCase">

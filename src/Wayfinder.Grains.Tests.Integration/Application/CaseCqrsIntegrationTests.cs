@@ -17,7 +17,7 @@ namespace Wayfinder.Grains.Tests.Integration.Application
 {
     // ADO #32/#33 - the CQRS-layer equivalent of #39's CaseOperationsIntegrationTests: exercises the
     // exact commands/queries Wayfinder.Api (and a future MCP server) dispatch, but drives them through
-    // the REAL native mediator (ISender / AddFlowApplication) over the existing in-memory Orleans
+    // the REAL native mediator (ISender / AddWayfinderApplication) over the existing in-memory Orleans
     // ClusterFixture - no web host, no Azurite/Docker (case ops need no durable storage), and no
     // JwtBearer/tenant-registry resolution either (that is Wayfinder.Api's IdentityContextMiddleware,
     // exercised in Wayfinder.Api.Tests instead - see that project). Proves a timer-free flagship .cmmn
@@ -31,7 +31,7 @@ namespace Wayfinder.Grains.Tests.Integration.Application
         public CaseCqrsIntegrationTests(ClusterFixture fixture)
         {
             // Compose the Application layer exactly as a host would: register the fixture's co-hosted
-            // Orleans client (the only dependency the handlers inject) and let AddFlowApplication
+            // Orleans client (the only dependency the handlers inject) and let AddWayfinderApplication
             // wire ISender + every ICommandHandler<,>/IQueryHandler<,> by its own reflection scan.
             //
             // ADO #33 - the handlers no longer default CaseRequestContext themselves (that seam,
@@ -46,7 +46,7 @@ namespace Wayfinder.Grains.Tests.Integration.Application
 
             _rootProvider = new ServiceCollection()
                 .AddSingleton<IClusterClient>(fixture.ClusterClient)
-                .AddFlowApplication()
+                .AddWayfinderApplication()
                 .BuildServiceProvider();
         }
 

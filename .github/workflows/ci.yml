@@ -1,4 +1,4 @@
-# Case.Flow CI — version, build, test, merged coverage.
+# Wayfinder CI — version, build, test, merged coverage.
 #
 # GitHub Actions port of devops/build/case.flow.ci.yml (Azure Pipelines). Same
 # stack: GitVersion 6.x computes SemVer from GitVersion.yml + `Wayfinder-`

@@ -7,11 +7,11 @@
   order, before MilestoneA's entry criterion is satisfied; either alone must not be enough.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/sentry-and-join"
+             targetNamespace="http://wayfinder/conformance/sentry-and-join"
              expressionLanguage="expression://lang/jint"
              id="Definitions_SentryAndJoin"
              name="SentryAndJoinSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="SentryAndJoinCase" name="SentryAndJoinCase">

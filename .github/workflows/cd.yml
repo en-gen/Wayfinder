@@ -1,4 +1,4 @@
-# Case.Flow CD — build and publish the Wayfinder.Silo container image.
+# Wayfinder CD — build and publish the Wayfinder.Silo container image.
 #
 # Fills the "planned, never authored" ADO Case.Wayfinder.CD slot (see
 # devops/deploy/templates/README.md) with a GitHub-native equivalent, scoped

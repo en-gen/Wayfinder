@@ -9,12 +9,12 @@
   end-to-end.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             xmlns:tns="http://case.flow/samples/milestone-sentry"
-             targetNamespace="http://case.flow/samples/milestone-sentry"
+             xmlns:tns="http://wayfinder/samples/milestone-sentry"
+             targetNamespace="http://wayfinder/samples/milestone-sentry"
              expressionLanguage="expression://lang/jint"
              id="Definitions_MilestoneSentry"
              name="MilestoneSentrySample"
-             exporter="Case.Flow sample author"
+             exporter="Wayfinder sample author"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CaseFileItemDefinition_1"
                           name="TheCaseFileItemDef"

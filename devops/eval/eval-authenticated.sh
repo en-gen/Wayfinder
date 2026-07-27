@@ -4,7 +4,7 @@
 # #49's cluster-status curl walkthrough exercises cluster formation. Unlike that walkthrough, this
 # script needs a real Zitadel-issued bearer token as input - Zitadel's FIRSTINSTANCE_* bootstrap
 # (docker-compose.yml) only gets as far as one org + one service-account machine key
-# automatically; it does NOT create the Case.Flow project/API application, a second org for
+# automatically; it does NOT create the Wayfinder project/API application, a second org for
 # tenant B, or human/service users with a token you can hand this script. See
 # devops/eval/README.md's "Authenticated API walkthrough (First Light)" section for the manual
 # one-time bootstrap steps that produce TENANT_A_TOKEN (and, optionally, TENANT_B_TOKEN).
@@ -17,7 +17,7 @@
 # read). With TENANT_B_TOKEN also set, it additionally proves the cross-tenant isolation wall
 # (tenant B reading tenant A's case -> 404) - the same property
 # MultiTenantIsolationApiTests.TenantB__Given_TenantAsCase__Then_GetReturns404 proves at the
-# in-process TestServer level (Flow.Grains.Tests.Integration/Api), demonstrated here instead
+# in-process TestServer level (Wayfinder.Grains.Tests.Integration/Api), demonstrated here instead
 # against the real containerized stack with a real Zitadel-issued token.
 #
 # Prerequisites: curl, python3 (used only for JSON field extraction - no other dependency).
@@ -25,7 +25,7 @@ set -euo pipefail
 
 SILO_URL="${SILO_URL:-http://localhost:8081}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CMMN_SAMPLE="$REPO_ROOT/src/Flow.Grains.Tests.Integration/Interchange/Samples/MilestoneSentryCase.cmmn"
+CMMN_SAMPLE="$REPO_ROOT/src/Wayfinder.Grains.Tests.Integration/Interchange/Samples/MilestoneSentryCase.cmmn"
 
 if [[ -z "${TENANT_A_TOKEN:-}" ]]; then
   echo "TENANT_A_TOKEN is required - see devops/eval/README.md's manual bootstrap steps for how to obtain one." >&2
@@ -67,9 +67,9 @@ case_id="$(json_field caseId "$create_response")"
 echo "    caseId = $case_id"
 
 echo "==> Reading the case back as tenant A (expect 200)"
-get_status="$(curl -sS -o /tmp/case-flow-eval-get.json -w '%{http_code}' "$SILO_URL/api/v1/cases($case_id)" \
+get_status="$(curl -sS -o /tmp/wayfinder-eval-get.json -w '%{http_code}' "$SILO_URL/api/v1/cases($case_id)" \
   -H "Authorization: Bearer $TENANT_A_TOKEN")"
-cat /tmp/case-flow-eval-get.json
+cat /tmp/wayfinder-eval-get.json
 echo
 if [[ "$get_status" != "200" ]]; then
   echo "FAIL: expected 200 reading own case, got $get_status" >&2
@@ -83,9 +83,9 @@ if [[ -z "${TENANT_B_TOKEN:-}" ]]; then
 fi
 
 echo "==> Reading tenant A's case AS TENANT B (expect 404 - the isolation wall)"
-cross_status="$(curl -sS -o /tmp/case-flow-eval-cross.json -w '%{http_code}' "$SILO_URL/api/v1/cases($case_id)" \
+cross_status="$(curl -sS -o /tmp/wayfinder-eval-cross.json -w '%{http_code}' "$SILO_URL/api/v1/cases($case_id)" \
   -H "Authorization: Bearer $TENANT_B_TOKEN")"
-cat /tmp/case-flow-eval-cross.json
+cat /tmp/wayfinder-eval-cross.json
 echo
 if [[ "$cross_status" != "404" ]]; then
   echo "FAIL: expected 404 (cross-tenant isolation), got $cross_status" >&2

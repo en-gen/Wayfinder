@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The mediator/DI seam (ServiceCollectionExtensions.AddFlowApplication) needs IServiceCollection
+    <!-- The mediator/DI seam (ServiceCollectionExtensions.AddWayfinderApplication) needs IServiceCollection
          and the ServiceCollectionServiceExtensions fluent registration methods (AddScoped/AddTransient) -
          both live in the Abstractions package; the concrete container implementation is supplied by
          whatever host composes this layer (Wayfinder.Silo today, a future Wayfinder.Api/MCP host, or a test's

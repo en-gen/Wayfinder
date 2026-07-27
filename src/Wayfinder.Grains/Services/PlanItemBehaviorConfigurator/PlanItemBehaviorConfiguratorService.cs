@@ -11,7 +11,7 @@ namespace Wayfinder.Grains.Services.PlanItemBehaviorConfigurator
     {
         private readonly IPlanItemStateMachineConfigurator _planItemStateMachineConfigurator;
 
-        // ADO #67 - Case.Flow ENGINE EXTENSION option (RepetitionGuardOptions), not CMMN spec
+        // ADO #67 - Wayfinder ENGINE EXTENSION option (RepetitionGuardOptions), not CMMN spec
         // surface. IOptions<T> parameter defaulted to null (rather than required) so every
         // existing direct `new PlanItemBehaviorConfiguratorService(...)` in the unit test suite
         // keeps compiling unchanged and gets the generous default; production DI (Wayfinder.Silo/

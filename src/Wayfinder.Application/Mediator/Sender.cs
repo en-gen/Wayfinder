@@ -10,7 +10,7 @@ namespace Wayfinder.Application.Mediator
     // No compile-time handler registry (no MediatR-style generated dispatch table): a command/query's
     // RUNTIME type is closed against ICommandHandler<,>/IQueryHandler<,> via reflection
     // (MakeGenericType), the resulting closed-generic interface is resolved from IServiceProvider
-    // (populated by ServiceCollectionExtensions.AddFlowApplication's assembly scan), and HandleAsync
+    // (populated by ServiceCollectionExtensions.AddWayfinderApplication's assembly scan), and HandleAsync
     // is invoked on whatever comes back. Deliberately small and dependency-free per ADO #32's scope
     // fence (no MediatR).
     public sealed class Sender : ISender
@@ -46,7 +46,7 @@ namespace Wayfinder.Application.Mediator
             {
                 throw new InvalidOperationException(
                     $"No handler registered for {requestKind} '{request.GetType().FullName}' " +
-                    $"(expected an implementation of {handlerType}). Was AddFlowApplication() called?");
+                    $"(expected an implementation of {handlerType}). Was AddWayfinderApplication() called?");
             }
 
             var handleMethod = handlerType.GetMethod(nameof(ICommandHandler<ICommand<object>, object>.HandleAsync));

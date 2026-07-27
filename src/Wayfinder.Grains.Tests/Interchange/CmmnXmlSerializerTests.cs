@@ -66,7 +66,7 @@ namespace Wayfinder.Grains.Tests.Interchange
             result.IsError.Should().BeFalse(result.Message);
             var definitions = result.Value;
 
-            definitions.TargetNamespace.Should().Be("http://case.flow/samples/rich");
+            definitions.TargetNamespace.Should().Be("http://wayfinder/samples/rich");
             definitions.ExpressionLanguage.Should().Be(ExpressionLanguage.Jint);
             definitions.CaseFileItemDefinitions.Should().ContainSingle(d => d.Id == "CFID_1");
             definitions.CaseFileItemDefinitions.Single().Property.Should().ContainSingle(p => p.Name == "amount");
@@ -75,8 +75,8 @@ namespace Wayfinder.Grains.Tests.Interchange
             definitions.AnyAttributes.Should().ContainSingle(a => a.LocalName == "origin" && a.Value == "test-suite");
             definitions.ExtensionElements.Any.Should().ContainSingle(e => e.LocalName == "settings");
             var relationship = definitions.Relationships.Should().ContainSingle().Subject;
-            relationship.Source.Should().ContainSingle(q => q.Name == "RichCase" && q.Namespace == "http://case.flow/samples/rich");
-            relationship.Target.Should().ContainSingle(q => q.Name == "Process_1" && q.Namespace == "http://case.flow/samples/rich");
+            relationship.Source.Should().ContainSingle(q => q.Name == "RichCase" && q.Namespace == "http://wayfinder/samples/rich");
+            relationship.Target.Should().ContainSingle(q => q.Name == "Process_1" && q.Namespace == "http://wayfinder/samples/rich");
             definitions.Artifacts.Should().ContainSingle().Which.Should().BeOfType<TextAnnotation>()
                 .Which.Text.Should().Be("Annotation kept at the definitions level.");
 
@@ -156,7 +156,7 @@ namespace Wayfinder.Grains.Tests.Interchange
             // Documentation instead of being silently dropped.
             const string xml = """
                 <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" id="D1" targetNamespace="http://case.flow/samples/mixed-doc">
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" id="D1" targetNamespace="http://wayfinder/samples/mixed-doc">
                   <case id="C1">
                     <casePlanModel id="CPM1">
                       <sentry id="S1">
@@ -197,7 +197,7 @@ namespace Wayfinder.Grains.Tests.Interchange
         {
             const string xml = """
                 <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-body-legacy">
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://wayfinder/samples/expr-body-legacy">
                   <case id="C1">
                     <casePlanModel id="CPM1">
                       <sentry id="S1">
@@ -220,7 +220,7 @@ namespace Wayfinder.Grains.Tests.Interchange
         {
             const string xml = """
                 <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-body-mixed">
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://wayfinder/samples/expr-body-mixed">
                   <case id="C1">
                     <casePlanModel id="CPM1">
                       <sentry id="S1">
@@ -245,7 +245,7 @@ namespace Wayfinder.Grains.Tests.Interchange
             // schema-standard mixed content, imported separately, must resolve to the same Body.
             const string legacy = """
                 <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-legacy">
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://wayfinder/samples/expr-legacy">
                   <case id="C1"><casePlanModel id="CPM1"><sentry id="S1">
                     <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint" body="value.status == 'approved'"/></ifPart>
                   </sentry></casePlanModel></case>
@@ -253,7 +253,7 @@ namespace Wayfinder.Grains.Tests.Interchange
                 """;
             const string mixed = """
                 <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-mixed">
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://wayfinder/samples/expr-mixed">
                   <case id="C1"><casePlanModel id="CPM1"><sentry id="S1">
                     <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint">value.status == 'approved'</condition></ifPart>
                   </sentry></casePlanModel></case>
@@ -272,7 +272,7 @@ namespace Wayfinder.Grains.Tests.Interchange
         {
             const string xml = """
                 <?xml version="1.0" encoding="UTF-8"?>
-                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://case.flow/samples/expr-export">
+                <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL" targetNamespace="http://wayfinder/samples/expr-export">
                   <case id="C1"><casePlanModel id="CPM1"><sentry id="S1">
                     <ifPart id="IP1" contextRef="X"><condition language="expression://lang/jint" body="value.amount &gt; 100"/></ifPart>
                   </sentry></casePlanModel></case>
@@ -307,7 +307,7 @@ namespace Wayfinder.Grains.Tests.Interchange
             var stage = new Stage { Id = "CPM1" };
             stage.Sentries.Add(sentry);
             var @case = new Case { Id = "C1", CasePlanModel = stage };
-            var definitions = new Definitions { TargetNamespace = "http://case.flow/samples/expr-handbuilt" };
+            var definitions = new Definitions { TargetNamespace = "http://wayfinder/samples/expr-handbuilt" };
             definitions.Cases.Add(@case);
 
             var exported = CmmnXmlSerializer.Export(definitions);
@@ -343,8 +343,8 @@ namespace Wayfinder.Grains.Tests.Interchange
             const string xml = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-                             xmlns:tns="http://case.flow/samples/roundtrip-small"
-                             targetNamespace="http://case.flow/samples/roundtrip-small"
+                             xmlns:tns="http://wayfinder/samples/roundtrip-small"
+                             targetNamespace="http://wayfinder/samples/roundtrip-small"
                              expressionLanguage="expression://lang/jint"
                              id="Definitions_Small"
                              name="SmallSample">

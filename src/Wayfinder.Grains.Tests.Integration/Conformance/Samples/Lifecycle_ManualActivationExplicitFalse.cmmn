@@ -7,11 +7,11 @@
   explicitly evaluates FALSE, so it must skip Enabled entirely and auto-start straight to Active.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/lifecycle-manual-activation-false"
+             targetNamespace="http://wayfinder/conformance/lifecycle-manual-activation-false"
              expressionLanguage="expression://lang/jint"
              id="Definitions_LifecycleManualActivationFalse"
              name="LifecycleManualActivationFalseSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="LifecycleManualActivationFalseCase" name="LifecycleManualActivationFalseCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">

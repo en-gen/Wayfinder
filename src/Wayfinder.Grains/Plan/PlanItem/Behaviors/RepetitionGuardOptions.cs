@@ -1,6 +1,6 @@
 namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
-    // ADO #67 - Case.Flow ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
+    // ADO #67 - Wayfinder ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
     // ~~~~~
     // 8.6.4 places no upper bound on RepetitionRule re-evaluation: a no-entry-criteria Stage or
     // Task instance with a constant-TRUE RepetitionRule is, per the letter of the spec, entitled

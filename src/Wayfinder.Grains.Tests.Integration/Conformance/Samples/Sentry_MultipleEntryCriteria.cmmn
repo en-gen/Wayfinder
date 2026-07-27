@@ -16,11 +16,11 @@
   sufficient and ItemA's criterion need never fire.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/sentry-multiple-entry-criteria"
+             targetNamespace="http://wayfinder/conformance/sentry-multiple-entry-criteria"
              expressionLanguage="expression://lang/jint"
              id="Definitions_SentryMultipleEntryCriteria"
              name="SentryMultipleEntryCriteriaSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <caseFileItemDefinition id="CFID_1" name="ItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified"/>
   <case id="SentryMultipleEntryCriteriaCase" name="SentryMultipleEntryCriteriaCase">

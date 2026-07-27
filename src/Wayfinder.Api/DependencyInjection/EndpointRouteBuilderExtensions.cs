@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Routing;
 
 namespace Wayfinder.Api.DependencyInjection
 {
-    // ADO #32/#33 - maps everything AddFlowApi registered. Called from Wayfinder.Silo/Startup.cs's
+    // ADO #32/#33 - maps everything AddWayfinderApi registered. Called from Wayfinder.Silo/Startup.cs's
     // UseEndpoints, alongside the existing /health, /, /cluster MapGet calls (which stay mapped
     // there directly, [AllowAnonymous] - see that file).
     public static class EndpointRouteBuilderExtensions
     {
-        public static IEndpointRouteBuilder MapFlowApi(this IEndpointRouteBuilder endpoints)
+        public static IEndpointRouteBuilder MapWayfinderApi(this IEndpointRouteBuilder endpoints)
         {
             if (endpoints is null) throw new ArgumentNullException(nameof(endpoints));
 

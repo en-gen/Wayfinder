@@ -1,6 +1,6 @@
 # devops/eval
 
-A real **multi-container** Orleans cluster for Case.Flow (work item #49), extended by work item
+A real **multi-container** Orleans cluster for Wayfinder (work item #49), extended by work item
 #32/#33 sub-unit 4 ("First Light") with a real authenticated case-operation API surface: Azurite
 plus 3 separate `Flow.Silo` containers running the DEPLOYED clustering path (`Program.cs`
 `ConfigureDeployedOrleans` - real Azure Table clustering + reminders, container-aware endpoints,
@@ -65,11 +65,11 @@ address on the compose network) and document why here.
 ## Authenticated API walkthrough (First Light)
 
 `/api/v1/...` (work item #32/#33) requires a real, validly-signed Zitadel token whose "sub"
-claim has been seeded into Case.Flow's tenant registry (`Flow.Api`'s `IdentityContextMiddleware`
+claim has been seeded into Wayfinder's tenant registry (`Flow.Api`'s `IdentityContextMiddleware`
 -> `ITenantResolver` - see those types' remarks). Getting from "Zitadel container is running" to
-"I have a bearer token Case.Flow will accept" needs a few **manual, one-time** steps - Zitadel's
+"I have a bearer token Wayfinder will accept" needs a few **manual, one-time** steps - Zitadel's
 own `FIRSTINSTANCE_*` bootstrap (this stack's `docker-compose.yml`) only goes as far as **one org
-+ one service-account machine user**; it does not create the Case.Flow project/API application
++ one service-account machine user**; it does not create the Wayfinder project/API application
 (the thing that gives you an *audience*), a second org for tenant B, or any human/service users
 you can actually mint a demo token for. Scripting those additional steps cleanly (Zitadel's
 Management API, JWT-profile token exchange for the bootstrap machine key, etc.) without a live
@@ -79,7 +79,7 @@ path instead.
 
 ### What's automated already
 
-- Postgres + Zitadel come up and Zitadel bootstraps itself: one org ("Case.Flow Eval"), one
+- Postgres + Zitadel come up and Zitadel bootstraps itself: one org ("Wayfinder Eval"), one
   machine (service-account) user (`case-flow-eval-sa`) with a **machine key** (not a PAT - see
   below), written to `devops/eval/zitadel/machinekey/zitadel-admin-sa.json` on the host (bind-
   mounted from the container's `/machinekey`).
@@ -87,7 +87,7 @@ path instead.
   service hostname - see "Why the issuer is the compose hostname, not localhost" below).
 - `Program.cs`'s `SeedEvalIdentityRegistryAsync` (gated to `DOTNET_ENVIRONMENT=Docker`) reads two
   placeholder tenant slots from `EvalIdentity__Tenants__0__*` / `__1__*` env vars
-  (`docker-compose.yml`) and seeds Case.Flow's tenant registry (`IIdentityRegistrySeeder` - the
+  (`docker-compose.yml`) and seeds Wayfinder's tenant registry (`IIdentityRegistrySeeder` - the
   same seam `MultiTenantIsolationApiTests` uses) for any slot whose `Subject` is non-blank. Both
   slots ship with a **blank Subject**, so the stack boots cleanly with no seeding performed until
   you complete the steps below and fill them in.
@@ -100,8 +100,8 @@ path instead.
    JSON with a JWT-profile-capable client) - or, more simply for a one-off demo, create a human
    admin via the Console's own first-run invite flow if you'd rather not deal with the machine
    key at all.
-2. **Create the Case.Flow project + an API application**: Console -> Projects -> New -> name it
-   `Case.Flow`, then add an Application of type "API" (not "Web"/"Native" - this is a
+2. **Create the Wayfinder project + an API application**: Console -> Projects -> New -> name it
+   `Wayfinder`, then add an Application of type "API" (not "Web"/"Native" - this is a
    machine-to-machine resource, not something a browser redirects into). The application's
    **Client ID** is what `Auth__Zitadel__Audience` (and each `EvalIdentity__Tenants__<n>__Audience`)
    needs to be set to.
@@ -130,7 +130,7 @@ path instead.
 
 ### Why the issuer is the compose hostname, not localhost
 
-JwtBearer validates a token's `iss` claim against `ValidIssuer` (`AddFlowApi`'s
+JwtBearer validates a token's `iss` claim against `ValidIssuer` (`AddWayfinderApi`'s
 `TokenValidationParameters`) with an **exact string match**. Zitadel sets `iss` from its own
 `ZITADEL_EXTERNALDOMAIN`/`EXTERNALPORT`/`EXTERNALSECURE` config. For that match to hold, whatever
 address a client used to reach Zitadel and mint a token must be the SAME address the silo (also a

@@ -9,11 +9,11 @@
   never in Stage.PlanItems, so it must never appear as an instantiated child.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
-             targetNamespace="http://case.flow/conformance/discretionary-item-excluded"
+             targetNamespace="http://wayfinder/conformance/discretionary-item-excluded"
              expressionLanguage="expression://lang/jint"
              id="Definitions_DiscretionaryItemExcluded"
              name="DiscretionaryItemExcludedSample"
-             exporter="Case.Flow conformance suite"
+             exporter="Wayfinder conformance suite"
              exporterVersion="1.0">
   <case id="DiscretionaryItemExcludedCase" name="DiscretionaryItemExcludedCase">
     <casePlanModel id="CPM" name="CasePlanModel" autoComplete="true">
