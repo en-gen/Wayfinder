@@ -143,17 +143,42 @@ concern applies to any already-persisted case; the fix is forward-only (existing
 which already recorded the spurious event will still replay corrupted — a known, accepted
 limitation, not addressed here).
 
-**Current state (develop HEAD + `fix/183-exit-criterion-journaled-as-entry`, 2026-07-27).** 28
-sample `.cmmn` files under `Conformance/Samples/`; 38 scenarios (`CaseFileScenarios` 3,
-`InstantiationScenarios` 2, `KnownGapScenarios` 10, `LifecycleScenarios` 12, `SentryScenarios` 11)
-— **38 executed green, 0 quarantined/skipped, 0 failing**. `KnownGapScenarios.cs` keeps its name
+**#180 fix + follow-up (branch `fix/180-empty-stage-completion`, 2026-07-27).**
+`StageBehavior.HandleChildTransitioned` evaluated Table 8.12 completion criteria exclusively in
+reaction to a child's own terminal transition, so a Stage with zero `PlanItems` (which produces
+zero child transitions) never triggered that evaluation and an `autoComplete=TRUE` empty Stage —
+which satisfies "no Active children, all required children terminal" VACUOUSLY over the empty set
+— sat Active forever. Fixed by extracting the `autoComplete=TRUE` predicate-and-act out of
+`HandleChildTransitioned` into `StageBehavior.TryAutoComplete` and calling it once more, from
+`HandleEnterActiveFromStart`, gated on `PlanItemDefinition.AutoComplete &&
+!PlanItemDefinition.PlanItems.Any()` — the empty-`PlanItems` gate means the new call is
+unreachable for any Stage that has a `PlanItem` at all (including a repeating one, whose
+repetition-0 instance is created by the same fan-out this call follows), so it cannot interact
+with the repetition/spawn race; the `AutoComplete` gate preserves `autoComplete=FALSE`'s
+requirement for explicit completion for an empty Stage. Graduated from a standalone repro test
+into three real `.cmmn`-driven scenarios in `LifecycleScenarios.cs` (an empty `<stage>` element
+round-trips through `CmmnXmlSerializer`/`CmmnCapabilityLint`/`ToDeployableCase` like any other
+sample, so there was no reason to keep it outside this suite): the original vacuous-completion
+case, the `autoComplete=FALSE` negative direction (must NOT auto-complete), and an
+all-discretionary-children Stage (zero fixed `PlanItems`, a non-null `PlanningTable`) confirming
+Table 8.12's `autoComplete=TRUE` column carries no "no DiscretionaryItems pending" term — see
+`StageCompletion__Given_AutoCompleteStageWithOnlyDiscretionaryItems__…` and the fix's own remarks
+in `StageBehavior.HandleEnterActiveFromStart` for why that conjunct is deliberately absent from the
+new gate. (Noted, not fixed here: an empty `autoComplete=TRUE` Stage that ALSO carries a
+`RepetitionRule` plus an explicit auto-activation rule would now complete-and-respawn in a loop,
+bounded only by the #67 repetition ceiling — a pre-existing hazard class this fix does not
+introduce, since pre-fix the Stage was simply wedged instead.)
+
+**Current state (develop HEAD + `fix/180-empty-stage-completion`, 2026-07-27).** 31
+sample `.cmmn` files under `Conformance/Samples/`; 41 scenarios (`CaseFileScenarios` 3,
+`InstantiationScenarios` 2, `KnownGapScenarios` 10, `LifecycleScenarios` 15, `SentryScenarios` 11)
+— **41 executed green, 0 quarantined/skipped, 0 failing**. `KnownGapScenarios.cs` keeps its name
 and the quarantine machinery described in the honesty rule above for the next engine gap this
 suite finds, but every scenario inside it today is an ordinary green `[Fact]`, not a quarantined
 `[Fact(Skip = ...)]` — that file's own header remarks still narrate the ORIGINAL failure
 investigations (including FINDING-1) for historical context only. This COVERAGE.md file is the
 current-status source of truth; where its per-row Status column disagrees with prose elsewhere,
 the Status column wins.
-
 ## Engine findings discovered by this suite (details in the #21 report)
 
 | Finding | One-line summary | Work item |
@@ -242,6 +267,9 @@ the Status column wins.
 | Spec rule | Scenario(s) | Status |
 |---|---|---|
 | 8.6.1 Table 8.12 autoComplete=TRUE | `LifecycleScenarios.TaskLifecycle__…CompleteCompletesCase` (case completes when last child terminal) | Pinned |
+| 8.6.1 Table 8.12 autoComplete=TRUE — vacuous satisfaction with zero children (#180) | `LifecycleScenarios.StageCompletion__Given_AutoCompleteStageWithZeroPlanItems__Then_CompletesVacuously` | Pinned (#180 — `StageBehavior.HandleEnterActiveFromStart` now evaluates the shared `TryAutoComplete` predicate once, inline, after its own (here empty) child fan-out, instead of only reactively from `HandleChildTransitioned`) |
+| 8.6.1 Table 8.12 autoComplete=FALSE — zero children requires explicit completion (#180 follow-up) | `LifecycleScenarios.StageCompletion__Given_NotAutoCompleteStageWithZeroPlanItems__Then_DoesNotAutoCompleteButManualSucceeds` | Pinned (#180 — the fix's new eager check is gated on `AutoComplete`, so this shape is untouched) |
+| 8.6.1 Table 8.12 autoComplete=TRUE — no DiscretionaryItems conjunct, all-discretionary Stage (#180 follow-up) | `LifecycleScenarios.StageCompletion__Given_AutoCompleteStageWithOnlyDiscretionaryItems__Then_CompletesVacuously` | Pinned (#180 — a deliberate reading: the autoComplete=TRUE column has no such term, unlike the autoComplete=FALSE column's Branch 1) |
 | 8.6.1 Table 8.12 autoComplete=FALSE — manual-completion OR-branch (D4) | `KnownGapScenarios.StageCompletion__…ManualCompletionBecomesAvailable` | Pinned (#68 — `StageBehavior.HandleChildTransitioned`'s `UserCompletable` flag-raise condition now gates on `!PlanItemDefinition.AutoComplete` and requires only required children terminal, matching `ManualCompletionCriteriaSatisfied`'s autoComplete=FALSE arm fixed by !26/#19; the observable flag now flips even while a non-required child stays Active) |
 | 8.6.2 ManualActivationRule TRUE → Enabled (incl. Table 5.51 default) | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…`, `…DisableAndReenable…`, `StageLifecycle__…` | Pinned |
 | 8.6.2 ManualActivationRule FALSE → Active | `LifecycleScenarios.TaskLifecycle__…ManualActivationRuleFalse…` | Pinned |
