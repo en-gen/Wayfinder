@@ -3,7 +3,9 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
 using Wayfinder.Grains.Plan.PlanItem;
+using Wayfinder.Grains.Plan.PlanItem.Events;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
@@ -160,6 +162,134 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "Table 8.8 (exit): the Task must transition Active -> Terminated when its exit criterion's sentry is satisfied");
         }
 
+        // ADO #183 - Table 8.8 (exit) + 8.5: satisfying a Task's EXIT criterion must journal and
+        // project ONLY ExitCriterionSatisfied. StageBehavior/TaskBehavior.HandleSentrySatisfied
+        // used to raise Host.RaiseEvent(new EntryCriterionSatisfied {...}) UNCONDITIONALLY, before
+        // branching on whether the satisfied criterion was actually an EntryCriterion or an
+        // ExitCriterion; PlanItemStore.Apply(EntryCriterionSatisfied) then applied it to
+        // EntryCriterionStore regardless of source. TaskA declares ZERO entry criteria in
+        // Sentry_ExitCriterionTask.cmmn, so there is no legitimate mechanism by which its
+        // EntryCriterionStore could ever read Satisfied - if it does, that is unambiguous proof of
+        // the cross-contamination, not a false positive from some other satisfied entry criterion.
+        // Checked two ways: (1) the live projection (GetSnapshot().EntryCriterionStore) - what any
+        // projection/read-model consumer would see; (2) the raw persisted journal
+        // (GetJournaledEvents(), the #59 seam) - proving the wrong event TYPE is what got durably
+        // recorded, which is what JournaledGrain replay will always reproduce on any future
+        // rehydration (Apply() is a pure fold over exactly this event sequence). Graduated from
+        // its original quarantine as a one-off `Plan/Sentry/Repro/Issue183_*` reproduction into
+        // this file per COVERAGE.md's honesty rule - it is an ordinary .cmmn-driven scenario
+        // reusing Sentry_ExitCriterionTask.cmmn (the same sample the functional exit scenario
+        // above already deploys), not a special case that belongs outside the suite's convention.
+        [Fact]
+        [ConformanceCitation("Table 8.8 / exit (Task) - journal/projection fidelity")]
+        [ConformanceCitation("8.5 / sentry satisfaction must raise the event matching the criterion's type")]
+        public async Task Sentry__Given_TaskExitCriterion__Then_EntryCriterionStoreAndJournalStayClean()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_ExitCriterionTask.cmmn");
+
+            var taskGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemA", deployed.Scope);
+
+            var beforeSnapshot = await taskGrain.GetSnapshot();
+            beforeSnapshot.PlanItemState.Should().Be(PlanItemState.Active,
+                "the Task must be executing before its exit criterion fires - 8.5 gates exit evaluation on Active");
+            beforeSnapshot.EntryCriterionStore.State.Should().Be(CriterionState.Unsatisfied,
+                "TaskA declares NO entry criterion at all in Sentry_ExitCriterionTask.cmmn - there is no " +
+                "legitimate way its EntryCriterionStore could be anything but Unsatisfied before anything fires");
+
+            var beforeEvents = await taskGrain.GetJournaledEvents();
+            beforeEvents.OfType<EntryCriterionSatisfied>().Should().BeEmpty(
+                "no entry criterion has been satisfied (or even declared) yet");
+
+            var exitItem = _harness.CaseFileItem(deployed.CaseInstanceId, "ExitItem");
+            await exitItem.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "ExitItem" }, JsonNode.Parse("""{"abort": false}"""));
+            await exitItem.Update(JsonNode.Parse("""{"abort": true}"""));
+
+            var terminated = await ConformanceHarness.PollUntil(
+                async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
+            terminated.Should().BeTrue(
+                "Table 8.8 (exit): the Task must transition Active -> Terminated when its exit criterion's " +
+                "sentry is satisfied - this functional path is not what #183 disputes");
+
+            var afterSnapshot = await taskGrain.GetSnapshot();
+
+            // Sanity: the exit side DID work correctly (matches the issue's own observation that
+            // this bug is invisible to functional testing because ExitCriterionSatisfied is also
+            // raised correctly).
+            afterSnapshot.ExitCriterionStore.State.Should().HaveFlag(CriterionState.Satisfied,
+                "the exit criterion genuinely was satisfied and must be reflected in ExitCriterionStore");
+
+            // THE KEY ASSERTION - fails without the #183 fix: TaskA has no entry criterion, so
+            // nothing should ever be able to mark EntryCriterionStore Satisfied.
+            afterSnapshot.EntryCriterionStore.State.Should().Be(CriterionState.Unsatisfied,
+                "TaskA declares no entry criterion - only its EXIT criterion fired, so EntryCriterionStore " +
+                "must remain Unsatisfied. If this fails, HandleSentrySatisfied is raising EntryCriterionSatisfied " +
+                "unconditionally (before branching on the criterion's actual type), and PlanItemStore is " +
+                "applying it to EntryCriterionStore regardless of source - corrupting the entry-criterion " +
+                "projection exactly as #183 describes.");
+
+            // Journal-level proof: the wrong event TYPE must not even be PERSISTED, independent of
+            // how the in-memory projection folds it - this is what makes it a journaling/replay
+            // defect (any future rehydration folds over exactly this persisted sequence) rather
+            // than a purely transient in-memory issue.
+            var afterEvents = await taskGrain.GetJournaledEvents();
+            afterEvents.OfType<ExitCriterionSatisfied>().Should().HaveCount(1,
+                "exactly one ExitCriterion was satisfied exactly once");
+            afterEvents.OfType<EntryCriterionSatisfied>().Should().BeEmpty(
+                "TaskA has no entry criterion - no EntryCriterionSatisfied event should ever be journaled for it. " +
+                "If this fails, the journal itself (not just the in-memory projection) contains an " +
+                "EntryCriterionSatisfied event for what was actually an exit-criterion satisfaction - exactly " +
+                "the corrupted audit/journal record #183 describes, and any replay/rehydration of this grain " +
+                "from the journal will reproduce the same corrupted EntryCriterionStore every time.");
+        }
+
+        // ADO #183 companion (positive path): Table 8.7 (entry) + 8.5 sentry semantics - a
+        // GENUINE entry criterion satisfaction must still raise EntryCriterionSatisfied and mark
+        // EntryCriterionStore Satisfied, both in the live projection and in the persisted
+        // journal. #183's fix moved that RaiseEvent inside the `criterion is EntryCriterion`
+        // branch of StageBehavior/TaskBehavior.HandleSentrySatisfied (previously unconditional,
+        // which spuriously journaled it for EXIT criteria too - see the exit-side scenario
+        // immediately above); this scenario pins that the entry side was not accidentally broken
+        // by tightening that condition.
+        [Fact]
+        [ConformanceCitation("Table 8.7 / entry")]
+        [ConformanceCitation("8.5 / sentry satisfaction drives EntryCriterionSatisfied")]
+        public async Task Sentry__Given_TaskEntryCriterion__Then_CaseFileEventSatisfiesEntryAndJournalsEntryCriterionSatisfied()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_EntryCriterionTask.cmmn");
+
+            var taskGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "PlanItemA", deployed.Scope);
+
+            (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available,
+                "TaskA declares an entry criterion, so it must wait in Available (8.7) until EntrySentry is satisfied");
+            (await taskGrain.GetSnapshot()).EntryCriterionStore.State.Should().Be(CriterionState.Unsatisfied,
+                "EntrySentry has not fired yet");
+
+            var entryItem = _harness.CaseFileItem(deployed.CaseInstanceId, "EntryItem");
+            await entryItem.Create(deployed.CaseDefinitionId, new CaseFileItem { Id = "EntryItem" }, JsonNode.Parse("""{"ready": false}"""));
+            await entryItem.Update(JsonNode.Parse("""{"ready": true}"""));
+
+            var active = await ConformanceHarness.PollUntil(
+                async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Active);
+            active.Should().BeTrue(
+                "Table 8.7 (entry) + 8.6.2: the ManualActivationRule's condition evaluates FALSE (mirrors " +
+                "Sentry_ExitCriterionTask.cmmn's own MAR_1), so satisfying the entry criterion transitions " +
+                "TaskA straight from Available to Active via Start");
+
+            var afterSnapshot = await taskGrain.GetSnapshot();
+            afterSnapshot.EntryCriterionStore.State.Should().HaveFlag(CriterionState.Satisfied,
+                "a genuine EntryCriterion satisfaction must still mark EntryCriterionStore Satisfied - the #183 " +
+                "fix must not over-correct into dropping legitimate EntryCriterionSatisfied events");
+
+            var afterEvents = await taskGrain.GetJournaledEvents();
+            afterEvents.OfType<EntryCriterionSatisfied>().Should().HaveCount(1,
+                "the entry criterion was satisfied exactly once, and the event journaled for it must be the " +
+                "correctly-typed EntryCriterionSatisfied - not merely reflected in the in-memory projection");
+            afterEvents.OfType<ExitCriterionSatisfied>().Should().BeEmpty(
+                "TaskA declares no exit criterion at all - no ExitCriterionSatisfied should ever be journaled for it");
+        }
+
         // Table 8.8 (exit) for a STAGE: StageA's exit criterion fires from a case-file event and
         // terminates the (manual-started) Active StageA - no Case-worker trigger. Pins the D6 fix
         // (stage exit criteria armed on the create path). Table 8.9's mandated termination
@@ -232,6 +362,21 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             caseTerminated.Should().BeTrue(
                 "Table 8.6 (terminate via exit criteria): the Case must transition Active -> Terminated when the " +
                 "CasePlanModel's own exit criterion's sentry is satisfied");
+
+            // ADO #183: CasePlanModelBehavior shares StageBehavior.HandleSentrySatisfied verbatim
+            // (no override - see CasePlanModelBehavior's own remarks), so the identical
+            // spurious-EntryCriterionSatisfied corruption applied here too whenever a Case
+            // terminated via its own exit criterion. 8.4.1 prohibits the CasePlanModel from
+            // declaring entry criteria at all, so - exactly like TaskA in
+            // Sentry_ExitCriterionTask.cmmn - there is no legitimate mechanism by which
+            // CaseStore.EntryCriterionStore could ever read Satisfied; if it does, that is the same
+            // cross-contamination #183 describes, at the CasePlanModel's own root.
+            (await deployed.CaseGrain.GetSnapshot()).EntryCriterionStore.State.Should().Be(CriterionState.Unsatisfied,
+                "the CasePlanModel cannot declare entry criteria (8.4.1) - only its own EXIT criterion fired, so " +
+                "EntryCriterionStore must remain Unsatisfied");
+            (await deployed.CaseGrain.GetJournaledEvents()).OfType<EntryCriterionSatisfied>().Should().BeEmpty(
+                "no EntryCriterionSatisfied should ever be journaled for the CasePlanModel - its own exit " +
+                "criterion firing must not also persist the wrong event type (#183)");
 
             // Table 8.9's mandated termination cascade: the CasePlanModel now reaches Terminated
             // via `terminate` rather than `exit` (see the class remarks above), and

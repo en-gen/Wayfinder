@@ -195,15 +195,22 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 @event.SourceDefinitionId,
                 @event.OnPartOccurred));
 
-            Host.RaiseEvent(new EntryCriterionSatisfied
-            {
-                SourceScope = @event.SourceScope,
-                SourceId = @event.SourceDefinitionId,
-                OnPartOccurred = @event.OnPartOccurred
-            });
-
             if (criterion is EntryCriterion)
             {
+                // ADO #183 - raise the event matching the criterion's actual type. Previously
+                // EntryCriterionSatisfied was raised unconditionally before this branch, so an
+                // ExitCriterion satisfaction also journaled a spurious EntryCriterionSatisfied
+                // and corrupted PlanItemStore.EntryCriterionStore for PlanItems with no entry
+                // criterion at all (PlanItemStore.Apply(EntryCriterionSatisfied) applies to
+                // EntryCriterionStore regardless of source). See the ExitCriterion branch below
+                // for the mirrored fix on the exit side.
+                Host.RaiseEvent(new EntryCriterionSatisfied
+                {
+                    SourceScope = @event.SourceScope,
+                    SourceId = @event.SourceDefinitionId,
+                    OnPartOccurred = @event.OnPartOccurred
+                });
+
                 // disregard entry criteria if already repeated
                 //   - just being defensive. this should never happen as entry criteria
                 //     subs are removed on repeat

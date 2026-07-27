@@ -107,15 +107,52 @@ source. Table 8.11's "when ONE of the achieving Sentries (entry criteria) is sat
 previously untested — is now Pinned for the entry-criteria case (the equivalent exit-criteria-OR
 shape remains unscenario-ized; see §8.5 below).
 
-**Current state (develop HEAD, 2026-07-14).** 26 sample `.cmmn` files under `Conformance/Samples/`;
-35 scenarios (`CaseFileScenarios` 3, `InstantiationScenarios` 2, `KnownGapScenarios` 10,
-`LifecycleScenarios` 12, `SentryScenarios` 8) — **35 executed green, 0 quarantined/skipped, 0
-failing**. `KnownGapScenarios.cs` keeps its name and the quarantine machinery described in the
-honesty rule above for the next engine gap this suite finds, but every scenario inside it today is
-an ordinary green `[Fact]`, not a quarantined `[Fact(Skip = ...)]` — that file's own header remarks
-still narrate the ORIGINAL failure investigations (including FINDING-1) for historical context
-only. This COVERAGE.md file is the current-status source of truth; where its per-row Status column
-disagrees with prose elsewhere, the Status column wins.
+**#183 (entry/exit criterion event-type journaling) fix (2026-07-27).**
+`StageBehavior`/`TaskBehavior.HandleSentrySatisfied` raised `Host.RaiseEvent(new
+EntryCriterionSatisfied {...})` UNCONDITIONALLY, before branching on whether the satisfied
+criterion was actually an `EntryCriterion` or an `ExitCriterion`; `PlanItemStore.Apply
+(EntryCriterionSatisfied)` then applied it to `EntryCriterionStore` regardless of source —
+corrupting the entry-criterion projection AND the persisted journal for any Task/Stage whose exit
+criterion fired, including PlanItems with no entry criterion declared at all. `ExitCriterionSatisfied`
+was also raised correctly afterward, which is why the functional behavior looked fine; only the
+projection and journal were wrong. Fixed by moving the `EntryCriterionSatisfied` raise inside the
+`criterion is EntryCriterion` branch in both behaviors. `CasePlanModelBehavior` shares
+`StageBehavior.HandleSentrySatisfied` verbatim (no override) and is covered by the same fix.
+`MilestoneBehavior`'s own unconditional raise was already correct (it only ever resolves against
+`EntryCriteria`, never `ExitCriteria`); `EventListenerBehavior.HandleSentrySatisfied` is a no-op.
+Graduated the original one-off reproduction (`Plan/Sentry/Repro/Issue183_*`, which broke this
+suite's own convention that every spec-relevant scenario is `.cmmn`-driven and lives in
+`Conformance/*Scenarios.cs`) into
+`SentryScenarios.Sentry__Given_TaskExitCriterion__Then_EntryCriterionStoreAndJournalStayClean`,
+reusing the existing `Sentry_ExitCriterionTask.cmmn` sample — no new sample needed. Added a
+positive-path companion, `Sentry_EntryCriterionTask.cmmn` +
+`SentryScenarios.Sentry__Given_TaskEntryCriterion__Then_CaseFileEventSatisfiesEntryAndJournalsEntryCriterionSatisfied`,
+proving a GENUINE entry-criterion satisfaction still raises and journals `EntryCriterionSatisfied`
+correctly (the fix must not over-correct into silently dropping a legitimate event). Also extended
+`Sentry__Given_CasePlanModelExitCriterion__Then_CaseFileEventTerminatesCase` with the same
+projection/journal assertions at the CasePlanModel root, since `CaseStore.EntryCriterionStore` had
+the identical exposure whenever a Case terminated via its own exit criterion — previously
+unproven. Added a unit-level regression guard (`Times.Never` on `RaiseEvent<EntryCriterionSatisfied>`)
+to both `StageBehaviorTests_HandleSentrySatisfied`'s and
+`TaskBehaviorTests_HandleSentrySatisfied`'s existing `…When_ExitCriterion__Then_RaiseEventAndExit`
+tests — confirmed by temporarily reverting the fix that this assertion fails against the buggy
+code, so it is a genuine regression guard, not a tautology. No consumer of the projection
+(`PlanItemStore`, `CaseStore`, `SnapshotMapper`) depended on the spurious event. The project is
+pre-1.0 (`CHANGELOG.md` is entirely `[Unreleased]`, no version tags) so no journal-migration
+concern applies to any already-persisted case; the fix is forward-only (existing-journal cases
+which already recorded the spurious event will still replay corrupted — a known, accepted
+limitation, not addressed here).
+
+**Current state (develop HEAD + `fix/183-exit-criterion-journaled-as-entry`, 2026-07-27).** 28
+sample `.cmmn` files under `Conformance/Samples/`; 38 scenarios (`CaseFileScenarios` 3,
+`InstantiationScenarios` 2, `KnownGapScenarios` 10, `LifecycleScenarios` 12, `SentryScenarios` 11)
+— **38 executed green, 0 quarantined/skipped, 0 failing**. `KnownGapScenarios.cs` keeps its name
+and the quarantine machinery described in the honesty rule above for the next engine gap this
+suite finds, but every scenario inside it today is an ordinary green `[Fact]`, not a quarantined
+`[Fact(Skip = ...)]` — that file's own header remarks still narrate the ORIGINAL failure
+investigations (including FINDING-1) for historical context only. This COVERAGE.md file is the
+current-status source of truth; where its per-row Status column disagrees with prose elsewhere,
+the Status column wins.
 
 ## Engine findings discovered by this suite (details in the #21 report)
 
@@ -134,7 +171,7 @@ disagrees with prose elsewhere, the Status column wins.
 | Table 8.6 suspend — downward propagation (Table 8.5 Suspended MUST) | `KnownGapScenarios.CaseSuspend__…SuspensionPropagatesToTask` | Pinned (#63) |
 | Table 8.6 terminate (Active → Terminated), case's own transition | `LifecycleScenarios.CaseLifecycle__…TerminateAndReactivateWalkTable86` | Pinned |
 | Table 8.6 terminate — downward propagation | `KnownGapScenarios.CaseTerminate__…TerminationPropagatesToMilestone` | Pinned (#63) |
-| Table 8.6 terminate — via CasePlanModel's own exit criteria (8.4.1) | `SentryScenarios.Sentry__Given_CasePlanModelExitCriterion__…CaseFileEventTerminatesCase` (asserts both the Case's own terminate and the Table 8.9 cascade to a child Task) | Pinned (#66) |
+| Table 8.6 terminate — via CasePlanModel's own exit criteria (8.4.1) | `SentryScenarios.Sentry__Given_CasePlanModelExitCriterion__…CaseFileEventTerminatesCase` (asserts the Case's own terminate, the Table 8.9 cascade to a child Task, AND — #183 — that `CaseStore.EntryCriterionStore`/journal stay clean of a spurious `EntryCriterionSatisfied`, since `CasePlanModelBehavior` shares `StageBehavior.HandleSentrySatisfied` verbatim) | Pinned (#66, #183) |
 | Table 8.6 complete (Active → Completed, via Table 8.12) | `LifecycleScenarios.TaskLifecycle__…CompleteCompletesCase` | Pinned |
 | Table 8.6 fault (Active → Failed) | `LifecycleScenarios.CaseLifecycle__…FaultReachesFailedAndReactivateRecovers` | Pinned |
 | Table 8.6 re-activate from Failed | `LifecycleScenarios.CaseLifecycle__…FaultReachesFailedAndReactivateRecovers` | Pinned |
@@ -167,7 +204,7 @@ disagrees with prose elsewhere, the Status column wins.
 | Table 8.8 complete (Active → Completed) — Task | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…` | Pinned |
 | Table 8.8 complete — RepetitionRule re-evaluation for no-entry-criteria items | `KnownGapScenarios.TaskRepetition__…CompletionSpawnsNewInstance` | Pinned (#19/D7, PR !26 `d991861`) |
 | Table 8.8 terminate (Active → Terminated, Case worker) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` | Pinned |
-| Table 8.8 exit — Task (exit criterion while Active) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…` | Pinned |
+| Table 8.8 exit — Task (exit criterion while Active) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…CaseFileEventTerminatesActiveTask` (functional); `…Then_EntryCriterionStoreAndJournalStayClean` (#183 — projection/journal fidelity: no spurious `EntryCriterionSatisfied`) | Pinned |
 | Table 8.8 exit — Stage (exit criterion while Active; D6 fix) | `SentryScenarios.Sentry__Given_StageExitCriterion__…` | Pinned |
 | Table 8.9 exit/terminate propagation to children | `KnownGapScenarios.StageExit__…ExitCascadesTerminationToTask` | Pinned (#63) |
 | Table 8.9 fault rows (children keep state on parent fault) | fault non-propagation pinned at the Case level (`TaskLifecycle__…FaultReactivate…`'s parent-still-Active assert); per-child state matrix not separately scenario-ized | Pinned (non-propagation observable) |
@@ -193,8 +230,9 @@ disagrees with prose elsewhere, the Status column wins.
 | Satisfaction bullet 1: OnParts + IfPart TRUE over CaseFile context | `SentryScenarios.Sentry__Given_IfPartOverCaseFileContext__…` (string condition); numeric variant pinned by pre-existing D1 flagship tests | Pinned |
 | Satisfaction bullet 3: standalone IfPart, no OnParts (D3) | `SentryScenarios.Sentry__Given_StandaloneIfPart__…` | Pinned |
 | "IfPart … evaluated for all CaseFileItem events" (case-wide) | `SentryScenarios.Sentry__Given_StandaloneIfPart__…` (unrelated-item event evaluated without spurious fire) | Pinned |
-| Entry criteria ready while Available | every entry-criterion scenario (milestone waits in Available until satisfied) | Pinned |
+| Entry criteria ready while Available | every entry-criterion scenario (milestone/Task wait in Available until satisfied); `SentryScenarios.Sentry__Given_TaskEntryCriterion__…` (#183 companion) additionally asserts the Task's `EntryCriterionSatisfied` is correctly raised AND journaled | Pinned |
 | Exit criteria ready while Active (Task and Stage) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…` / `…StageExitCriterion__…` | Pinned |
+| Sentry satisfaction raises the event matching the criterion's actual type (Entry vs. Exit), not raised unconditionally | `SentryScenarios.Sentry__Given_TaskExitCriterion__Then_EntryCriterionStoreAndJournalStayClean` (exit side stays clean of a spurious `EntryCriterionSatisfied`, live projection AND persisted journal) / `…Sentry__Given_TaskEntryCriterion__…` (entry side still fires correctly) / `…Sentry__Given_CasePlanModelExitCriterion__…` (same fidelity at the CasePlanModel root) | Pinned (#183) |
 | Per-OnPart re-arm across distinct source occurrences (Figure 8.5 B/B′; D5 fix) | `SentryScenarios.Sentry__Given_RepeatableMilestone__…RearmsAcrossDistinctSourceInstances` | Pinned |
 | PlanItemOnPart via `sourceRef`/`exitCriterionRef` (Table 5.30 exit mode) | `SentryScenarios.Sentry__Given_PlanItemOnPartWithExitCriterionRef__…` | Pinned (Bug #82 — D10 fix: `PlanItemStateMachine`'s parameterized Exit trigger threads the firing `ExitCriterion`'s own id through `BaseBehavior.HandleTransitioned` into `PlanItemTransitionedEvent.ExitCriterionRef`; `CmmnCapabilityLint`'s former rule 4 removed) |
 | Multiple entry/exit criteria — only one needed | `SentryScenarios.Sentry__Given_TwoEntryCriteria__Then_EitherAloneSatisfiesEntry` (#87): a PlanItem with two independent, single-OnPart entry criteria fires on satisfying only the second; the exit-criteria analog is untested — no sample declares a PlanItem with two `<exitCriterion>` elements | Pinned (entry criteria, #87) / KnownGap (exit criteria — no scenario yet, no work item filed) |
@@ -238,7 +276,7 @@ disagrees with prose elsewhere, the Status column wins.
 
 ## Import / lint / deploy pipeline (the suite's own plumbing)
 
-Every scenario transitively pins: `CmmnXmlSerializer.Import` on all 26 sample files,
+Every scenario transitively pins: `CmmnXmlSerializer.Import` on all 28 sample files,
 `CmmnCapabilityLint` clean-pass gating (`DeployAndCreate` throws on `HasUnsupported`),
 `ToDeployableCase`, and `Define`/`Create`/`Trigger` deployment. The importer/lint's own
 behavior matrix is pinned by the ADO #20 suites (`CmmnXmlSerializerTests`,
