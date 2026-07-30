@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Wayfinder.Grains.Plan.PlanItem.Events;
 using Orleans;
 
@@ -47,6 +48,53 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
 
         public bool IsRepetitionRedelivery(string sourceInstanceId) =>
             sourceInstanceId != null && _repetitionSourceInstanceIds.Contains(sourceInstanceId);
+
+        // #178 - repetition requests observed while this Host was genuinely Suspended, queued for
+        // replay once it returns to Active (StageBehavior.DrainPendingRepetitions). A List (not a
+        // Dictionary) so drain order is FIFO by arrival, matching the order the corresponding
+        // PlanItemRepetitionCriteriaMetEvent deliveries actually occurred in; HasPendingRepetition
+        // below is the dedupe check that keeps this keyed on SourceInstanceId in practice (the
+        // #161 redelivery guard's own key) without needing a second index - the list is expected
+        // to stay small (bounded by legitimate activity during one suspension), unlike Children/
+        // _repetitionSourceInstanceIds above which grow for the container's entire lifetime.
+        [Id(2)]
+        public IList<PendingRepetition> PendingRepetitions { get; } = new List<PendingRepetition>();
+
+        // #178 hazard 1 - keyed on the SAME SourceInstanceId the #161 guard above uses, so a
+        // redelivered PlanItemRepetitionCriteriaMetEvent that arrives a second time while still
+        // Suspended cannot queue a second, duplicate buffered entry for the same logical request.
+        public bool HasPendingRepetition(string sourceInstanceId) =>
+            sourceInstanceId != null && PendingRepetitions.Any(p => p.SourceInstanceId == sourceInstanceId);
+
+        // #178 - write side of the buffer. A redelivery of an already-buffered request (same
+        // SourceInstanceId) is intentionally a silent no-op here - StageBehavior's caller already
+        // logs the redelivery before ever raising this event, so guarding it a second time here
+        // would just be defensive-in-depth against a directly-constructed duplicate event.
+        public void Apply(RepetitionBuffered @event)
+        {
+            if (@event.SourceInstanceId != null && !HasPendingRepetition(@event.SourceInstanceId))
+            {
+                PendingRepetitions.Add(new PendingRepetition
+                {
+                    SourceInstanceId = @event.SourceInstanceId,
+                    PlanItemDefinitionId = @event.PlanItemDefinitionId,
+                    NextRepetition = @event.NextRepetition
+                });
+            }
+        }
+
+        // #178 - removes one drained entry (whether it was successfully spawned or refused by the
+        // #67 ceiling - see StageBehavior.DrainPendingRepetitions). SourceInstanceId is unique per
+        // entry (HasPendingRepetition/Apply(RepetitionBuffered) above enforce that), so at most one
+        // match is ever removed.
+        public void Apply(RepetitionBufferDrained @event)
+        {
+            var entry = PendingRepetitions.FirstOrDefault(p => p.SourceInstanceId == @event.SourceInstanceId);
+            if (entry != null)
+            {
+                PendingRepetitions.Remove(entry);
+            }
+        }
 
         public void Apply(ChildCreated @event)
         {

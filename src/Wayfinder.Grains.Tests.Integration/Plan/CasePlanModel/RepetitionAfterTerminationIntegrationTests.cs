@@ -16,66 +16,72 @@ using Xunit;
 using CaseModel = Wayfinder.Grains.Interfaces.Model.Case;
 using SentryModel = Wayfinder.Grains.Interfaces.Model.Sentry;
 
-namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.Repro
+namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 {
-    // ISSUE #178 REPRODUCTION - "zombie execution": a Terminated Stage may still spawn a
+    // Issue #178 - "zombie execution": before this fix, a Terminated Stage could still spawn a
     // repetition child.
     //
-    // Claimed mechanism:
+    // Root cause (two independent contributors):
     //   - BaseBehavior.HandleEnterTerminal (BaseBehavior.cs) unsubscribes ONLY ExitCriteria on
     //     entry to a terminal state:
     //         Task HandleEnterTerminal() => Task.WhenAll(Host.Definition.ExitCriteria
     //             .Select(c => Host.UnsubscribeFrom<SentrySatisfiedEvent>(c.SentryRef)));
     //     A child's EntryCriteria subscription is left standing even after the child reaches
-    //     Terminated via a parent-cascaded Exit (HandleParentTransitioned).
-    //   - StageBehavior.HandleChildRepeated (StageBehavior.cs) never consults
-    //     Host.State.PlanItemState - it acts on ANY PlanItemRepetitionCriteriaMetEvent scoped to
-    //     this stage, regardless of whether the stage itself is Active, Terminated, or Suspended:
-    //         private async Task HandleChildRepeated(PlanItemRepetitionCriteriaMetEvent @event, ...)
-    //         {
-    //             if (@event.SourceScope != Host.Address) return;
-    //             ...
-    //             await CreateChild(child, nextRepetition);
-    //         }
-    //   - TaskBehavior.HandleSentrySatisfied's repetition branch has no state guard either - a
-    //     Terminated child whose Repeated flag is still false (it reached Terminated via a
-    //     parent-cascaded Exit, not via detecting a repeat) will happily take the repetition
-    //     branch on a later, genuine satisfaction of its still-live entry criterion.
+    //     Terminated via a parent-cascaded Exit (HandleParentTransitioned) - so the event stream
+    //     StageBehavior.HandleChildRepeated listens on can still deliver.
+    //   - StageBehavior.HandleChildRepeated (StageBehavior.cs) used to never consult
+    //     Host.State.PlanItemState - it acted on ANY PlanItemRepetitionCriteriaMetEvent scoped to
+    //     this stage, regardless of whether the stage itself was Active, Terminated, or Suspended.
+    //     Fixed by branching on Host.State.PlanItemState before ever reaching the ceiling-check/
+    //     CreateChild machinery: Completed/Terminated/Closed refuse outright (Table 8.9 - a
+    //     terminating Stage cascades exit to every non-terminal child first, so nothing live can
+    //     remain to legitimately request one); Suspended buffers the request for replay on resume
+    //     instead of dropping it (docs/03-cmmn-execution-semantics.md section 2 - the request was
+    //     earned before suspension, merely late); Failed refuses but raises an observable event
+    //     (RepetitionRefusedWhileFailed), since re-activation is a human recovery action and a
+    //     silent stale replay into a just-recovered case would be surprising.
     //
-    // Reproduction (per the issue's own sketch): a nested Stage S with its own exit criterion,
-    // containing a repeating child Task T whose entry criterion is an INDEPENDENT Sentry (watches
-    // a sibling PlanItem inside S, not T's own lifecycle). S is driven to Active, its exit
-    // criterion fires (S -> Terminated, cascading T -> Terminated per Table 8.9), and only THEN is
-    // the independent sentry satisfied a SECOND time (Figure 8.5 B/B' - a second, distinct
-    // completion of the sibling source, exactly the pattern this suite already establishes in
-    // SentryRepetitionResetIntegrationTests/SentryScenarios). If the claim is real, T's still-live
-    // entry-criterion subscription reacts, and S's HandleChildRepeated spawns a new T instance
-    // inside the already-Terminated S.
+    // This scenario (per the issue's own reproduction sketch) exercises the Terminated half: a
+    // nested Stage S with its own exit criterion, containing a repeating child Task T whose entry
+    // criterion is an INDEPENDENT Sentry (watches a sibling PlanItem inside S, not T's own
+    // lifecycle). S is driven to Active, its exit criterion fires (S -> Terminated, cascading T ->
+    // Terminated per Table 8.9), and only THEN is the independent sentry satisfied a SECOND time
+    // (Figure 8.5 B/B' - a second, distinct completion of the sibling source, exactly the pattern
+    // this suite already establishes in SentryRepetitionResetIntegrationTests/SentryScenarios). T's
+    // still-live entry-criterion subscription reacts; the fix must refuse the resulting spawn
+    // attempt rather than let StageBehavior.HandleChildRepeated create a new T instance inside the
+    // already-Terminated S. The Suspended-buffers-and-replays-on-resume behavior, the redelivery-
+    // while-suspended dedupe, and the ceiling-still-applies-on-replay guarantee are all covered at
+    // the faster unit layer instead (StageBehaviorTests_HandleChildRepeated_RepetitionGuard.cs,
+    // Stores/StageBehaviorStoreTests.cs) - this integration test is reserved for the one assertion
+    // that genuinely needs the real grain/stream/cascade machinery: that a live parent-terminate
+    // cascade actually leaves the child's entry-criterion subscription active, and the fix refuses
+    // the resulting spawn attempt end-to-end.
     //
-    // ASSERTION STRATEGY (issue #174 compliance - this is fundamentally a NEGATIVE claim, "a
-    // Terminated stage must not spawn a repetition child", so a bare fixed sleep would be
-    // silently permissive):
+    // ASSERTION STRATEGY (issue #174 compliance - "a Terminated stage must not spawn a repetition
+    // child" is fundamentally a NEGATIVE claim, so a bare fixed sleep would be silently
+    // permissive):
     //   1. POSITIVE lower bound: poll (30s budget) for T's OWN Repeated flag to flip true. This is
-    //      strictly on the causal path BEFORE the Stage's (unguarded) CreateChild call - Repeated
+    //      strictly on the causal path BEFORE the Stage's HandleChildRepeated ever runs - Repeated
     //      is only raised AFTER Publish(PlanItemRepetitionCriteriaMetEvent) has already been
     //      awaited (TaskBehavior.HandleSentrySatisfied: Task.WhenAll(Unsubscribe, Publish) THEN
     //      RaiseEvent(Repeated)) - so observing Repeated == true proves the very event S's
     //      HandleChildRepeated reacts to has already been published, not merely attempted.
     //   2. No clean positive UPPER bound exists for "the Stage has finished NOT reacting" - the
-    //      cascade under test produces no other observable side effect besides the spawn itself.
-    //      Per this repro's own methodology, a documented 30s poll budget is used for the absence
-    //      check - generous enough that the handful of in-process awaits a real CreateChild call
-    //      performs (DefineRepetition, Trigger(Create), two SubscribeTo calls) would trivially
-    //      complete inside it on any engine, buggy or not. This budget is a deliberate,
-    //      acknowledged limitation, not a silent one.
+    //      cascade under test produces no other observable side effect besides the (refused) spawn
+    //      itself. A documented 30s poll budget is used for the absence check - generous enough
+    //      that the handful of in-process awaits a real CreateChild call performs (DefineRepetition,
+    //      Trigger(Create), two SubscribeTo calls) would trivially complete inside it on any
+    //      engine, fixed or not. This budget is a deliberate, acknowledged limitation, not a
+    //      silent one.
     [Collection(ClusterCollection.Name)]
-    public class Issue178_ZombieRepetitionIntegrationTests
+    public class RepetitionAfterTerminationIntegrationTests
     {
         private const string Scope = "CPM";
 
         private readonly IClusterClient _clusterClient;
 
-        public Issue178_ZombieRepetitionIntegrationTests(ClusterFixture fixture)
+        public RepetitionAfterTerminationIntegrationTests(ClusterFixture fixture)
         {
             _clusterClient = fixture.ClusterClient;
 
@@ -268,7 +274,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.Repro
                 TimeSpan.FromSeconds(30));
 
             secondChildSpawned.Should().BeFalse(
-                "#178: StageBehavior.HandleChildRepeated (StageBehavior.cs) never consults Host.State.PlanItemState " +
+                "#178: StageBehavior.HandleChildRepeated must consult Host.State.PlanItemState " +
                 "before calling CreateChild - a Terminated stage must not create new repetition children. " +
                 $"(Diagnostic: T's own Repeated flag reached true = {tRepeatedAfterTermination} before this check, " +
                 "confirming the repetition-triggering event was genuinely published, not merely never sent.)");

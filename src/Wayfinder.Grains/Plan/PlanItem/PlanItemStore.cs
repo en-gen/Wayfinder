@@ -180,6 +180,28 @@ namespace Wayfinder.Grains.Plan.PlanItem
             }
         }
 
+        // #178 - same delegation shape as Apply(ChildCreated)/Apply(ChildRepeated) above: the
+        // buffered-repetition queue lives on the nested StageBehaviorStore, not here.
+        public void Apply(RepetitionBuffered @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
+        public void Apply(RepetitionBufferDrained @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
         public void Apply(TimerStartTriggerOccurred @event)
         {
             Updated = @event.Updated;
