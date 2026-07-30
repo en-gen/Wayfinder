@@ -228,6 +228,25 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         private PlanItemControl GetItemControl() =>
             Host.Definition.ItemControl ?? PlanItemDefinition.DefaultControl;
 
+        // #182 (sub-claim 1) - exposed for TimerEventListenerBehavior's Completed-branch guard.
+        // ~~~~~
+        // EventListeners have no RepetitionRule concept per 5.4.11.3 (see
+        // TryRepeatOnCompleteOrTerminate's own remarks above, and the CONFIRMED evidence on #182:
+        // a recurring timer repeats via its own TimerExpression, not a spec-sanctioned
+        // RepetitionRule re-evaluation) - so this is deliberately NOT "does this item repeat per
+        // spec", it is "did a case author attach one anyway". Nothing in the schema forbids
+        // attaching an ItemControl.RepetitionRule to an EventListener PlanItem even though the
+        // spec gives it no meaning there, and TimerEventListenerBehavior uses this as an engine-
+        // level escape hatch: an explicitly-attached, explicitly-false rule stops an otherwise-
+        // unconditional recurring-timer republish from marching into the engine's own #67
+        // repetition ceiling (RepetitionGuardOptions.MaxRepetitionsPerPlanItem) and faulting the
+        // container - see RepetitionCeilingExceeded's remarks for why that ceiling is an engine
+        // safety valve, not spec surface, and therefore has no business faulting a genuinely
+        // unbounded, spec-legal recurring timer. When no rule is attached (the common case) this
+        // returns false and the timer's republish stays fully unconditional, unchanged from
+        // before this fix.
+        protected bool HasExplicitRepetitionRule() => GetItemControl()?.RepetitionRule != null;
+
         // 8.6.2 ManualActivationRule
         // ~~~~~
         // The ManualActivationRule determines whether the Task or Stage instance should move to state Enabled or Active.

@@ -199,5 +199,27 @@ namespace Wayfinder.Grains.Plan.PlanItem
                 timerStore.Apply(@event);
             }
         }
+
+        // #182 (sub-claim 2) - same delegation shape as TimerStartTriggerOccurred/
+        // TimerExpressionEvaluated above.
+        public void Apply(SuspendedTimerTickBuffered @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is TimerEventListenerBehaviorStore timerStore)
+            {
+                timerStore.Apply(@event);
+            }
+        }
+
+        public void Apply(SuspendedTimerTicksReplayed @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is TimerEventListenerBehaviorStore timerStore)
+            {
+                timerStore.Apply(@event);
+            }
+        }
     }
 }
