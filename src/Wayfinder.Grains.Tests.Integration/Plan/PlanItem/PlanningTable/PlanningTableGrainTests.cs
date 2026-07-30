@@ -1,13 +1,17 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using AutoFixture.Xunit2;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.CmmnElement.Events;
 using Wayfinder.Grains.Plan.PlanningTable;
+using Wayfinder.Grains.Plan.PlanningTable.Events;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Orleans;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
@@ -200,6 +204,54 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
             result.Should()
                 .ContainSingle()
                 .And.Contain(expectedResult);
+        }
+
+        // #184 - GetPlannableItems is a read-only query. It must not permanently mutate this
+        // grain's journal: repeated polling of an unchanged planning table should not accumulate
+        // journal entries 1:1 with read volume. ICmmnElementGrain.GetJournaledEvents() reads the
+        // grain's own confirmed journal directly (CmmnElementGrain.cs), and
+        // IManagementGrain.ForceActivationCollection forces a real activation recycle, proving
+        // whatever is asserted here actually ended up (or didn't) permanently in the journal -
+        // not just visible from within the activation that ran the reads.
+        [Theory, AutoData]
+        public async Task GetPlannableItems__Given_RepeatedReadOnlyPolling__Then_JournalDoesNotGrowWithReadVolume
+            (string caseDefinitionId, Guid caseInstanceId)
+        {
+            var discretionaryItem = new DiscretionaryItem
+            {
+                ApplicabilityRuleRefs = new[] { Rules.IsApplicable.Id }
+            };
+
+            var definition = new Interfaces.Model.PlanningTable
+            {
+                ApplicabilityRules = { Rules.IsApplicable },
+                TableItems = { discretionaryItem }
+            };
+
+            var subject = _clusterClient.GetGrain<IPlanningTableGrain>(caseInstanceId, ShortGuid.NewGuid());
+
+            await subject.Define(caseDefinitionId, definition);
+
+            const int pollCount = 20;
+            for (var i = 0; i < pollCount; i++)
+            {
+                var plannable = await subject.GetPlannableItems();
+
+                plannable.Should().ContainSingle().And.Contain(discretionaryItem,
+                    $"GetPlannableItems must keep answering correctly on read #{i + 1} - this is a journaling-hygiene fix, not a change to query behavior");
+            }
+
+            // force this activation to recycle so the assertion below reflects the PERMANENT
+            // journal, not merely what is visible from within the activation that did the reads
+            await _clusterClient.GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.Zero);
+
+            var journalAfterReads = await subject.GetJournaledEvents();
+
+            journalAfterReads.OfType<ApplicabilityRuleEvaluated>().Should().BeEmpty(
+                "GetPlannableItems is read-only and must not journal an ApplicabilityRuleEvaluated event per rule per call (#184)");
+
+            journalAfterReads.OfType<CmmnElementDefined<Interfaces.Model.PlanningTable>>().Should().HaveCount(1,
+                "Define is a genuine, deliberately-confirmed write and is unaffected by this fix");
         }
     }
 }

@@ -5,7 +5,6 @@ using Wayfinder.Grains.Executables;
 using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Interfaces.Model;
 using Wayfinder.Grains.Plan.CmmnElement;
-using Wayfinder.Grains.Plan.PlanningTable.Events;
 using Microsoft.Extensions.Logging;
 
 namespace Wayfinder.Grains.Plan.PlanningTable
@@ -87,6 +86,17 @@ namespace Wayfinder.Grains.Plan.PlanningTable
         // `?.Value ?? true`, since Value is never actually null on a Failure result. Here the
         // consequence was fail-CLOSED (an erroring rule silently dropped the DiscretionaryItem from
         // the planning table) rather than #158's fail-open, but it's the identical coalesce bug.
+        //
+        // #184 - this method is reached only from the read-only GetPlannableItems() query (never
+        // from a write/transition path), so it deliberately does NOT RaiseEvent an
+        // ApplicabilityRuleEvaluated here. It previously did, on every call, with no ConfirmEvents()
+        // anywhere on this path - journal size scaled 1:1 with read/poll volume rather than case
+        // activity. Nothing consumes that event today (no Apply override on PlanningTableStore
+        // beyond the inherited BaseStore.Apply(BaseUpdate), which only bumps a store-level Updated
+        // timestamp that is never mapped into any snapshot - PlanningTableStore has no ToSnapshot at
+        // all), so dropping the raise is a pure journaling-hygiene fix: the applicability result
+        // below is still computed identically, including the #158 fail-open ValueOr(true) default
+        // and the error logging just below.
         private async Task<bool> EvaluateApplicabilityRule(ApplicabilityRule rule)
         {
             ExecutableResult<bool> ruleResult = null;
@@ -96,12 +106,6 @@ namespace Wayfinder.Grains.Plan.PlanningTable
                     .ExecuteAsBool(rule.ContextRef, rule.Condition);
             }
             var result = ruleResult?.ValueOr(true) ?? true;
-
-            RaiseEvent(new ApplicabilityRuleEvaluated
-            {
-                Result = result,
-                Error = ruleResult?.Message
-            });
 
             if (ruleResult?.IsError ?? false)
             {
