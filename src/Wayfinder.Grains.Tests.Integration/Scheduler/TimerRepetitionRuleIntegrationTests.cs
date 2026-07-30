@@ -7,7 +7,7 @@ using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
 using Wayfinder.Grains.Interfaces.Plan.Case;
 using Wayfinder.Grains.Plan.PlanItem;
-using Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard;
+using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using NodaTime;
@@ -43,20 +43,43 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
     // (still climbs to the ceiling and faults) pending a separate maintainer decision on whether
     // TimerEventListener repetition should count against the plan-item ceiling at all.
     //
-    // Test design note (post-review): the original version of this test waited on an INDEPENDENT
-    // stream observer to witness real Quartz-fired ticks (150ms interval) as its positive
-    // synchronization point. That measured 0/10 ticks, deterministically, on both full-suite runs -
-    // not a flake, but real-clock starvation: under full-suite load this suite's own real-time
-    // Quartz scheduling can be denied a thread for the whole observation window, no matter how wide
-    // the budget. Since the fix under test is about what TimerEventListenerBehavior.ProcessTick
-    // does when a tick ARRIVES (the RepetitionRule guard), not about whether Quartz manages to fire
-    // one under load, this version drives the tick path directly - publishing synthetic
-    // TimerTickedEvent messages onto the exact stream identity TimerTickJob publishes to
-    // (StreamProviderExtensions.GetCaseEventStream, confirmed against TimerTickJob.cs) - so the
-    // assertion is grounded in this fix's own logic, not in Quartz's real-time scheduling fidelity.
-    // The timer's OWN schedule is pushed a full hour out so the real Quartz trigger genuinely never
-    // fires during the test, eliminating any residual race between real and synthetic ticks.
-    [Collection(RepetitionGuardClusterCollection.Name)]
+    // Test design note (post-review, round 1): the original version of this test waited on an
+    // INDEPENDENT stream observer to witness real Quartz-fired ticks (150ms interval) as its
+    // positive synchronization point. That measured 0/10 ticks, deterministically, on both
+    // full-suite runs - not a flake, but real-clock starvation. Since the fix under test is about
+    // what TimerEventListenerBehavior.ProcessTick does when a tick ARRIVES (the RepetitionRule
+    // guard), not about whether Quartz manages to fire one under load, this version drives the
+    // tick path directly - publishing synthetic TimerTickedEvent messages onto the exact stream
+    // identity TimerTickJob publishes to (StreamProviderExtensions.GetCaseEventStream, confirmed
+    // against TimerTickJob.cs) - so the assertion is grounded in this fix's own logic, not in
+    // Quartz's real-time scheduling fidelity. The timer's OWN schedule is pushed a full hour out
+    // so the real Quartz trigger genuinely never fires during the test, eliminating any residual
+    // race between real and synthetic ticks.
+    //
+    // Test design note (post-review, round 2 - collection placement): this test previously lived
+    // in RepetitionGuardClusterCollection (its own dedicated TestCluster, used otherwise only by
+    // RepetitionGuardFootgunIntegrationTests, which is Task-based and never touches Quartz at
+    // all). That made this the FIRST test ever to make that collection's silo genuinely
+    // instantiate and start its Quartz scheduler - and QuartzSchedulerConfig.Volatile hardcodes
+    // "quartz.scheduler.instanceName" to the fixed value "UnitTest" for every silo that uses it
+    // (ClusterFixture's silo included). QuartzSchedulerFactory extends Quartz.Impl.
+    // StdSchedulerFactory, whose GetScheduler() resolves through Quartz's own process-wide static
+    // SchedulerRepository keyed by that instance name - so once RepetitionGuardClusterFixture's
+    // cluster disposed (shutting down the "UnitTest" scheduler it had just started), any LATER
+    // collection in the SAME test process whose silo also resolves the "UnitTest" name (i.e.
+    // ClusterFixture, used by TimerEventSchedulerGrainTests/TimerEventListenerEndToEndTests/
+    // SuspendedTimerTickIntegrationTests) could resolve that same, now-shutdown scheduler instead
+    // of a fresh one. Root-caused by bisection: removing just this test file made all three
+    // (TimerEventSchedulerGrainTests x2, TimerEventListenerEndToEndTests) pass reliably; removing
+    // SuspendedTimerTickIntegrationTests instead (leaving this one) reproduced the identical three
+    // failures 100% of the time. Fix: stop being the thing that wakes RepetitionGuardCluster
+    // Collection's scheduler up in the first place - this test now shares ClusterCollection/
+    // ClusterFixture with the tests it was colliding with, where a real Quartz scheduler is
+    // already continuously alive across that collection's whole lifetime, so joining it introduces
+    // no new first-activation event. The low-ceiling fixture was never load-bearing for this
+    // test's own assertions (they assert "exactly one instance ever existed", independent of
+    // whatever the ceiling value is), so nothing is lost by moving off it.
+    [Collection(ClusterCollection.Name)]
     public class TimerRepetitionRuleIntegrationTests
     {
         private const string Scope = "CPM";
@@ -68,7 +91,7 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
 
         private readonly IClusterClient _clusterClient;
 
-        public TimerRepetitionRuleIntegrationTests(RepetitionGuardClusterFixture fixture)
+        public TimerRepetitionRuleIntegrationTests(ClusterFixture fixture)
         {
             _clusterClient = fixture.ClusterClient;
 
@@ -194,7 +217,8 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
             finalSnapshot.PlanItemState.Should().Be(PlanItemState.Active,
                 "the case must never fault - the explicit false RepetitionRule must have stopped " +
                 "the timer from respawning on every one of the extra ticks, long before the engine's " +
-                "own repetition ceiling (5, via RepetitionGuardClusterFixture) could ever be reached");
+                "own repetition ceiling (RepetitionGuardOptions.MaxRepetitionsPerPlanItem) could " +
+                "ever be reached");
 
             var timerInstances = finalSnapshot.BehaviorExtension.Children[TimerPlanItemId];
             timerInstances.Should().HaveCount(1,
