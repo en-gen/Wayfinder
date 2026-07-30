@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Events;
 using Wayfinder.Grains.Executables;
@@ -22,7 +23,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             base(host, planItemDefinition, stateMachine)
         {
             StateMachine.Configure(PlanItemState.Available)
-                .OnEntryFromAsync(PlanItemTransition.Create, HandleEnterAvailableFromCreate);
+                .OnEntryFromAsync(PlanItemTransition.Create, HandleEnterAvailableFromCreate)
+                // #182 (sub-claim 2) - ConfigureForMilestoneOrEventListener defines exactly one
+                // outgoing Suspended trigger, Resume -> Available (no separate ParentResume
+                // permit the way Stage/Task's Suspended config has - see
+                // EventListenerBehavior.HandleParentTransitioned, which maps every incoming
+                // Resume/ParentResume/Reactivate cascade onto this same local Resume trigger), so
+                // hooking Resume here is the single choke point every real resume path funnels
+                // through for this state machine shape.
+                .OnEntryFromAsync(PlanItemTransition.Resume, HandleEnterAvailableFromResume);
 
             StateMachine.Configure(PlanItemState.Terminated)
                 .OnEntryAsync(HandleTerminated);
@@ -201,20 +210,90 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 .ScheduleTimer(Host.InstanceId, TimerStore.TimerSchedule, occurred, Host.Context);
         }
 
-        private async Task HandleTimerTickedEvent(TimerTickedEvent @event, StreamSequenceToken token = null)
+        // #182 - the live stream handler is now a thin adapter over ProcessTick, which also
+        // drives the buffered-tick replay below (HandleEnterAvailableFromResume). Keeping a
+        // single dispatch point means a replayed tick goes through EXACTLY the same
+        // Available/Completed/Suspended branching a live tick would, including re-checking
+        // current state each time (see ProcessTick's own remarks on why that matters for
+        // multi-tick replay).
+        private Task HandleTimerTickedEvent(TimerTickedEvent @event, StreamSequenceToken token = null) =>
+            ProcessTick(@event.FireTime);
+
+        // #182 - dispatches strictly on CURRENT state, never on how the tick arrived (live stream
+        // delivery vs. replay), so a replayed tick that lands on an item no longer Available (e.g.
+        // a second buffered tick from a schedule that ticked more than once while suspended, which
+        // the first replayed tick already carried to Completed) is handled exactly as a live tick
+        // in that same state would be - including, if some future state-machine change ever made
+        // re-suspension mid-replay possible, re-buffering via the Suspended arm below rather than
+        // silently dropping it.
+        private async Task ProcessTick(DateTimeOffset fireTime)
         {
-            if (Host.State.PlanItemState == PlanItemState.Available)
+            switch (Host.State.PlanItemState)
             {
-                await StateMachine.FireAsync(PlanItemTransition.Occur);
+                case PlanItemState.Available:
+                    {
+                        await StateMachine.FireAsync(PlanItemTransition.Occur);
+                        break;
+                    }
+                case PlanItemState.Completed:
+                    {
+                        await Host.UnsubscribeFrom<TimerTickedEvent>(Host.InstanceId);
+
+                        // #182 (sub-claim 1) - see BaseBehavior.HasExplicitRepetitionRule's
+                        // remarks. No attached rule (the common recurring-timer case) short-
+                        // circuits to true and EvaluateRepetitionRule is never called - the
+                        // republish below stays exactly as unconditional as it was before this
+                        // fix, no new audit event, no new evaluation side effect.
+                        var shouldRepeat = !HasExplicitRepetitionRule() || await EvaluateRepetitionRule();
+
+                        if (shouldRepeat)
+                        {
+                            await Host.Publish(new PlanItemRepetitionCriteriaMetEvent(
+                                Host.Scope,
+                                Host.InstanceId,
+                                Host.DefinitionId,
+                                Host.State.Repetition));
+                        }
+
+                        await Host.ConfirmEvents();
+                        break;
+                    }
+                case PlanItemState.Suspended:
+                    {
+                        // #182 (sub-claim 2) - buffer rather than drop; see
+                        // SuspendedTimerTickBuffered's remarks and docs section 2 ("suspension
+                        // preserves state; it never discards it").
+                        Host.RaiseEvent(new SuspendedTimerTickBuffered { FireTime = fireTime });
+                        await Host.ConfirmEvents();
+                        break;
+                    }
+                    // Any other state (Terminated) means this tick arrived too late to matter -
+                    // the listener is done and nothing here should act on it.
             }
-            else if (Host.State.PlanItemState == PlanItemState.Completed)
+        }
+
+        // #182 (sub-claim 2) - runs as a state ENTRY action on Available, reached only via this
+        // item's own Resume trigger (see the constructor's remarks on why Resume is the single
+        // choke point). Snapshots-then-clears PendingSuspendedTicks with one RaiseEvent up front
+        // (SuspendedTimerTicksReplayed) so the replay loop below iterates a local list, never the
+        // live store collection the same turn could still be appending to. If this item is
+        // terminated instead of resumed (Suspended -[ParentTerminate]-> Terminated is the only
+        // other permitted exit from Suspended - see ConfigureForMilestoneOrEventListener), this
+        // method never runs at all, so a buffered tick behind a terminated listener is correctly
+        // never replayed - it simply stays inert in the now-terminal grain's state.
+        private async Task HandleEnterAvailableFromResume()
+        {
+            var pendingTicks = TimerStore.PendingSuspendedTicks;
+            if (pendingTicks.Count == 0) return;
+
+            var snapshot = pendingTicks.Select(t => t.FireTime).ToList();
+
+            Host.RaiseEvent(new SuspendedTimerTicksReplayed());
+            await Host.ConfirmEvents();
+
+            foreach (var fireTime in snapshot)
             {
-                await Host.UnsubscribeFrom<TimerTickedEvent>(Host.InstanceId);
-                await Host.Publish(new PlanItemRepetitionCriteriaMetEvent(
-                    Host.Scope,
-                    Host.InstanceId,
-                    Host.DefinitionId,
-                    Host.State.Repetition));
+                await ProcessTick(fireTime);
             }
         }
 
