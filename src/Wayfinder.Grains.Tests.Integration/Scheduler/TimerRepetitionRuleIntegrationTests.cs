@@ -11,7 +11,6 @@ using Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using NodaTime;
-using NodaTime.Text;
 using Orleans;
 using Orleans.Streams;
 using Xunit;
@@ -39,7 +38,24 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
     // escape hatch: if a case author attaches an ItemControl.RepetitionRule to a timer anyway
     // (nothing in the schema forbids it, even though the spec gives it no meaning there), an
     // explicitly-false evaluation stops the republish; no attached rule (the common case) leaves
-    // the timer's repetition exactly as unconditional as before this fix.
+    // the timer's repetition exactly as unconditional as before this fix - see this fix's own
+    // report for the explicit confirmation that the NO-RULE case is intentionally left unchanged
+    // (still climbs to the ceiling and faults) pending a separate maintainer decision on whether
+    // TimerEventListener repetition should count against the plan-item ceiling at all.
+    //
+    // Test design note (post-review): the original version of this test waited on an INDEPENDENT
+    // stream observer to witness real Quartz-fired ticks (150ms interval) as its positive
+    // synchronization point. That measured 0/10 ticks, deterministically, on both full-suite runs -
+    // not a flake, but real-clock starvation: under full-suite load this suite's own real-time
+    // Quartz scheduling can be denied a thread for the whole observation window, no matter how wide
+    // the budget. Since the fix under test is about what TimerEventListenerBehavior.ProcessTick
+    // does when a tick ARRIVES (the RepetitionRule guard), not about whether Quartz manages to fire
+    // one under load, this version drives the tick path directly - publishing synthetic
+    // TimerTickedEvent messages onto the exact stream identity TimerTickJob publishes to
+    // (StreamProviderExtensions.GetCaseEventStream, confirmed against TimerTickJob.cs) - so the
+    // assertion is grounded in this fix's own logic, not in Quartz's real-time scheduling fidelity.
+    // The timer's OWN schedule is pushed a full hour out so the real Quartz trigger genuinely never
+    // fires during the test, eliminating any residual race between real and synthetic ticks.
     [Collection(RepetitionGuardClusterCollection.Name)]
     public class TimerRepetitionRuleIntegrationTests
     {
@@ -48,6 +64,7 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
         private const string TimerPlanItemId = "PlanItemTimer";
         private const string SentinelDefinitionId = "SentinelTask";
         private const string SentinelPlanItemId = "PlanItemSentinel";
+        private const int SimulatedExtraTicks = 9;
 
         private readonly IClusterClient _clusterClient;
 
@@ -60,26 +77,20 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
         }
 
         [Fact]
-        public async Task RecurringTimer__Given_UnboundedScheduleAndExplicitFalseRepetitionRule__When_TicksContinue__Then_ExactlyOneInstanceEverExistsAndCaseNeverFaults()
+        public async Task RecurringTimer__Given_ExplicitFalseRepetitionRule__When_ManyTicksArrive__Then_ExactlyOneInstanceEverExistsAndCaseNeverFaults()
         {
             var caseInstanceId = Guid.NewGuid();
             var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
 
-            // Same unbounded, genuinely-recurring schedule shape as the original repro (150ms
-            // interval, bare "R" - no repetitions cap) run against the SAME artificially low
-            // ceiling fixture (RepetitionGuardClusterFixture.LowCeiling = 5) - proving the fix
-            // holds even under an adversarially tight budget, not merely under production's
-            // 10,000 default where "never faulted" could just mean "hasn't gotten there yet".
-            var isoPeriod = PeriodPattern.NormalizingIso.Format(Period.FromMilliseconds(150).Normalize());
+            // A real but genuinely-never-fires-during-this-test schedule (single shot, one hour
+            // out) - the plan item still needs a valid TimerExpression to reach Available and
+            // schedule a real Quartz trigger the normal way, but this test asserts entirely on
+            // SYNTHETIC ticks published directly below, so the real trigger must stay silent for
+            // the whole run or it would spuriously add an extra, untracked live tick.
             var timerDefinition = new TimerEventListener
             {
                 Id = TimerDefinitionId,
-                TimerExpression = new Expression
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Language = ExpressionLanguage.Jint,
-                    Body = $"'R/{isoPeriod}'"
-                }
+                TimerExpression = Timers.TimerExpression(SystemClock.Instance.GetCurrentInstant().Plus(Duration.FromHours(1)))
             };
 
             // Sentinel sibling (blocking HumanTask, no ItemControl -> ManualActivationRule defaults
@@ -125,58 +136,85 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
 
             var firstTimerInstanceId = caseSnapshot.BehaviorExtension.Children[TimerPlanItemId].Keys.Single();
 
-            // Independent observer on the FIRST (and, per this fix, ONLY) timer instance's own
-            // tick stream - same established technique as Issue182_SuspendedTimerTickDroppedIntegrationTests:
-            // decoupled from the plan item's own (now-unsubscribed-after-Completed) behavior, so it
-            // keeps witnessing every real Quartz tick regardless of what the grain-side subscription
-            // does. Used here as the POSITIVE synchronization point (issue #174 compliance): rather
-            // than sleeping a fixed window and hoping nothing spawned, we wait for PROOF that many
-            // more real ticks landed after the first occurrence, then assert the spawn count against
-            // that decisive backdrop - "no runaway spawn" becomes a grounded claim, not an absence
-            // inferred from silence.
-            var observedTicks = 0;
-            await _clusterClient.GetStreamProvider("Default")
-                .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, firstTimerInstanceId)
-                .SubscribeAsync((@event, token) =>
-                {
-                    observedTicks++;
-                    return Task.CompletedTask;
-                });
+            var tickStream = _clusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, firstTimerInstanceId);
 
-            // Positive poll: at least 10 real ticks witnessed (the first occurrence plus >=9 more
-            // that would have marched straight past the LowCeiling=5 ceiling pre-fix). 150ms
-            // interval means this settles in ~1.5s in isolation; the 30s budget (matching this
-            // suite's own established convention for this exact timer area - see
-            // RepetitionGuardFootgunIntegrationTests and the original repro this test replaced)
-            // protects against real cross-cluster Quartz contention when the full suite runs many
-            // real-clock TestClusters in parallel (issue #153) - confirmed necessary: a tighter
-            // 15s budget measured 0/10 ticks once under full-suite contention even though the
-            // schedule is proven to settle in ~1.5s isolated 3/3.
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-            while (observedTicks < 10 && DateTime.UtcNow < deadline)
+            // Drive the FIRST occurrence directly - same stream identity and event shape
+            // TimerTickJob.Execute publishes in production (confirmed against
+            // Scheduler/TimerTickJob.cs), so this exercises the exact same
+            // TimerEventListenerBehavior.HandleTimerTickedEvent subscription path a real Quartz
+            // tick would, with no dependency on Quartz's own thread pool actually getting
+            // scheduled under load.
+            await tickStream.OnNextAsync(new TimerTickedEvent(null, null, DateTimeOffset.UtcNow, null));
+
+            var timerGrain = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{firstTimerInstanceId}");
+
+            // Positive, decisive sync point: poll for the FIRST synthetic tick's Occur transition
+            // to land. This is not subject to real-clock starvation - the event is already
+            // published and durably queued for delivery, so it WILL be processed as soon as the
+            // grain gets a turn; the budget only protects against a slow/contended runner, it is
+            // never waiting on an uncertain external clock to fire something in the first place.
+            var reachedCompleted = await PollUntil(
+                async () => (await timerGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed,
+                TimeSpan.FromSeconds(30));
+            reachedCompleted.Should().BeTrue("the first synthetic tick must drive Available -> Occur -> Completed before any repetition logic is even reachable");
+
+            // Now drive SimulatedExtraTicks more synthetic ticks - each one simulating what a real
+            // recurring schedule would have delivered next. Every one of these hits
+            // TimerEventListenerBehavior.ProcessTick's Completed branch, which is exactly the
+            // guard under test (BaseBehavior.HasExplicitRepetitionRule + EvaluateRepetitionRule).
+            // Published sequentially and awaited so each publish call only returns once the
+            // stream provider has accepted it for delivery.
+            for (var i = 0; i < SimulatedExtraTicks; i++)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(50));
+                await tickStream.OnNextAsync(new TimerTickedEvent(null, null, DateTimeOffset.UtcNow, null));
             }
 
-            observedTicks.Should().BeGreaterThanOrEqualTo(10,
-                "the independent observer must witness many more real ticks than the ceiling (5) - " +
-                "without this positive signal we cannot tell 'the schedule stopped ticking' from " +
-                "'the engine correctly stopped spawning despite ticks continuing'");
+            // Settle-and-sample: unlike waiting for an uncertain external tick, these
+            // SimulatedExtraTicks are already durably published and guaranteed to be delivered
+            // eventually - there is nothing further that could arrive later that hasn't already
+            // been fed. Sampling repeatedly over a short window (matching
+            // RepetitionGuardFootgunIntegrationTests' own established "absence half" convention,
+            // widened here to cover several already-queued deliveries draining) confirms the guard
+            // holds steady, not just at one instant.
+            for (var i = 0; i < 10; i++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(200));
+
+                var sampledSnapshot = await caseGrain.GetSnapshot();
+                sampledSnapshot.PlanItemState.Should().Be(PlanItemState.Active,
+                    "the case must never fault while draining the already-published extra ticks - " +
+                    "the explicit false RepetitionRule must be honored on every one of them, not just the first");
+                sampledSnapshot.BehaviorExtension.Children[TimerPlanItemId].Should().HaveCount(1,
+                    "no additional timer instance may appear while draining the already-published extra ticks");
+            }
 
             var finalSnapshot = await caseGrain.GetSnapshot();
 
             finalSnapshot.PlanItemState.Should().Be(PlanItemState.Active,
                 "the case must never fault - the explicit false RepetitionRule must have stopped " +
-                "the timer from respawning long before the engine's own repetition ceiling could " +
-                "ever be reached, even though the underlying schedule kept ticking well past it");
+                "the timer from respawning on every one of the extra ticks, long before the engine's " +
+                "own repetition ceiling (5, via RepetitionGuardClusterFixture) could ever be reached");
 
             var timerInstances = finalSnapshot.BehaviorExtension.Children[TimerPlanItemId];
             timerInstances.Should().HaveCount(1,
-                "exactly one timer instance must ever have existed - the explicitly-false " +
-                "RepetitionRule must be consulted and honored on every Completed-branch tick, not " +
-                "just the first, or a second instance would have spawned");
+                $"exactly one timer instance must ever have existed across all {SimulatedExtraTicks + 1} " +
+                "delivered ticks - the explicitly-false RepetitionRule must be consulted and honored on " +
+                "every Completed-branch tick, not just the first, or a second instance would have spawned");
             timerInstances.Should().ContainKey(firstTimerInstanceId,
                 "the single surviving instance must be the original one - no respawn ever occurred");
+        }
+
+        private static async Task<bool> PollUntil(Func<Task<bool>> condition, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await condition()) return true;
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+            }
+
+            return await condition();
         }
     }
 }
