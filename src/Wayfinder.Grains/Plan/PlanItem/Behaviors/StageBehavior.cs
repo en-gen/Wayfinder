@@ -426,6 +426,33 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         transition = PlanItemTransition.Exit;
                         break;
                     }
+                // #179 - Table 8.9's `complete` rows: a Completed Stage may coexist ONLY with
+                // children in {Disabled, Completed, Terminated, Failed} - Available, Enabled,
+                // Active, and Suspended are explicitly marked impossible. Table 8.12's
+                // autoComplete=TRUE completion criteria ("no Active children AND all REQUIRED
+                // children terminal") says nothing about non-required children, so a stage can
+                // legitimately reach Completed while a non-required child still sits in Available/
+                // Enabled - the two tables only reconcile if completion itself drives that
+                // remainder to a terminal state, the same way Terminate/Exit above already
+                // quiesces the whole subtree. So: cascade Exit here too, but - unlike the Exit/
+                // Terminate case above, which deliberately targets every non-terminal state - gate
+                // it on Host.State.PlanItemState not already being terminal. IsTerminal() is
+                // exactly Table 8.9's "may coexist" set (Disabled, Completed, Terminated, Failed),
+                // so this reuses that predicate rather than re-deriving the same four states here:
+                // a Disabled or already-Failed child is left alone, matching the table precisely,
+                // where the bare CanFire(Exit) gate the Exit/Terminate case relies on would not -
+                // ConfigureForStageOrTask permits Exit from Disabled and Failed too (a genuine
+                // termination cascade DOES reach into those), so Complete needs its own, narrower
+                // condition rather than reusing that gate unchanged.
+                case PlanItemTransition.Complete:
+                    {
+                        if (!Host.State.PlanItemState.IsTerminal())
+                        {
+                            Host.RaiseEvent(new ParentCompleted());
+                            transition = PlanItemTransition.Exit;
+                        }
+                        break;
+                    }
             }
 
             if (transition.HasValue && StateMachine.CanFire(transition.Value))

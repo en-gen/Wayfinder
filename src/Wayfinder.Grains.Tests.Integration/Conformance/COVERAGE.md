@@ -233,7 +233,7 @@ the Status column wins.
 | Table 8.8 exit — Stage (exit criterion while Active; D6 fix) | `SentryScenarios.Sentry__Given_StageExitCriterion__…` | Pinned |
 | Table 8.9 exit/terminate propagation to children | `KnownGapScenarios.StageExit__…ExitCascadesTerminationToTask` | Pinned (#63) |
 | Table 8.9 fault rows (children keep state on parent fault) | fault non-propagation pinned at the Case level (`TaskLifecycle__…FaultReactivate…`'s parent-still-Active assert); per-child state matrix not separately scenario-ized | Pinned (non-propagation observable) |
-| Table 8.9 complete rows (`<impossible>` cells) | blocked behind Table 8.12's remaining gap (D4 remainder) — completing a stage with children in the listed states isn't reachable through the public surface today | KnownGap:#19 (D4 remainder) — via StageCompletion scenario (see below) |
+| Table 8.9 complete rows (`<impossible>` cells) | `StageCompletionCascadeIntegrationTests.StageCompletionCascade__…ChildIsCascadedToTerminatedAndNeverActivates` (a non-required child left Available when its parent auto-completes is now cascaded to Terminated via `exit`, so it can never re-activate or spawn children inside a Completed parent) / `…ChildrenAreLeftAlone` (Disabled/Failed children are left untouched, per this table's own rows); model-driven, not a `.cmmn` conformance scenario | Pinned (#179 — `StageBehavior.HandleParentTransitioned` gained a `Complete` case that cascades Exit to any non-terminal child, reusing the existing Exit/Terminate downward-cascade mechanism) |
 
 ## §8.4.3 EventListener and Milestone lifecycle (Tables 8.10, 8.11)
 
