@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Events;
@@ -25,6 +24,20 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
     // (TimerEventListenerBehaviorStore.PendingSuspendedTicks, via SuspendedTimerTickBuffered) and
     // replayed on Resume (TimerEventListenerBehavior.HandleEnterAvailableFromResume) - see docs
     // section 2 ("suspension preserves state; it never discards it").
+    //
+    // Test design note (post-review): the original version of these tests waited on an INDEPENDENT
+    // stream observer to witness a REAL Quartz-scheduled tick (a single-shot trigger ~10s out) as
+    // its positive precondition. Under full-suite contention that observation can be starved
+    // outright (Quartz's own thread pool never gets scheduled within the observation window - not
+    // a flake, a deterministic denial under load). Since the fix under test is what
+    // TimerEventListenerBehavior.ProcessTick does with a tick that ARRIVES while Suspended, not
+    // whether Quartz manages to fire one under contention, these versions publish a SYNTHETIC
+    // TimerTickedEvent directly onto the same stream identity TimerTickJob publishes to (confirmed
+    // against Scheduler/TimerTickJob.cs) once the listener is confirmed genuinely Suspended -
+    // exercising the exact same subscription path deterministically. The real schedule is pushed a
+    // full hour out purely so Quartz never fires a second, untracked tick during the run; the
+    // Suspend/Resume/Terminate cascades themselves stay real (fast in-process async messaging, not
+    // wall-clock dependent, so no risk of the same starvation class).
     [Collection(ClusterCollection.Name)]
     public class SuspendedTimerTickIntegrationTests
     {
@@ -49,56 +62,8 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
             var caseInstanceId = Guid.NewGuid();
             var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
 
-            // Non-repeating (no "R" prefix), fires exactly once ~10s from now via an explicit start
-            // instant - matches the original repro's own documented reasoning for why a bare
-            // duration-only expression fires essentially immediately instead (ConfigureTrigger
-            // treats the duration as the repeat interval, irrelevant with zero repeats, and starts
-            // the trigger at UtcNow regardless).
-            var scheduledFireInstant = SystemClock.Instance.GetCurrentInstant().Plus(Duration.FromSeconds(10));
-            var timerDefinition = new TimerEventListener
-            {
-                Id = timerDefinitionId,
-                TimerExpression = Timers.TimerExpression(scheduledFireInstant)
-            };
-
-            var @case = new Interfaces.Model.Case
-            {
-                Id = caseDefinitionId,
-                CaseRoles = new CaseRoles(),
-                CasePlanModel = new Stage
-                {
-                    Id = Scope,
-                    PlanItemDefinitions = { timerDefinition },
-                    PlanItems =
-                    {
-                        new Interfaces.Model.PlanItem { Id = timerPlanItemId, DefinitionRef = timerDefinition.Id }
-                    }
-                }
-            };
-
-            await _clusterClient
-                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
-                .Define(@case);
-
-            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, Scope);
-
-            await caseGrain.Create(caseDefinitionId);
-            var caseSnapshot = await caseGrain.Trigger(PlanItemTransition.Create);
-
-            var timerInstanceId = caseSnapshot.BehaviorExtension.Children[timerPlanItemId].Keys.Single();
-            var timerGrain = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{timerInstanceId}");
-
-            // Independent tick observer, decoupled from the plan item's own behavior/state - same
-            // established technique as the original repro. Positively proves the real Quartz tick
-            // fired, distinguishing "hasn't ticked yet" from "ticked and was buffered/dropped".
-            var observedTicks = new List<DateTimeOffset>();
-            await _clusterClient.GetStreamProvider("Default")
-                .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, timerInstanceId)
-                .SubscribeAsync((@event, token) =>
-                {
-                    observedTicks.Add(@event.FireTime);
-                    return Task.CompletedTask;
-                });
+            var timerGrainInfo = await CreateSuspendableTimerCase(caseDefinitionId, caseInstanceId, timerDefinitionId, timerPlanItemId);
+            var (caseGrain, timerGrain, timerInstanceId, tickStream) = timerGrainInfo;
 
             (await timerGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available,
                 "the timer must be waiting on its schedule before we suspend it, or this test proves nothing");
@@ -109,16 +74,16 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
             var suspended = await PollUntil(
                 async () => (await timerGrain.GetSnapshot()).PlanItemState == PlanItemState.Suspended,
                 TimeSpan.FromSeconds(8));
-            suspended.Should().BeTrue("the Suspend cascade must reach the timer before its tick fires, or this test proves nothing");
+            suspended.Should().BeTrue("the Suspend cascade must reach the timer before we publish the synthetic tick, or this test proves nothing");
 
-            // THE POSITIVE PRECONDITION: independently confirm the real Quartz tick actually fired.
-            var tickObserved = await PollUntil(
-                () => Task.FromResult(observedTicks.Count >= 1),
-                TimeSpan.FromSeconds(20));
-            tickObserved.Should().BeTrue("the independent stream observer must witness the real Quartz tick - without this positive signal we cannot distinguish 'never ticked' from 'ticked and was buffered'");
+            // Drive the tick directly while genuinely Suspended - see class remarks. No dependency
+            // on Quartz's own thread pool getting scheduled under load.
+            await tickStream.OnNextAsync(new TimerTickedEvent(null, null, DateTimeOffset.UtcNow, null));
 
             (await timerGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Suspended,
-                "the witnessed tick must have arrived while the listener was still Suspended, confirming the precondition this fix requires");
+                "publishing the synthetic tick must not itself change state - it should only be " +
+                "durably buffered (TimerEventListenerBehaviorStore.PendingSuspendedTicks), not acted " +
+                "on, while still Suspended");
 
             // Resume - CasePlanModel leaves Suspended via Reactivate (Table 8.6/#63 D8 carve-out),
             // which EventListenerBehavior.HandleParentTransitioned maps to the child's own Resume
@@ -127,11 +92,13 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
             await caseGrain.Trigger(PlanItemTransition.Reactivate);
 
             // THE #182 FIX ASSERTION: a genuine positive-poll budget for the buffered tick's
-            // replay. Per this task's own #182 guidance, the underlying grain turn that processes
-            // Resume is non-reentrant and completes the whole replay (Suspended -> Available ->
-            // Occur -> Completed) before any external GetSnapshot() can interleave and observe an
-            // intermediate Available state - so this positively waits for the DECISIVE terminal
-            // signal (Completed) rather than checking for a transient Available window first.
+            // replay. The underlying grain turn that processes Resume is non-reentrant and
+            // completes the whole replay (Suspended -> Available -> Occur -> Completed) before any
+            // external GetSnapshot() can interleave and observe an intermediate Available state -
+            // so this positively waits for the DECISIVE terminal signal (Completed) rather than
+            // checking for a transient Available window first. This poll is grounded in local
+            // grain-turn completion, not an external clock, so it is not subject to the same
+            // starvation class as waiting on Quartz.
             var reachedCompleted = await PollUntil(
                 async () => (await timerGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed,
                 TimeSpan.FromSeconds(30));
@@ -140,19 +107,19 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
                 "the tick buffered while Suspended must be replayed on Resume - the fix's " +
                 "TimerEventListenerBehavior.HandleEnterAvailableFromResume replays " +
                 "TimerEventListenerBehaviorStore.PendingSuspendedTicks, firing the Occur transition " +
-                "the live tick never got to fire while the listener was Suspended");
+                "the synthetic tick never got to fire while the listener was Suspended");
 
-            // "Replays exactly once": the schedule was single-shot, so the ONLY correctness risk is
-            // double-processing the one buffered tick into a second spawned instance (see
-            // BaseBehavior.HasExplicitRepetitionRule's remarks - no rule attached here, so the
-            // no-rule branch would otherwise republish unconditionally if ProcessTick were somehow
-            // invoked twice for the same tick). Asserting exactly one child instance ever existed
-            // for this PlanItem directly rules that out.
+            // "Replays exactly once": the ONLY correctness risk is double-processing the one
+            // buffered tick into a second spawned instance (see BaseBehavior.
+            // HasExplicitRepetitionRule's remarks - no rule attached here, so the no-rule branch
+            // would otherwise republish unconditionally if ProcessTick were somehow invoked twice
+            // for the same tick). Asserting exactly one child instance ever existed for this
+            // PlanItem directly rules that out.
             var finalCaseSnapshot = await caseGrain.GetSnapshot();
             var timerInstances = finalCaseSnapshot.BehaviorExtension.Children[timerPlanItemId];
             timerInstances.Should().HaveCount(1,
                 "the buffered tick must replay exactly once - no second (respawned) timer instance " +
-                "should ever have been created from a single-shot schedule's one buffered tick");
+                "should ever have been created from the one buffered tick");
             timerInstances.Should().ContainKey(timerInstanceId);
         }
 
@@ -165,63 +132,19 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
             var caseInstanceId = Guid.NewGuid();
             var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
 
-            var scheduledFireInstant = SystemClock.Instance.GetCurrentInstant().Plus(Duration.FromSeconds(10));
-            var timerDefinition = new TimerEventListener
-            {
-                Id = timerDefinitionId,
-                TimerExpression = Timers.TimerExpression(scheduledFireInstant)
-            };
-
-            var @case = new Interfaces.Model.Case
-            {
-                Id = caseDefinitionId,
-                CaseRoles = new CaseRoles(),
-                CasePlanModel = new Stage
-                {
-                    Id = Scope,
-                    PlanItemDefinitions = { timerDefinition },
-                    PlanItems =
-                    {
-                        new Interfaces.Model.PlanItem { Id = timerPlanItemId, DefinitionRef = timerDefinition.Id }
-                    }
-                }
-            };
-
-            await _clusterClient
-                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
-                .Define(@case);
-
-            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, Scope);
-
-            await caseGrain.Create(caseDefinitionId);
-            var caseSnapshot = await caseGrain.Trigger(PlanItemTransition.Create);
-
-            var timerInstanceId = caseSnapshot.BehaviorExtension.Children[timerPlanItemId].Keys.Single();
-            var timerGrain = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{timerInstanceId}");
-
-            var observedTicks = new List<DateTimeOffset>();
-            await _clusterClient.GetStreamProvider("Default")
-                .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, timerInstanceId)
-                .SubscribeAsync((@event, token) =>
-                {
-                    observedTicks.Add(@event.FireTime);
-                    return Task.CompletedTask;
-                });
+            var (caseGrain, timerGrain, _, tickStream) = await CreateSuspendableTimerCase(caseDefinitionId, caseInstanceId, timerDefinitionId, timerPlanItemId);
 
             await caseGrain.Trigger(PlanItemTransition.Suspend);
 
             var suspended = await PollUntil(
                 async () => (await timerGrain.GetSnapshot()).PlanItemState == PlanItemState.Suspended,
                 TimeSpan.FromSeconds(8));
-            suspended.Should().BeTrue("the Suspend cascade must reach the timer before its tick fires, or this test proves nothing");
+            suspended.Should().BeTrue("the Suspend cascade must reach the timer before we publish the synthetic tick, or this test proves nothing");
 
-            var tickObserved = await PollUntil(
-                () => Task.FromResult(observedTicks.Count >= 1),
-                TimeSpan.FromSeconds(20));
-            tickObserved.Should().BeTrue("the independent stream observer must witness the real Quartz tick, confirming a tick genuinely got buffered rather than this test proving nothing");
+            await tickStream.OnNextAsync(new TimerTickedEvent(null, null, DateTimeOffset.UtcNow, null));
 
             (await timerGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Suspended,
-                "the witnessed tick must have arrived while still Suspended");
+                "the synthetic tick must have been buffered, not acted on, while still Suspended");
 
             // Terminate DIRECTLY instead of resuming - ConfigureForMilestoneOrEventListener permits
             // Suspended -[ParentTerminate]-> Terminated (Table 8.9's "termination cascades to
@@ -236,14 +159,61 @@ namespace Wayfinder.Grains.Tests.Integration.Scheduler
 
             // Positive-but-bounded settle window: Terminated has no outgoing transition in
             // ConfigureForMilestoneOrEventListener, so there is nothing further for this listener to
-            // ever do - but wait past the schedule's own would-be single fire (already consumed by
-            // the buffered tick above) to prove no delayed replay sneaks the state to Completed.
-            await Task.Delay(TimeSpan.FromSeconds(3));
+            // ever do. Sampled repeatedly rather than a single check-after-sleep.
+            for (var i = 0; i < 10; i++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(200));
+                (await timerGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Terminated,
+                    "the buffered tick must never replay once the listener is Terminated instead of " +
+                    "Resumed - HandleEnterAvailableFromResume only runs as an entry action reached via " +
+                    "this item's own Resume trigger, which Terminated bypasses entirely");
+            }
+        }
 
-            (await timerGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Terminated,
-                "the buffered tick must never replay once the listener is Terminated instead of " +
-                "Resumed - HandleEnterAvailableFromResume only runs as an entry action reached via " +
-                "this item's own Resume trigger, which Terminated bypasses entirely");
+        private async Task<(ICaseGrain CaseGrain, IPlanItemInternalGrain TimerGrain, string TimerInstanceId, IAsyncStream<TimerTickedEvent> TickStream)> CreateSuspendableTimerCase(
+            string caseDefinitionId, Guid caseInstanceId, string timerDefinitionId, string timerPlanItemId)
+        {
+            // Real but genuinely-never-fires-during-this-test schedule (single shot, one hour out)
+            // - the plan item still needs a valid TimerExpression to reach Available and schedule a
+            // real Quartz trigger the normal way; the tick this test actually exercises is
+            // published synthetically below, so the real trigger must stay silent for the whole run.
+            var timerDefinition = new TimerEventListener
+            {
+                Id = timerDefinitionId,
+                TimerExpression = Timers.TimerExpression(SystemClock.Instance.GetCurrentInstant().Plus(Duration.FromHours(1)))
+            };
+
+            var @case = new Interfaces.Model.Case
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRoles(),
+                CasePlanModel = new Stage
+                {
+                    Id = Scope,
+                    PlanItemDefinitions = { timerDefinition },
+                    PlanItems =
+                    {
+                        new Interfaces.Model.PlanItem { Id = timerPlanItemId, DefinitionRef = timerDefinition.Id }
+                    }
+                }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, Scope);
+
+            await caseGrain.Create(caseDefinitionId);
+            var caseSnapshot = await caseGrain.Trigger(PlanItemTransition.Create);
+
+            var timerInstanceId = caseSnapshot.BehaviorExtension.Children[timerPlanItemId].Keys.Single();
+            var timerGrain = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{timerInstanceId}");
+
+            var tickStream = _clusterClient.GetStreamProvider("Default")
+                .GetCaseEventStream<TimerTickedEvent>(caseInstanceId, timerInstanceId);
+
+            return (caseGrain, timerGrain, timerInstanceId, tickStream);
         }
 
         private static async Task<bool> PollUntil(Func<Task<bool>> condition, TimeSpan timeout)
