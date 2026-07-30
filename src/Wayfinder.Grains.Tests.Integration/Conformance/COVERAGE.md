@@ -169,16 +169,73 @@ new gate. (Noted, not fixed here: an empty `autoComplete=TRUE` Stage that ALSO c
 bounded only by the #67 repetition ceiling — a pre-existing hazard class this fix does not
 introduce, since pre-fix the Stage was simply wedged instead.)
 
-**Current state (develop HEAD + `fix/180-empty-stage-completion`, 2026-07-27).** 31
-sample `.cmmn` files under `Conformance/Samples/`; 41 scenarios (`CaseFileScenarios` 3,
-`InstantiationScenarios` 2, `KnownGapScenarios` 10, `LifecycleScenarios` 15, `SentryScenarios` 11)
-— **41 executed green, 0 quarantined/skipped, 0 failing**. `KnownGapScenarios.cs` keeps its name
-and the quarantine machinery described in the honesty rule above for the next engine gap this
-suite finds, but every scenario inside it today is an ordinary green `[Fact]`, not a quarantined
-`[Fact(Skip = ...)]` — that file's own header remarks still narrate the ORIGINAL failure
-investigations (including FINDING-1) for historical context only. This COVERAGE.md file is the
-current-status source of truth; where its per-row Status column disagrees with prose elsewhere,
-the Status column wins.
+**#178 fix + #198 discovery (branch `fix/178-zombie-repetition`, 2026-07-30).** #178
+(`StageBehavior.HandleChildRepeated` never consulted `Host.State.PlanItemState` before spawning a
+repetition child) let a Terminated/Completed/Closed/Suspended/Failed container still spawn one.
+Fixed by branching on the container's own state before ever reaching `CreateChild`. While
+resolving a suite conflict this fix's own verification surfaced -
+`KnownGapScenarios.StageBookkeeping__Given_MilestoneRepetitionDetected__Then_StageSpawnsRepetitionInstance`
+started failing once the fix landed - a dedicated investigation found the CasePlanModel's
+completion in that scenario was CORRECT: it reached Completed more than two seconds and several
+message hops before the scenario's own out-of-band second-instance probe (`BookkeepingProbeB2`)
+was even defined, `SourcePlanItem` declares no `repetitionRule` at all
+(`Sentry_RearmRepetition.cmmn:29`, so a second instance of it was never modelable in the first
+place), and that probe bypasses `StageBehavior.CreateChild` entirely (`GetGrain` + `Define()`
+directly), so it never appeared in `StageStore.Children` and could not have blocked completion
+even in principle. On `develop` this scenario passed **only by materializing Table 8.9's own
+`<impossible>` cell** - a Completed Stage receiving a live-spawned child - and that green status
+was the bug, not evidence of conformance. Rewritten to assert the opposite (poll for the
+CasePlanModel's completion FIRST, so the assertion cannot race; then drive the late redelivery and
+poll `Repeated == true`; then assert NO second instance spawns), retitled to name what it now
+actually tests, and graduated out of `KnownGapScenarios` into
+`LifecycleScenarios.StageCompletion__Given_LateRepetitionRequestArrivesAfterAutoComplete__Then_RefusesTheSpawn`
+(Table 8.9's refusal case, not Bug #62's original spawn-bookkeeping case) - reusing
+`Sentry_RearmRepetition.cmmn` as-is, no new sample needed.
+    That same investigation, run at scale, found a SECOND, previously-invisible failure:
+`KnownGapScenarios.TaskRepetition__Given_RepetitionRuleAndNoEntryCriteria__Then_CompletionSpawnsNewInstance`
+fails ~25% of runs on this branch. This is a real, pre-existing engine defect, filed as
+[#198](https://github.com/en-gen/Wayfinder/issues/198): `SourceTask`'s completion both (1) raises
+`Repeated` and publishes `PlanItemRepetitionCriteriaMetEvent` (`BaseBehavior.
+TryRepeatOnCompleteOrTerminate`) and (2) triggers the owning CasePlanModel's Table 8.12 completion
+check (`StageBehavior.HandleChildTransitioned`) - on two separate, unordered streams. On
+`develop` the completion check runs first roughly 40% of the time, silently completing the
+CasePlanModel over what a moment later becomes an Active child - the identical `<impossible>` cell
+above, just reached via a different scenario, and never caught because that test's own assertion
+only ever checked `instances == 2`, never the container's state. The #178 fix converts that
+SILENT violation into a VISIBLE ~25% flake here (it now correctly refuses the late spawn once the
+completion race is lost). Per the quarantine protocol (ADO #21), this scenario is quarantined
+(`[Fact(Skip = "#198 ...")]`), NOT fixed and NOT weakened - #198 belongs at the Table 8.12
+completion-evaluation seam, a different piece of work than #178. See
+`docs/03-cmmn-execution-semantics.md`'s §8 implementation note and its new Conformance-status row
+for #198.
+    Running the full suite repeatedly to confirm this was the only intermittent scenario surfaced
+the SAME #198 shape - a single no-entry-criteria repeating child under a Stage/CasePlanModel whose
+`AutoComplete` defaults to false, no `PlanningTable` - in two more PRE-EXISTING tests outside the
+Conformance suite: `Plan/CasePlanModel/RepetitionOnCompletionIntegrationTests.
+TaskComplete__Given_NoEntryCriteriaRepeatableTask__Then_FirstEvalDiscardedAndRepetitionSpawnedOnComplete`
+and `Plan/CasePlanModel/RepetitionRedeliveryIntegrationTests.
+HandleChildRepeated__Given_SameRepetitionCriteriaMetEventDeliveredTwice__Then_ExactlyOneChildIsCreated`
+(the latter fails in its own arrange phase, before the #161 redelivery-guard logic it actually
+exists to test ever runs). Both are outside this file's own scope (not `.cmmn`-driven Conformance
+scenarios), but the SAME root cause and the SAME decision applies: quarantined with a `[Fact(Skip =
+"#198 ...")]` citing this same issue, not fixed, not weakened. `RepetitionGuardFootgunIntegrationTests`
+was checked and confirmed SAFE - it deliberately keeps a permanently-Enabled sentinel sibling
+specifically so Table 8.12 Branch 1 can never be satisfied while its repetition ceiling test
+cascades, which is exactly the kind of guard that routes around this race; every entry-criterion-
+driven repetition test (`SentryScenarios`, `SentryRepetitionResetIntegrationTests`,
+`RepetitionAfterTerminationIntegrationTests`) uses a different code path
+(`HandleSentrySatisfied`, not `TryRepeatOnCompleteOrTerminate`) and is unaffected.
+
+**Current state (branch `fix/178-zombie-repetition`, 2026-07-30).** 31 sample `.cmmn` files
+under `Conformance/Samples/`; 41 scenarios (`CaseFileScenarios` 3, `InstantiationScenarios` 2,
+`KnownGapScenarios` 9, `LifecycleScenarios` 16, `SentryScenarios` 11) — **40 executed green, 1
+quarantined (skipped, #198), 0 failing**. `KnownGapScenarios.cs` keeps its name and the
+quarantine machinery described in the honesty rule above; that file's own header remarks still
+narrate the ORIGINAL failure investigations (including FINDING-1) for historical context, and one
+scenario inside it (`TaskRepetition__…`, above) is once again an actual quarantined
+`[Fact(Skip = ...)]`, not just historical narration. This COVERAGE.md file is the current-status
+source of truth; where its per-row Status column disagrees with prose elsewhere, the Status
+column wins.
 ## Engine findings discovered by this suite (details in the #21 report)
 
 | Finding | One-line summary | Work item |
@@ -227,13 +284,14 @@ the Status column wins.
 | Table 8.8 fault (Active → Failed; MUST NOT propagate) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` (incl. parent-still-Active assert) | Pinned |
 | Table 8.8 re-activated (Failed → Active) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` | Pinned |
 | Table 8.8 complete (Active → Completed) — Task | `LifecycleScenarios.TaskLifecycle__…NoManualActivationRule…` | Pinned |
-| Table 8.8 complete — RepetitionRule re-evaluation for no-entry-criteria items | `KnownGapScenarios.TaskRepetition__…CompletionSpawnsNewInstance` | Pinned (#19/D7, PR !26 `d991861`) |
+| Table 8.8 complete — RepetitionRule re-evaluation for no-entry-criteria items | `KnownGapScenarios.TaskRepetition__…CompletionSpawnsNewInstance` — the RepetitionRule re-evaluation itself (`BaseBehavior.TryRepeatOnCompleteOrTerminate`) is unaffected and unit-tested; this `.cmmn` scenario is quarantined (~25% flake, `[Fact(Skip = "#198 ...")]`) because it races the owning CasePlanModel's OWN Table 8.12 completion check on a separate, unordered stream | KnownGap:#198 (completion-evaluation race, discovered investigating #178) |
 | Table 8.8 terminate (Active → Terminated, Case worker) | `LifecycleScenarios.TaskLifecycle__…FaultReactivateTerminateWalkTable88` | Pinned |
 | Table 8.8 exit — Task (exit criterion while Active) | `SentryScenarios.Sentry__Given_TaskExitCriterion__…CaseFileEventTerminatesActiveTask` (functional); `…Then_EntryCriterionStoreAndJournalStayClean` (#183 — projection/journal fidelity: no spurious `EntryCriterionSatisfied`) | Pinned |
 | Table 8.8 exit — Stage (exit criterion while Active; D6 fix) | `SentryScenarios.Sentry__Given_StageExitCriterion__…` | Pinned |
 | Table 8.9 exit/terminate propagation to children | `KnownGapScenarios.StageExit__…ExitCascadesTerminationToTask` | Pinned (#63) |
 | Table 8.9 fault rows (children keep state on parent fault) | fault non-propagation pinned at the Case level (`TaskLifecycle__…FaultReactivate…`'s parent-still-Active assert); per-child state matrix not separately scenario-ized | Pinned (non-propagation observable) |
-| Table 8.9 complete rows (`<impossible>` cells) — Stage AND Task columns only; Milestone/EventListener have their own column and legitimately REMAIN Available/Suspended under a completed parent (Table 8.7's completed-Stage description names only "Stage or Task instances"), so those two behaviors are deliberately untouched | `StageCompletionCascadeIntegrationTests.StageCompletionCascade__…StageAndTaskChildrenAreCascadedToTerminatedAndNeverActivate` (a non-required Stage child AND a non-required Task child both left Available/Enabled when their parent auto-completes are cascaded to Terminated via `exit`, so neither can re-activate — the Stage child, additionally, never spawns its own required child) / `…ChildrenAreLeftAlone` (Disabled/Failed children are left untouched, per this table's own rows); model-driven, not a `.cmmn` conformance scenario | Pinned (#179 — `StageBehavior` AND `TaskBehavior.HandleParentTransitioned` both gained a `Complete` case that cascades Exit to any non-terminal child, reusing the existing Exit/Terminate downward-cascade mechanism; `ConfigureForStageOrTask`'s shared state machine and `IsTerminal()` port the same gate verbatim to Task) |
+| Table 8.9 complete rows (`<impossible>` cells) — no non-terminal child SURVIVES a completing parent — Stage AND Task columns only; Milestone/EventListener have their own column and legitimately REMAIN Available/Suspended under a completed parent (Table 8.7's completed-Stage description names only "Stage or Task instances"), so those two behaviors are deliberately untouched | `StageCompletionCascadeIntegrationTests.StageCompletionCascade__…StageAndTaskChildrenAreCascadedToTerminatedAndNeverActivate` (a non-required Stage child AND a non-required Task child both left Available/Enabled when their parent auto-completes are cascaded to Terminated via `exit`, so neither can re-activate — the Stage child, additionally, never spawns its own required child) / `…ChildrenAreLeftAlone` (Disabled/Failed children are left untouched, per this table's own rows); model-driven, not a `.cmmn` conformance scenario | Pinned (#179 — `StageBehavior` AND `TaskBehavior.HandleParentTransitioned` both gained a `Complete` case that cascades Exit to any non-terminal child, reusing the existing Exit/Terminate downward-cascade mechanism; `ConfigureForStageOrTask`'s shared state machine and `IsTerminal()` port the same gate verbatim to Task) |
+| Table 8.9 complete rows (`<impossible>` cells) — no new child is ADMITTED into a completed parent | `LifecycleScenarios.StageCompletion__Given_LateRepetitionRequestArrivesAfterAutoComplete__Then_RefusesTheSpawn` — a repetition request arriving after its owning CasePlanModel has already, legitimately, completed must be refused, not spawned into the Completed container | Pinned (#178) |
 
 ## §8.4.3 EventListener and Milestone lifecycle (Tables 8.10, 8.11)
 
@@ -276,8 +334,8 @@ the Status column wins.
 | 8.6.3 RequiredRule evaluated on create; gates parent completion | evaluation-on-create asserted in `KnownGapScenarios.StageCompletion`'s precondition (`Required=true`, now an ordinary green `[Fact]`) and by the existing behavior unit suites; the FULL required-blocks-completion conformance matrix (every combination of required/non-required, autoComplete TRUE/FALSE, and child-state permutations) is not exhaustively scenario-ized beyond the one D4 branch `StageCompletion` pins | Pinned (the one scenario-ized branch, #68) — KnownGap:#19 (remaining matrix combinations; evaluation-on-create covered by unit suites) |
 | 8.6.4 RepetitionRule — first evaluation discarded (D7 half) | `SentryScenarios.…RearmsAcrossDistinctSourceInstances` pins `Repeated=false` after first occurrence | Pinned (observable half) |
 | 8.6.4 repetition on entry-criterion-with-OnPart satisfaction (detection) | `SentryScenarios.…RearmsAcrossDistinctSourceInstances` (`Repeated=true` on second occurrence) | Pinned |
-| 8.6.4 repetition instance creation by owning Stage (Figure 8.6) | `KnownGapScenarios.StageBookkeeping__…StageSpawnsRepetitionInstance` | Pinned (Bug #62, PR !26 `86d7b50`) |
-| 8.6.4 repeat-on-complete/terminate (no entry criteria) | `KnownGapScenarios.TaskRepetition__…` | Pinned (#19/D7, PR !26 `d991861`) |
+| 8.6.4 repetition instance creation by owning Stage (Figure 8.6) | mechanism itself unchanged and unit-tested (`StageBehaviorTests_HandleChildRepeated_RepetitionGuard.cs` — Bug #62, PR !26 `86d7b50`, still holds for a genuinely Active container); the `.cmmn` scenario that used to demonstrate a successful spawn head-on, `KnownGapScenarios.StageBookkeeping__…`, was retired (its own completion timing made it prove Table 8.9's refusal instead — see `LifecycleScenarios.StageCompletion__Given_LateRepetitionRequestArrivesAfterAutoComplete__…`, above); the other candidate, `TaskRepetition__…` below, is quarantined | KnownGap:#198 (conformance-level positive-spawn coverage currently unavailable; underlying mechanism itself unaffected) |
+| 8.6.4 repeat-on-complete/terminate (no entry criteria) | `KnownGapScenarios.TaskRepetition__…` — quarantined (~25% flake); see the row above and the #198 entry in this file's prose | KnownGap:#198 |
 | 8.6.5 ApplicabilityRule filters plannable items | pre-existing `PlanningTableGrainTests` (TRUE/FALSE/nested tables) | Pinned (covered by existing suite; not re-scenario-ized) |
 
 ## §8.7 Planning

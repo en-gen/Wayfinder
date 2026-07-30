@@ -1,6 +1,8 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using FluentAssertions;
 using Xunit;
@@ -465,6 +467,122 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "(that conjunct exists only in the autoComplete=FALSE column's Branch 1) - a Stage " +
                 "with zero fixed PlanItems and an un-planned PlanningTable completes exactly as " +
                 "vacuously as one with no PlanningTable at all");
+        }
+
+        // Table 8.9 (complete rows / <impossible> cells) + issue #178 - before that fix, a
+        // repetition request that arrived AFTER its owning Stage had already, legitimately,
+        // completed still spawned a new instance into it: zombie execution, reached here via
+        // natural auto-completion (Table 8.12) rather than an explicit exit criterion (the shape
+        // #178's own repro/RepetitionAfterTerminationIntegrationTests covers).
+        //
+        // This scenario's CasePlanModel (autoComplete=FALSE, Sentry_RearmRepetition.cmmn) has
+        // only two top-level PlanItems and no PlanningTable, so once BOTH are terminal - the
+        // non-repeating SourcePlanItem (it declares no repetitionRule at all,
+        // Sentry_RearmRepetition.cmmn:29 - its own single instance is simply done, never a second
+        // one) and MilestonePlanItem's repetition-0 occurrence - Table 8.12's autoComplete=FALSE
+        // Branch 1 ("no Active children AND all children terminal AND no DiscretionaryItems") is
+        // satisfied and the CasePlanModel legitimately completes. Direct instrumentation (the
+        // #178 investigation that found this scenario) confirmed this happens more than two
+        // seconds and several message hops before this scenario ever constructs its second
+        // SourcePlanItem instance below - not a race this test could accidentally win or lose,
+        // which is why it polls for the CasePlanModel's own completion FIRST and asserts it
+        // before doing anything else.
+        //
+        // B' (a second, physically distinct instance sharing SourcePlanItem's identity) is
+        // constructed the same synthetic, out-of-band way SentryRepetitionResetIntegrationTests/
+        // SentryScenarios already establish (GetGrain + Define, deliberately bypassing
+        // StageBehavior.CreateChild) - it stands in for a genuinely LATE redelivery of an
+        // already-satisfied RepeatSentry trigger (exactly the "earned before, merely late in
+        // delivery" shape #178's own Suspended-buffer analysis describes), not a modeled CMMN
+        // instance the engine itself would ever construct this way. Because it bypasses
+        // CreateChild it never appears in StageStore.Children and so could not have blocked the
+        // CasePlanModel's completion above even in principle - the ordering asserted above is not
+        // an artifact of this probe's own construction.
+        //
+        // On develop (pre-#178) an earlier version of this scenario passed - it asserted a SECOND
+        // MilestonePlanItem instance appeared - but only by materializing Table 8.9's own
+        // <impossible> cell: a Completed Stage may only coexist with Disabled/Failed/Completed/
+        // Terminated children, never a freshly-spawned Available one. That GREEN status was the
+        // bug, not evidence of conformance. Originally authored (as
+        // KnownGapScenarios.StageBookkeeping__…, Bug #62/PR !26) to prove repetition SPAWNING
+        // worked at all, before #178 was discovered - graduated and rewritten here, once #178
+        // landed, to assert the opposite: the spawn must be REFUSED once the owning container has
+        // legitimately completed.
+        [Fact]
+        [ConformanceCitation("Table 8.9 / complete rows - <impossible> cells (Completed Stage + live child)")]
+        [ConformanceCitation("Table 8.12 / autoComplete=FALSE Branch 1 - completion-ordering precondition")]
+        public async Task StageCompletion__Given_LateRepetitionRequestArrivesAfterAutoComplete__Then_RefusesTheSpawn()
+        {
+            var deployed = await _harness.DeployAndCreate("Sentry_RearmRepetition.cmmn");
+
+            var sourceGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "SourcePlanItem", deployed.Scope);
+            var milestoneGrain = _harness.ResolveChild(
+                deployed.CaseInstanceId, deployed.AfterCreateSnapshot.BehaviorExtension, "MilestonePlanItem", deployed.Scope);
+
+            // B completes -> milestone rep 0 occurs (proven green in SentryScenarios).
+            await sourceGrain.Trigger(PlanItemTransition.ManualStart);
+            await sourceGrain.Trigger(PlanItemTransition.Complete);
+            (await ConformanceHarness.PollUntil(
+                async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed)).Should().BeTrue();
+
+            // Poll for the CasePlanModel's OWN completion FIRST, before ever constructing B' -
+            // so the rest of this scenario cannot race against it.
+            var caseCompletedBeforeSecondInstance = await ConformanceHarness.PollUntil(
+                async () => (await deployed.CaseGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
+            caseCompletedBeforeSecondInstance.Should().BeTrue(
+                "Table 8.12 (autoComplete=FALSE, Branch 1): with SourcePlanItem's own single " +
+                "instance terminal (it has no repetitionRule) and MilestonePlanItem's " +
+                "repetition-0 occurrence terminal, and no PlanningTable, the CasePlanModel must " +
+                "complete BEFORE this scenario ever constructs a second SourcePlanItem instance - " +
+                "establishing this ordering is the precondition the rest of this scenario depends " +
+                "on, not something it can assume");
+
+            // B' - a second, physically distinct instance sharing SourcePlanItem's identity,
+            // constructed out-of-band (see this scenario's own remarks). Stands in for a
+            // genuinely late redelivery of an already-satisfied RepeatSentry trigger, now
+            // arriving into an ALREADY-Completed CasePlanModel.
+            var sourcePlanItemModel = deployed.CaseModel.CasePlanModel.PlanItems.Single(p => p.Id == "SourcePlanItem");
+            var secondInstance = _harness.ClusterClient.GetGrain<IPlanItemInternalGrain>(
+                deployed.CaseInstanceId, $"{deployed.Scope}.LateRedeliveryProbeB2");
+            await secondInstance.Define(deployed.CaseDefinitionId, sourcePlanItemModel);
+            await secondInstance.Trigger(PlanItemTransition.Create);
+            await secondInstance.Trigger(PlanItemTransition.ManualStart);
+            await secondInstance.Trigger(PlanItemTransition.Complete);
+
+            // Positive lower bound (issue #174 discipline): poll for Milestone's OWN Repeated
+            // flag to flip true. Repeated is only raised AFTER
+            // Publish(PlanItemRepetitionCriteriaMetEvent) has already been awaited
+            // (TaskBehavior/StageBehavior.HandleSentrySatisfied), so observing Repeated == true
+            // proves the very event the CasePlanModel's HandleChildRepeated reacts to has already
+            // been published, not merely attempted.
+            var milestoneRepeatedAfterCompletion = await ConformanceHarness.PollUntil(
+                async () => (await milestoneGrain.GetSnapshot()).Repeated);
+            milestoneRepeatedAfterCompletion.Should().BeTrue(
+                "the late redelivery must genuinely re-satisfy RepeatSentry and reach the " +
+                "repetition branch, or this scenario would prove nothing about #178's refusal " +
+                "below");
+
+            // No clean positive upper bound exists for "the CasePlanModel has finished NOT
+            // spawning" - ConformanceHarness.PollUntil's documented 30s budget stands in,
+            // generous enough that a real (bug-reintroducing) spawn's handful of in-process
+            // awaits would trivially complete inside it on any engine, fixed or not.
+            var secondInstanceSpawned = await ConformanceHarness.PollUntil(async () =>
+            {
+                var caseSnapshot = await deployed.CaseGrain.GetSnapshot();
+                return _harness.CountChildInstances(caseSnapshot.BehaviorExtension, "MilestonePlanItem") == 2;
+            });
+
+            secondInstanceSpawned.Should().BeFalse(
+                "Table 8.9 (complete rows): a Completed Stage may only coexist with Disabled/" +
+                "Failed/Completed/Terminated children - Available (what a freshly spawned " +
+                "repetition instance would start in) is an <impossible> cell. Issue #178: " +
+                "StageBehavior.HandleChildRepeated must refuse to spawn into an already-Completed " +
+                "container, even though the triggering event genuinely arrived (Milestone's own " +
+                $"Repeated flag reached true = {milestoneRepeatedAfterCompletion} above)");
+
+            (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Completed,
+                "the CasePlanModel must still be Completed - unaffected by the refused spawn attempt");
         }
     }
 }
