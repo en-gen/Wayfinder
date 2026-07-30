@@ -17,15 +17,19 @@ using SentryModel = Wayfinder.Grains.Interfaces.Model.Sentry;
 
 namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 {
-    // #179 - Table 8.9's `complete` rows mark a Completed Stage coexisting with a child in
-    // {Available, Enabled, Active, Suspended} as IMPOSSIBLE - only {Disabled, Completed,
-    // Terminated, Failed} may remain. Table 8.12's autoComplete=TRUE completion criteria ("no
-    // Active children AND all REQUIRED children terminal") says nothing about non-required
-    // children, so a Stage can legitimately reach Completed while a non-required child still sits
-    // Available/Enabled. The two tables only reconcile if completion itself drives that remainder
-    // to a terminal state - StageBehavior.HandleParentTransitioned now cascades Exit to any
-    // non-terminal child of a completing parent, mirroring the pre-existing Exit/Terminate
-    // cascade (Table 8.9's exit/terminate propagation) rather than inventing a second mechanism.
+    // #179 - Table 8.9's `complete` rows mark a Completed Stage coexisting with a Stage or Task
+    // child in {Available, Enabled, Active, Suspended} as IMPOSSIBLE - only {Disabled, Completed,
+    // Terminated, Failed} may remain. (Milestone/EventListener have their OWN column in that same
+    // table and legitimately survive - Available/Suspended are explicitly permitted there, per
+    // Table 8.7's completed-Stage description naming only "Stage or Task instances"; those two
+    // behaviors are deliberately untouched by this fix.) Table 8.12's autoComplete=TRUE completion
+    // criteria ("no Active children AND all REQUIRED children terminal") says nothing about
+    // non-required children, so a Stage can legitimately reach Completed while a non-required
+    // Stage or Task child still sits Available/Enabled. The two tables only reconcile if
+    // completion itself drives that remainder to a terminal state - StageBehavior AND
+    // TaskBehavior's HandleParentTransitioned now both cascade Exit to any non-terminal child of a
+    // completing parent, mirroring the pre-existing Exit/Terminate cascade (Table 8.9's
+    // exit/terminate propagation) rather than inventing a second mechanism.
     //
     // Model-driven (ICaseGrain.Create + Trigger only), matching StageCompletionRulesIntegrationTests'
     // and SentryRepetitionResetIntegrationTests' conventions - not `.cmmn`-driven, so this lives
@@ -48,9 +52,12 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         // Case shape (mirrors the original #179 reproduction):
         //   StageS (autoComplete=TRUE)
         //     PlanItemR       -> TaskR       (required, no criteria)
-        //     PlanItemTrigger -> TaskTrigger (non-required, no criteria - its own completion is
-        //                                     StageB's INDEPENDENT entry criterion, unrelated to
-        //                                     StageS's own completion)
+        //     PlanItemTrigger -> TaskTrigger (non-required, no criteria - left Enabled when StageS
+        //                                     completes, so it doubles as this test's Task-typed
+        //                                     cascade target. Its own completion is also StageB's
+        //                                     INDEPENDENT entry criterion, unrelated to StageS's
+        //                                     own completion - see the remarks below on why that
+        //                                     criterion is deliberately never satisfied)
         //     PlanItemB       -> StageB (non-required, EntryCriterion -> IndependentSentry,
         //                                ManualActivationRule=FALSE so a satisfied entry criterion
         //                                drives Start directly)
@@ -59,7 +66,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         //                 Active (StageBehavior.HandleEnterActiveFromStart) - i.e. exactly the
         //                 "begins spawning its own children" half of the original defect.
         [Fact]
-        public async Task StageCompletionCascade__Given_AutoCompleteStageWithNonRequiredChildAvailable__When_ParentCompletes__Then_ChildIsCascadedToTerminatedAndNeverActivates()
+        public async Task StageCompletionCascade__Given_AutoCompleteStageWithNonRequiredChildrenAvailable__When_ParentCompletes__Then_StageAndTaskChildrenAreCascadedToTerminatedAndNeverActivate()
         {
             var caseInstanceId = Guid.NewGuid();
             var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
@@ -193,26 +200,30 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             stageBChildren.Should().NotContainKey("PlanItemC",
                 "StageB was cascaded out of Available before ever reaching Active, so it must never have instantiated its required child TaskC - the 'begins spawning its own children' half of #179's defect");
 
-            // Now satisfy StageB's INDEPENDENT entry criterion anyway - completing TaskTrigger, a
-            // sibling whose only relationship to StageS's own completion is that it happened not
-            // to be Active at the time. Pre-fix this legitimately drove StageB out of Available
-            // (HandleSentrySatisfied's Available-gated branch). Post-fix StageB is already
-            // Terminated, so that branch's own state guard never matches and nothing happens - a
-            // POSITIVE poll for any deviation from Terminated, over a generous window, is the same
-            // decisive absence-of-signal technique the original #179 repro used: if the engine
-            // regressed, this poll finds StageB moving off Terminated; if not, it correctly times
-            // out.
-            await taskTriggerGrain.Trigger(PlanItemTransition.ManualStart);
-            await taskTriggerGrain.Trigger(PlanItemTransition.Complete);
-
-            var stageBLeftTerminated = await PollUntil(
-                async () => (await stageBGrain.GetSnapshot()).PlanItemState != PlanItemState.Terminated,
-                TimeSpan.FromSeconds(3));
-            stageBLeftTerminated.Should().BeFalse(
-                "StageB is already Terminated - satisfying its independent entry criterion afterward must be a no-op, not a legitimate late activation");
-
-            ((StageBehaviorSnapshot)(await stageBGrain.GetSnapshot()).BehaviorExtension).Children
-                .Should().NotContainKey("PlanItemC", "TaskC must still never have been created");
+            // TaskBehavior carries the IDENTICAL Complete-cascade case (Table 8.9 puts Task in the
+            // SAME `<impossible>` column as Stage - see StageBehavior.HandleParentTransitioned's
+            // type-asymmetry remarks): TaskTrigger (non-required, Enabled, non-terminal) must be
+            // cascaded too, not just StageB.
+            //
+            // Deliberately NOT manually completed here. An earlier draft of this test drove
+            // TaskTrigger through ManualStart/Complete AFTER StageS had already completed, to
+            // satisfy StageB's independent entry criterion and prove StageB stayed inert - but at
+            // the time TaskBehavior itself was unfixed, so that call was silently exercising the
+            // exact defect class #179 exists to close: a Task legitimately transitioning
+            // Enabled -> Active -> Completed inside an already-Completed parent, live inside its
+            // own regression test. Now that TaskBehavior is fixed, TaskTrigger is cascaded to
+            // Terminated at the same moment as StageB, so StageB's independent entry criterion
+            // (sourced from TaskTrigger's own completion) can never be satisfied by anything live
+            // at all - its only possible driver is itself terminal. No separate "late
+            // satisfaction is a no-op" poll is needed to prove StageB stays inert:
+            // PlanItemStateMachine.ConfigureForStageOrTask configures ZERO outgoing Permit(...)
+            // edges from Terminated, so that is a state-machine-level guarantee, not merely an
+            // application-level check.
+            var taskTriggerTerminated = await PollUntil(
+                async () => (await taskTriggerGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated,
+                TimeSpan.FromSeconds(10));
+            taskTriggerTerminated.Should().BeTrue(
+                "#179 fix (TaskBehavior half): StageS completing must cascade Exit to TaskTrigger too - Table 8.9 puts Task in the same `<impossible>` column as Stage, not the Milestone/EventListener column that legitimately survives a completed parent");
 
             (await stageSGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Completed,
                 "StageS must still be Completed - the cascade must not have reopened it");

@@ -444,6 +444,18 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 // ConfigureForStageOrTask permits Exit from Disabled and Failed too (a genuine
                 // termination cascade DOES reach into those), so Complete needs its own, narrower
                 // condition rather than reusing that gate unchanged.
+                //
+                // Type asymmetry, deliberate: Table 8.9's `complete` rows carry SEPARATE columns
+                // per child type - Stage and Task instances in {Available, Enabled, Active,
+                // Suspended} are `<impossible>` (this cascade), but Milestone and EventListener
+                // instances in Available/Suspended are explicitly permitted to REMAIN Available/
+                // Suspended under a Completed parent (they legitimately survive it). Table 8.7's
+                // own description of a completed Stage confirms this: it names only "Stage or Task
+                // instances" as needing to be Completed/Terminated, conspicuously omitting
+                // Milestone/EventListener. TaskBehavior.HandleParentTransitioned carries the
+                // identical case (ConfigureForStageOrTask is shared, so IsTerminal()+Exit port
+                // verbatim); MilestoneBehavior/EventListenerBehavior deliberately do NOT - adding
+                // it there would itself be a Table 8.9 violation, just in the opposite direction.
                 case PlanItemTransition.Complete:
                     {
                         if (!Host.State.PlanItemState.IsTerminal())

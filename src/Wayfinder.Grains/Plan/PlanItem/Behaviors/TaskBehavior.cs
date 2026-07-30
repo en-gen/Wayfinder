@@ -160,6 +160,26 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         transition = PlanItemTransition.Exit;
                         break;
                     }
+                // #179 - see StageBehavior.HandleParentTransitioned's remarks for the full
+                // rationale (Table 8.9's `complete` rows vs. Table 8.12's autoComplete=TRUE
+                // criteria) and the re-entrancy analysis. Ported verbatim, not merely
+                // analogous: Table 8.9's `complete` rows put Task instances in the SAME column
+                // as Stage instances (Available/Enabled/Active/Suspended both `<impossible>`,
+                // confirmed by Table 8.7's completed-Stage description naming only "Stage or
+                // Task instances") - unlike Milestone/EventListener, which have their own column
+                // and legitimately survive a completed parent, so this case does NOT get ported
+                // to MilestoneBehavior/EventListenerBehavior. ConfigureForStageOrTask is shared
+                // by Task and Stage, so IsTerminal() (Table 8.9's "may coexist" set - Disabled,
+                // Completed, Terminated, Failed) and the Exit trigger both apply identically.
+                case PlanItemTransition.Complete:
+                    {
+                        if (!Host.State.PlanItemState.IsTerminal())
+                        {
+                            Host.RaiseEvent(new ParentCompleted());
+                            transition = PlanItemTransition.Exit;
+                        }
+                        break;
+                    }
             }
 
             if (transition.HasValue && StateMachine.CanFire(transition.Value))
