@@ -63,9 +63,21 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 // not as an unconditional entry action on Active: Start/ManualStart's own arrival
                 // is handled by HandleEnterActiveFromStart above, is never reachable FROM
                 // Suspended (ConfigureForStageOrTask permits no such edge), and the buffer is
-                // always empty on a first activation regardless. Scoped to ordinary Stage/Task -
-                // CasePlanModelBehavior's own Suspended/Reactivate cycle does not currently drain
-                // a case-root-level buffer; see this fix's own remarks for that known limitation.
+                // always empty on a first activation regardless.
+                //
+                // Deliberately NOT registered for Reactivate here (ordinary Stage/Task's only
+                // source for Reactivate is Failed - see ConfigureForStageOrTask): a buffered
+                // entry left over after DrainPendingRepetitions itself Faults this Host mid-batch
+                // (the #67 ceiling - see that method's ceilingBreached remarks) is, by
+                // construction, one that would immediately re-fault the container if replayed. A
+                // human reactivating from Failed is a recovery action for whatever ORIGINALLY
+                // faulted the Host, not a request to re-attempt every stale spawn that was queued
+                // behind the one that caused it - auto-draining on Reactivate would silently
+                // re-trigger that exact fault. This is a considered decision, not an oversight:
+                // see CasePlanModelBehavior's own Reactivate registration for the CASE-level
+                // counterpart of this same call (its Reactivate is overloaded across MULTIPLE
+                // source states by Table 8.6, so it needs a source-state guard rather than simply
+                // omitting the hook).
                 .OnEntryFromAsync(PlanItemTransition.Resume, DrainPendingRepetitions)
                 .OnEntryFromAsync(PlanItemTransition.ParentResume, DrainPendingRepetitions);
         }
@@ -821,12 +833,24 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
                 case PlanItemState.Failed:
                     // Semi-terminal and re-activatable (Reactivate -> Active), so not
-                    // unambiguously "done" the way Completed/Terminated/Closed are - but
-                    // re-activation is a human recovery action, and silently replaying a stale
-                    // repetition request into a just-recovered case would be surprising, not
-                    // helpful. Refuse, same as the terminal branch above, but raise an OBSERVABLE
-                    // event (RepetitionRefusedWhileFailed) rather than only a log line, so this
-                    // refusal is visible to whoever investigates the Failed case.
+                    // unambiguously "done" the way Completed/Terminated/Closed are - but the
+                    // decisive argument for refusing (not buffering) is spec-structural, not a UX
+                    // judgment call: Table 8.9's suspend/resume pair carries EXPLICIT
+                    // preserve-and-restore semantics via Figure 8.3's history pseudo-state (the
+                    // basis for the Suspended branch above), while the fault/re-activate pair in
+                    // Tables 8.6/8.7 carries NO history semantics at all. Buffering-on-suspend
+                    // IMPLEMENTS a spec behavior; buffering-on-fault would INVENT one the spec
+                    // never describes.
+                    //
+                    // The practical case for refuse-and-record over silent drop: `fault` is
+                    // exactly what the #67 repetition ceiling fires (SpawnRepetitionOrRefuseCeiling
+                    // below) - so buffering across a Fault would mean replaying the very requests
+                    // that faulted this container the moment it is reactivated, immediately
+                    // re-faulting it. A refuse-loop by construction, not a recovery path. Refuse,
+                    // same as the terminal branch above, but raise an OBSERVABLE event
+                    // (RepetitionRefusedWhileFailed) rather than only a log line, so a silent
+                    // refusal is not mistaken for "nothing happened" by whoever investigates the
+                    // Failed case.
                     Host.LogWithContext(logger => logger.LogWarning(
                         "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | refusing repetition of {ChildElementDefinitionId} - this container has Failed (#178)",
                         Host.Definition.GetType().Name,
@@ -912,67 +936,130 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         }
 
         // #178 - replays StageStore.PendingRepetitions once this Host has returned to Active (see
-        // the Resume/ParentResume entry-action registration in the constructor above).
-        private async Task DrainPendingRepetitions()
+        // the Resume/ParentResume entry-action registration in the constructor above, and
+        // CasePlanModelBehavior's own Reactivate registration for the CasePlanModel's equivalent -
+        // that class's own remarks explain why the CasePlanModel needs a source-state-guarded hook
+        // on a DIFFERENT trigger rather than reusing Resume/ParentResume directly). Protected (not
+        // private) so CasePlanModelBehavior can invoke it.
+        //
+        // No "is this Host still Active" re-check at the top of the loop: this method never awaits
+        // anything that could let another message interleave on this activation (this grain class
+        // is not [Reentrant], so nothing else can run here until this whole Trigger(...) call
+        // completes) - the only way this Host's own state changes DURING this loop is the
+        // ceilingBreached Fault below, which is handled explicitly via that return value, not by
+        // re-reading Host.State (see its remarks for why a re-read would not even catch it).
+        protected async Task DrainPendingRepetitions()
         {
             // Snapshot: PendingRepetitions is mutated (entries removed) as this loop progresses -
             // iterate a stable copy, not the live collection.
             foreach (var pending in StageStore.PendingRepetitions.ToList())
             {
-                // Defensive re-check: a request buffered while genuinely Suspended must never be
-                // replayed into a container that is not (or is no longer) Active. This alone is
-                // NOT sufficient to catch a mid-batch ceiling breach, though - see the
-                // ceilingBreached handling below for why.
-                if (Host.State.PlanItemState != PlanItemState.Active) break;
-
-                var child = PlanItemDefinition.PlanItems
-                    .SingleOrDefault(pi => pi.Id == pending.PlanItemDefinitionId);
-
-                var ceilingBreached = false;
-
-                if (child == null)
+                // Hazard (review round 2) - the drain must honor the SAME #161 redelivery guard
+                // the live path checks in HandleChildRepeated. Reachable: an earlier drain
+                // iteration (of THIS same entry, on a prior Suspend/Resume cycle) confirmed
+                // CreateChild + ChildRepeated - which durably records the guard - and then this
+                // activation died before the FOLLOWING RepetitionBufferDrained was confirmed. The
+                // guard is durable; the still-buffered entry is ALSO durable (the same
+                // ConfirmEvents() call that would have removed it never ran) - so without this
+                // check, the next drain would spawn a SECOND child at the same repetition index.
+                // Checked before ever touching CreateChild, mirroring HandleChildRepeated's own
+                // ordering.
+                if (StageStore.IsRepetitionRedelivery(pending.SourceInstanceId))
                 {
-                    // The definition changed out from under a still-buffered request (should not
-                    // happen in practice - PlanItemDefinition is immutable for the lifetime of
-                    // this Host - but defensive, matching HandleChildRepeated's own unknown-child
-                    // handling). Drop it: there is nothing left to spawn. Not a ceiling breach -
-                    // does not stop the rest of the batch from draining.
-                    Host.LogWithContext(logger => logger.LogCritical(
-                        "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | buffered repetition request references unknown child {ChildElementDefinitionId} - dropping",
+                    Host.LogWithContext(logger => logger.LogInformation(
+                        "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | ignoring buffered repetition request from source instance {SourceInstanceId} - a child was already spawned for it by an earlier, unconfirmed-until-now drain",
                         Host.Definition.GetType().Name,
                         PlanItemDefinition.GetType().Name,
                         Host.Scope,
                         Host.InstanceId,
-                        pending.PlanItemDefinitionId));
+                        pending.SourceInstanceId));
+
+                    Host.RaiseEvent(new RepetitionBufferDrained { SourceInstanceId = pending.SourceInstanceId });
+                    await Host.ConfirmEvents();
+                    continue;
                 }
-                else
+
+                try
                 {
-                    // Hazard 2: the #67 ceiling still applies on replay - this goes through the
-                    // exact same check-then-spawn path a live (non-buffered) request would.
-                    ceilingBreached = await SpawnRepetitionOrRefuseCeiling(child, pending.SourceInstanceId, pending.NextRepetition);
+                    var child = PlanItemDefinition.PlanItems
+                        .SingleOrDefault(pi => pi.Id == pending.PlanItemDefinitionId);
+
+                    var ceilingBreached = false;
+
+                    if (child == null)
+                    {
+                        // The definition changed out from under a still-buffered request (should
+                        // not happen in practice - PlanItemDefinition is immutable for the
+                        // lifetime of this Host - but defensive, matching HandleChildRepeated's
+                        // own unknown-child handling). Drop it: there is nothing left to spawn.
+                        // Not a ceiling breach - does not stop the rest of the batch from
+                        // draining.
+                        Host.LogWithContext(logger => logger.LogCritical(
+                            "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | buffered repetition request references unknown child {ChildElementDefinitionId} - dropping",
+                            Host.Definition.GetType().Name,
+                            PlanItemDefinition.GetType().Name,
+                            Host.Scope,
+                            Host.InstanceId,
+                            pending.PlanItemDefinitionId));
+                    }
+                    else
+                    {
+                        // Hazard 2: the #67 ceiling still applies on replay - this goes through
+                        // the exact same check-then-spawn path a live (non-buffered) request
+                        // would.
+                        ceilingBreached = await SpawnRepetitionOrRefuseCeiling(child, pending.SourceInstanceId, pending.NextRepetition);
+                    }
+
+                    // Drain (remove) this entry regardless of whether it was spawned or refused
+                    // by the ceiling: a ceiling-refused buffered request is not retried, matching
+                    // the live ceiling path's own no-retry semantics (see
+                    // SpawnRepetitionOrRefuseCeiling's remarks) - re-attempting the SAME buffered
+                    // request on a future resume would just repeat the identical refusal (see
+                    // also the #178 decision recorded in this class's constructor and
+                    // CasePlanModelBehavior's, on why neither ordinary Stage/Task nor the
+                    // CasePlanModel auto-drains on a Failed->Reactivate recovery).
+                    Host.RaiseEvent(new RepetitionBufferDrained { SourceInstanceId = pending.SourceInstanceId });
+                    await Host.ConfirmEvents();
+
+                    // Self-review hazard - stop draining the REST of this batch the moment one
+                    // entry breaches the ceiling, using SpawnRepetitionOrRefuseCeiling's OWN
+                    // return value, not a subsequent Host.State.PlanItemState re-read: this
+                    // method runs as an OnEntryFromAsync action of the Resume/ParentResume/
+                    // Reactivate transition still being dispatched, so the Fault fired inside
+                    // SpawnRepetitionOrRefuseCeiling is REENTRANT - Stateless (FiringMode.Queued)
+                    // enqueues it rather than applying it immediately, and will not drain that
+                    // queue until this ENTIRE outer transition finishes unwinding (see that
+                    // method's remarks). Host.State.PlanItemState would therefore still read
+                    // Active here even though the container is, semantically, already faulted -
+                    // relying on it would let a SECOND buffered entry spawn (or hit its own,
+                    // redundant ceiling refusal) into what is effectively already a faulted
+                    // container within the very same drain pass.
+                    if (ceilingBreached) break;
                 }
-
-                // Drain (remove) this entry regardless of whether it was spawned or refused by
-                // the ceiling: a ceiling-refused buffered request is not retried, matching the
-                // live ceiling path's own no-retry semantics (see SpawnRepetitionOrRefuseCeiling's
-                // remarks) - re-attempting the SAME buffered request on a future resume would just
-                // repeat the identical refusal.
-                Host.RaiseEvent(new RepetitionBufferDrained { SourceInstanceId = pending.SourceInstanceId });
-                await Host.ConfirmEvents();
-
-                // Self-review hazard - stop draining the REST of this batch the moment one entry
-                // breaches the ceiling, using SpawnRepetitionOrRefuseCeiling's OWN return value,
-                // not a subsequent Host.State.PlanItemState re-read: this method runs as an
-                // OnEntryFromAsync action of the Resume/ParentResume transition still being
-                // dispatched, so the Fault fired inside SpawnRepetitionOrRefuseCeiling is
-                // REENTRANT - Stateless (FiringMode.Queued) enqueues it rather than applying it
-                // immediately, and will not drain that queue until this ENTIRE outer transition
-                // finishes unwinding (see that method's remarks). Host.State.PlanItemState would
-                // therefore still read Active here even though the container is, semantically,
-                // already faulted - relying on it would let a SECOND buffered entry spawn (or hit
-                // its own, redundant ceiling refusal) into what is effectively already a faulted
-                // container within the very same drain pass.
-                if (ceilingBreached) break;
+                catch (Exception ex)
+                {
+                    // Should-fix (review round 2) - this method runs as an entry action of the
+                    // transition ITSELF still being dispatched (see the ceilingBreached remarks
+                    // just above for the same reentrancy fact). Stateless commits the destination
+                    // state and runs OnTransitionedAsync/HandleTransitioned BEFORE entry actions
+                    // run, so an exception escaping this loop escapes this entry action, escapes
+                    // the outer FireAsync call, and leaves this Host stuck: the transition itself
+                    // already happened and cannot be "retried" by firing it again, and - unlike
+                    // the live (non-buffered) path - there is no Orleans stream-agent
+                    // retry-then-redeliver to eventually re-invoke this drain. So: catch here,
+                    // log, leave THIS entry buffered (do not raise RepetitionBufferDrained, do not
+                    // rethrow), and let the REST of the batch still get a chance - a transient
+                    // failure (e.g. a timeout) spawning one buffered request must not permanently
+                    // strand every other request queued behind it, nor silently swallow the fact
+                    // that this one needs another attempt later.
+                    Host.LogWithContext(logger => logger.LogError(ex,
+                        "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | draining buffered repetition request from source instance {SourceInstanceId} threw - leaving it buffered for a future drain attempt",
+                        Host.Definition.GetType().Name,
+                        PlanItemDefinition.GetType().Name,
+                        Host.Scope,
+                        Host.InstanceId,
+                        pending.SourceInstanceId));
+                }
             }
         }
 
@@ -1032,23 +1119,37 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
                 if (StateMachine.CanFire(PlanItemTransition.Fault))
                 {
-                    // HandleTransitioned (BaseBehavior) raises Transitioned and confirms - the
-                    // same ConfirmEvents() call commits the RepetitionCeilingExceeded event
-                    // raised just above, per the same Publish-before-Repeated/Bug #61 ordering
-                    // discipline used elsewhere in this class.
+                    // WHO actually commits the RepetitionCeilingExceeded event raised just above
+                    // depends on which caller reached here - do not assume it is always
+                    // HandleTransitioned's own confirm (review round 2: the original comment here
+                    // claimed that unconditionally, which is only true on ONE of the two paths):
                     //
-                    // #178 note on reentrancy: when this is reached via DrainPendingRepetitions
-                    // (itself an OnEntryFromAsync action of the Resume/ParentResume transition
-                    // still being dispatched), this FireAsync(Fault) call is REENTRANT - Stateless
-                    // (FiringMode.Queued, its default - see PlanItemStateMachine's own remarks on
-                    // the equivalent Create->Start reentrant case) ENQUEUES it rather than running
-                    // it to completion immediately, and does not drain that queue until the
-                    // OUTERMOST FireAsync call (Resume) itself finishes unwinding. So
-                    // Host.State.PlanItemState will NOT yet read Failed immediately after this
-                    // await returns, even though this await itself completes normally - the
-                    // bool return below, not a subsequent Host.State read, is what
-                    // DrainPendingRepetitions relies on to stop draining further entries in the
-                    // same pass.
+                    // - LIVE path (called directly from HandleChildRepeated, NOT reentrant): this
+                    //   FireAsync(Fault) runs to completion synchronously within this await.
+                    //   HandleTransitioned (BaseBehavior) raises Transitioned and confirms as part
+                    //   of that - the SAME ConfirmEvents() call commits RepetitionCeilingExceeded,
+                    //   per the same Publish-before-Repeated/Bug #61 ordering discipline used
+                    //   elsewhere in this class.
+                    // - REPLAYED path (called from DrainPendingRepetitions, itself an
+                    //   OnEntryFromAsync action of the Resume/ParentResume/Reactivate transition
+                    //   still being dispatched): this FireAsync(Fault) call is REENTRANT -
+                    //   Stateless (FiringMode.Queued, its default - see PlanItemStateMachine's own
+                    //   remarks on the equivalent Create->Start reentrant case) ENQUEUES it rather
+                    //   than running it to completion immediately, and does not drain that queue
+                    //   until the OUTERMOST FireAsync call itself finishes unwinding.
+                    //   HandleTransitioned's confirm does NOT run here in that case - it is
+                    //   DrainPendingRepetitions' OWN trailing ConfirmEvents() call (immediately
+                    //   after this method returns) that actually commits
+                    //   RepetitionCeilingExceeded. Host.State.PlanItemState also will NOT yet read
+                    //   Failed immediately after this await returns on this path, even though the
+                    //   await itself completes normally - the bool return below, not a subsequent
+                    //   Host.State read, is what DrainPendingRepetitions relies on to stop
+                    //   draining further entries in the same pass.
+                    //
+                    // Correct today by ordering, on both paths - not by anything that enforces it.
+                    // If either call site's confirm is ever reordered or removed, this event could
+                    // silently stop being committed on one of the two paths without a compiler or
+                    // test failure pointing here; keep this comment truthful if that happens.
                     await StateMachine.FireAsync(PlanItemTransition.Fault);
                 }
                 else

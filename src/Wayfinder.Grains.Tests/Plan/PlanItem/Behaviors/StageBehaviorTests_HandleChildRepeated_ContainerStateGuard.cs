@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Wayfinder.Grains.Events;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
 using Wayfinder.Grains.Interfaces.Plan.PlanItem.Behaviors;
 using Wayfinder.Grains.Plan;
 using Wayfinder.Grains.Plan.PlanItem;
@@ -202,12 +203,21 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().HaveCount(1);
         }
 
-        // #178 - the buffer must actually replay once the Stage returns to Active. Resume is
-        // registered as an entry action on Active in StageBehavior's constructor
-        // (DrainPendingRepetitions); firing it through the REAL backing PlanItemStateMachine (not
-        // just asserting the buffer's contents) proves the wiring, not just the store.
-        [Fact]
-        public async Task Resume__Given_BufferedRepetitionFromWhileSuspended__Then_DrainsAndSpawnsChild()
+        // #178 - the buffer must actually replay once the Stage returns to Active, via EITHER
+        // trigger that lands there from Suspended (review round 2, item 7 - both Resume and
+        // ParentResume are wired to DrainPendingRepetitions in the constructor, but only Resume
+        // was ever exercised; the sibling trigger was the exact "one path wired, one forgotten"
+        // shape that produced the CasePlanModel Reactivate blocker below, so it gets equal
+        // coverage here). ParentResume needs a genuine ParentSuspend cascade first (not just
+        // Suspended as the initial state) so PlanItemStateMachine's ParentSuspendState -
+        // PermitDynamicIf(ParentResume, ...) needs a real value to dynamically resolve back to
+        // Active. Firing through the REAL backing PlanItemStateMachine (not just asserting the
+        // buffer's contents) proves the wiring, not just the store.
+        [Theory]
+        [InlineData(PlanItemTransition.Suspend, PlanItemTransition.Resume)]
+        [InlineData(PlanItemTransition.ParentSuspend, PlanItemTransition.ParentResume)]
+        public async Task Resume__Given_BufferedRepetitionFromWhileSuspended__Then_DrainsAndSpawnsChild(
+            PlanItemTransition suspendTrigger, PlanItemTransition resumeTrigger)
         {
             const int ceiling = 10;
             const int currentRepetition = 1;
@@ -224,7 +234,9 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
             var stage = new Stage { PlanItems = { pi } };
 
-            var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Suspended);
+            // Starts Active (not Suspended directly) so suspendTrigger's own transition genuinely
+            // runs and, for the ParentSuspend case, actually populates ParentSuspendState.
+            var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
 
@@ -249,6 +261,9 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object, ceiling);
 
+            await mockMachine.Object.FireAsync(suspendTrigger);
+            testStore.PlanItemState.Should().Be(PlanItemState.Suspended);
+
             // Buffer the request while genuinely Suspended (real handler, not a direct store call).
             await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
                 address, sourceInstanceId, planItemDefinitionId, currentRepetition));
@@ -256,9 +271,9 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().HaveCount(1,
                 "the request must have been buffered, not spawned, while Suspended");
 
-            // Resume -> Active through the REAL PlanItemStateMachine, which runs
+            // Resume/ParentResume -> Active through the REAL PlanItemStateMachine, which runs
             // StageBehavior's registered DrainPendingRepetitions entry action.
-            await mockMachine.Object.FireAsync(PlanItemTransition.Resume);
+            await mockMachine.Object.FireAsync(resumeTrigger);
 
             testStore.PlanItemState.Should().Be(PlanItemState.Active);
 
@@ -372,6 +387,218 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var remaining = ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions;
             remaining.Should().HaveCount(1, "the drain must stop re-checking state and leave the untried entry buffered");
             remaining.Single().SourceInstanceId.Should().Be(secondSourceInstanceId);
+        }
+
+        // #178 review round 2, BLOCKER - StageBehavior's own constructor only wires
+        // DrainPendingRepetitions to Resume/ParentResume, but ConfigureForCasePlanModel permits
+        // ONLY Reactivate + Close out of Suspended (Table 8.6 - the Case has no Resume/
+        // ParentResume edge at all). Without CasePlanModelBehavior's own Reactivate registration
+        // (guarded to transition.Source == Suspended), a repetition request buffered while the
+        // CasePlanModel itself was genuinely Suspended would never drain - this proves it does,
+        // through the real CasePlanModel-shaped state machine (Stage.IsCasePlanModel = true, same
+        // harness shape RepeatOnCompleteOrTerminateTests already establishes for
+        // CasePlanModelBehavior).
+        [Fact]
+        public async Task Reactivate__Given_CasePlanModelBufferedRepetitionWhileSuspended__Then_DrainsAndSpawnsChild()
+        {
+            const int ceiling = 10;
+            const int currentRepetition = 1;
+
+            var caseInstanceId = Guid.NewGuid();
+            var instanceId = "CPM";
+            var planItemDefinitionId = ShortGuid.NewGuid();
+            var definitionScope = "CPM";
+            var sourceInstanceId = ShortGuid.NewGuid();
+
+            var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
+            var casePlanModel = new Stage { Id = "CPM", IsCasePlanModel = true, PlanItems = { pi } };
+
+            var testStore = new TestPlanItemStore(piDef: casePlanModel, initialState: PlanItemState.Active);
+
+            var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
+                .Returns(mockPlanItemGrain.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.GrainFactory).Returns(mockGrainFactory.Object);
+            mockHost.Setup(x => x.Address).Returns(instanceId);
+            mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
+            mockHost.Setup(x => x.DefinitionId).Returns(casePlanModel.Id);
+            mockHost.Setup(x => x.DefinitionScope).Returns(definitionScope);
+            mockHost.Setup(x => x.InstanceId).Returns(instanceId);
+            mockHost.Setup(x => x.Scope).Returns(string.Empty);
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new CasePlanModelBehavior(mockHost.Object, casePlanModel, mockMachine.Object, ceiling);
+
+            // Table 8.6 - the Case's own Suspend (not a cascaded ParentSuspend - the CasePlanModel
+            // has no parent) takes it Active -> Suspended.
+            await mockMachine.Object.FireAsync(PlanItemTransition.Suspend);
+            testStore.PlanItemState.Should().Be(PlanItemState.Suspended);
+
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                instanceId, sourceInstanceId, planItemDefinitionId, currentRepetition));
+
+            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().HaveCount(1,
+                "the request must have been buffered, not spawned, while the CasePlanModel was Suspended");
+
+            // Table 8.6 - the Case's own Reactivate (Suspended -> Active). This is the SAME
+            // trigger name used from Completed/Terminated/Failed, but CasePlanModelBehavior's
+            // registration only drains when the source was genuinely Suspended.
+            await mockMachine.Object.FireAsync(PlanItemTransition.Reactivate);
+
+            testStore.PlanItemState.Should().Be(PlanItemState.Active);
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Once);
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Once);
+
+            mockPlanItemGrain.Verify(x => x.DefineRepetition(
+                    testStore.CaseDefinitionId, pi, currentRepetition + 1, casePlanModel.Id, definitionScope),
+                Times.Once);
+            mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
+
+            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().BeEmpty();
+        }
+
+        // #178 review round 2, HIGH - the drain must honor the SAME #161 redelivery guard the
+        // live path checks. Simulates the race directly: a child was already spawned for this
+        // source instance (the durable guard is recorded) but the buffer entry that requested it
+        // was never removed (the process died before RepetitionBufferDrained was confirmed) -
+        // draining must recognize this as already-satisfied and clean up the stale entry WITHOUT
+        // spawning a second child.
+        [Fact]
+        public async Task DrainPendingRepetitions__Given_EntryAlreadyGuardedByRedeliveryCheck__Then_SkipsAndDrainsWithoutSpawning()
+        {
+            const int ceiling = 10;
+            const int currentRepetition = 1;
+
+            var address = ShortGuid.NewGuid();
+            var planItemDefinitionId = ShortGuid.NewGuid();
+            var sourceInstanceId = ShortGuid.NewGuid();
+
+            var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
+            var stage = new Stage { PlanItems = { pi } };
+
+            var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.GrainFactory).Returns(mockGrainFactory.Object);
+            mockHost.Setup(x => x.Address).Returns(address);
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object, ceiling);
+
+            await mockMachine.Object.FireAsync(PlanItemTransition.Suspend);
+
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                address, sourceInstanceId, planItemDefinitionId, currentRepetition));
+
+            var stageStore = (StageBehaviorStore)testStore.BehaviorExtension;
+            stageStore.PendingRepetitions.Should().HaveCount(1);
+
+            // Simulate: an earlier drain already spawned the child (durably recording the #161
+            // guard via ChildRepeated) but crashed before confirming the RepetitionBufferDrained
+            // that would have removed this now-stale entry.
+            stageStore.Apply(new ChildRepeated { SourceInstanceId = sourceInstanceId });
+            stageStore.IsRepetitionRedelivery(sourceInstanceId).Should().BeTrue();
+
+            await mockMachine.Object.FireAsync(PlanItemTransition.Resume);
+
+            // No grain call at all - GetGrain must never even be reached for this entry.
+            mockGrainFactory.Verify(x => x.GetGrain<IPlanItemInternalGrain>(It.IsAny<Guid>(), It.IsAny<string>(), null), Times.Never);
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never,
+                "the guard was already recorded by the simulated earlier drain - this pass must not raise it again");
+
+            stageStore.PendingRepetitions.Should().BeEmpty(
+                "the stale buffered entry must still be drained (removed) even though it was skipped, not spawned");
+        }
+
+        // #178 review round 2, SHOULD-FIX - DrainPendingRepetitions runs as an entry action of the
+        // transition itself still being dispatched; an exception escaping the loop would escape
+        // FireAsync(Resume) entirely and permanently strand the whole batch (no stream-agent
+        // redelivery exists for the buffered path, unlike the live one). A transient failure on
+        // one buffered entry must leave THAT entry buffered and let the rest of the batch proceed.
+        [Fact]
+        public async Task DrainPendingRepetitions__Given_FirstEntryThrows__Then_LeavesItBufferedAndProcessesSecondEntry()
+        {
+            const int ceiling = 10;
+
+            var caseInstanceId = Guid.NewGuid();
+            var address = ShortGuid.NewGuid();
+            var planItemDefinitionId = ShortGuid.NewGuid();
+            var definitionScope = $"CPM.{ShortGuid.NewGuid()}";
+            var throwingSourceInstanceId = ShortGuid.NewGuid();
+            var succeedingSourceInstanceId = ShortGuid.NewGuid();
+
+            var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
+            var stage = new Stage { PlanItems = { pi } };
+
+            var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
+
+            var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            // First entry drained (FIFO - the throwing one, buffered first below) throws; the
+            // second entry's Trigger(Create) call (this same mock, a fresh grain key per
+            // CreateChild call but this SetupSequence applies across ALL calls in order) succeeds.
+            mockPlanItemGrain.SetupSequence(x => x.Trigger(PlanItemTransition.Create))
+                .ThrowsAsync(new TimeoutException("transient failure"))
+                .ReturnsAsync((PlanItemSnapshot)null);
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
+                .Returns(mockPlanItemGrain.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.GrainFactory).Returns(mockGrainFactory.Object);
+            mockHost.Setup(x => x.Address).Returns(address);
+            mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
+            mockHost.Setup(x => x.DefinitionId).Returns(stage.Id);
+            mockHost.Setup(x => x.DefinitionScope).Returns(definitionScope);
+            mockHost.Setup(x => x.Scope).Returns("CPM");
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object, ceiling);
+
+            await mockMachine.Object.FireAsync(PlanItemTransition.Suspend);
+
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                address, throwingSourceInstanceId, planItemDefinitionId, 1));
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                address, succeedingSourceInstanceId, planItemDefinitionId, 2));
+
+            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().HaveCount(2);
+
+            // Must not throw out of the transition itself - the whole point of catching inside
+            // the loop.
+            Func<Task> act = () => mockMachine.Object.FireAsync(PlanItemTransition.Resume);
+            await act.Should().NotThrowAsync();
+
+            testStore.PlanItemState.Should().Be(PlanItemState.Active,
+                "the transition itself must complete normally despite one buffered entry throwing");
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Once,
+                "only the SECOND (succeeding) entry should have spawned a child");
+            mockHost.Verify(x => x.RaiseEvent(It.Is<ChildRepeated>(e => e.SourceInstanceId == succeedingSourceInstanceId)), Times.Once);
+
+            var remaining = ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions;
+            remaining.Should().HaveCount(1, "the throwing entry must remain buffered for a future drain attempt");
+            remaining.Single().SourceInstanceId.Should().Be(throwingSourceInstanceId);
         }
     }
 }
