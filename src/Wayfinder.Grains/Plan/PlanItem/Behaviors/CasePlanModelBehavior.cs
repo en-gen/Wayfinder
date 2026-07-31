@@ -59,6 +59,14 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         private Task HandleEnterActiveFromCreate() =>
             SubscribeToCriteria(x => x.ExitCriteria, StreamFlags.Create);
 
+        // #178 - see the Reactivate registration in the constructor for the full reasoning. Only
+        // drains when this Active arrival is genuinely leaving Suspended (Table 8.6's OTHER three
+        // Reactivate sources - Completed/Terminated/Failed - must not trigger a drain).
+        private Task DrainPendingRepetitionsIfLeavingSuspended(PlanItemStateMachine.Transition transition) =>
+            transition.Source == PlanItemState.Suspended
+                ? DrainPendingRepetitions()
+                : Task.CompletedTask;
+
         // ADO #67 - see StageBehavior's own ctor remarks: threaded through to the base
         // constructor unchanged (the CasePlanModel enforces the same ceiling in the inherited
         // HandleChildRepeated), defaulted so existing direct construction keeps compiling.
@@ -70,12 +78,42 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             base(host, planItemDefinition, stateMachine, repetitionCeiling)
         {
             // Table 8.6 - re-activate (Completed/Terminated/Failed/Suspended -> Active,
-            // "Transition by a Case worker (human), or an administrator") deliberately has NO
-            // entry action of its own: the case's top-level PlanItems already exist from the
-            // original Create (below), and Table 8.6 assigns re-activation no re-instantiation
-            // semantics - re-running the Create entry action would duplicate every top-level
-            // child. The transition itself is already permitted by
+            // "Transition by a Case worker (human), or an administrator") does NOT re-run
+            // HandleEnterActiveFromStart/HandleEnterActiveFromCreate: the case's top-level
+            // PlanItems already exist from the original Create, and Table 8.6 assigns
+            // re-activation no re-instantiation semantics - re-running child creation here would
+            // duplicate every top-level child. The transition itself is already permitted by
             // PlanItemStateMachine.ConfigureForCasePlanModel.
+            //
+            // #178 (review round 2, BLOCKER) - it DOES need one entry action, though:
+            // StageBehavior's own constructor registers DrainPendingRepetitions on Resume/
+            // ParentResume, but ConfigureForCasePlanModel permits ONLY Reactivate + Close out of
+            // Suspended - the Case has no Resume/ParentResume edge at all (Table 8.6). Without
+            // this registration, a repetition request buffered while the CasePlanModel itself was
+            // genuinely Suspended would NEVER drain: not spawned, not dropped, sitting in
+            // StageStore.PendingRepetitions (and the journal) permanently - on the single most
+            // common repeating-item container, via the ordinary spec path, no race required.
+            //
+            // Guarded on transition.Source == Suspended, NOT registered unconditionally for
+            // Reactivate: Table 8.6 overloads this SAME trigger name across FOUR source states
+            // (Completed, Terminated, Failed, Suspended -> Active), and only the Suspended one is
+            // a genuine "resume from a preserve-and-restore pause" (Table 8.9 + Figure 8.3 - the
+            // same basis StageBehavior.HandleChildRepeated's Suspended branch cites). The other
+            // three are human recovery actions from states this fix intentionally does NOT
+            // buffer into in the first place (Completed/Terminated refuse outright; Failed
+            // refuses-and-records - see HandleChildRepeated's own remarks, especially the
+            // fault/re-activate-carries-no-history-semantics argument for Failed) - so a
+            // Reactivate arriving from any of those three must not drain anything. In practice the
+            // buffer can only be non-empty on a Reactivate-from-Failed when a ceiling breach
+            // Faulted this Host mid-drain (see DrainPendingRepetitions' ceilingBreached remarks);
+            // replaying THOSE leftover entries on a later Reactivate would immediately re-fault
+            // the container - the same refuse-loop-by-construction StageBehavior's own
+            // constructor documents for why ordinary Stage/Task deliberately has NO Reactivate
+            // hook at all. This guard achieves that same outcome for the CasePlanModel via a
+            // source-state check instead, since Reactivate cannot simply be omitted here the way
+            // it is for ordinary Stage/Task.
+            StateMachine.Configure(PlanItemState.Active)
+                .OnEntryFromAsync(PlanItemTransition.Reactivate, DrainPendingRepetitionsIfLeavingSuspended);
             //
             // ADO #66 - CasePlanModel exit criteria were never armed
             // ~~~~~

@@ -107,6 +107,8 @@ Note the spec's defaults differ per rule — ManualActivationRule's absent-defau
 The spec's Example 1 (§8.6.4) is worth reading directly: it walks a repeatable Task B feeding a non-repeatable Task A, and shows three B instances yielding a single A. It is the clearest statement that repetition multiplies instances without multiplying dependents.
 
 > **Implementation note.** The spec describes the trigger and the resulting instance as a single step. In a distributed engine they are separated by a message hop, which is where several of our defects live — a spawned instance can miss the very satisfaction that created it. See [#177](https://github.com/en-gen/Wayfinder/issues/177), [#181](https://github.com/en-gen/Wayfinder/issues/181).
+>
+> That same split has a second consequence, only connected to it once the #178 investigation traced a stage that completed over what should have been a live child: the OWNING Stage's own Table 8.12 completion check (§5) runs on its own event stream, independent of the repetition trigger's stream. A "repetition detected" event and the completion check that Table 8.12 mandates on every child transition are not ordered against each other, so the check can run — and the Stage can legitimately complete — in the gap between "repetition detected" (`Repeated` raised) and "instance created". The result is exactly §4's impossible cell, produced silently: nothing in the completion check today knows a repetition is in flight. See [#198](https://github.com/en-gen/Wayfinder/issues/198).
 
 ---
 
@@ -121,5 +123,6 @@ Rules above that Wayfinder is known to violate today, each with a reproducing te
 | Terminated stages spawning children (§3) | [#178](https://github.com/en-gen/Wayfinder/issues/178) | Confirmed, unfixed |
 | Completion over live children (§4) | [#179](https://github.com/en-gen/Wayfinder/issues/179) | Confirmed, unfixed |
 | Timer repetition ignoring the rule (§8) | [#182](https://github.com/en-gen/Wayfinder/issues/182) | Confirmed, unfixed |
+| Stage completion racing an in-flight repetition (§5) | [#198](https://github.com/en-gen/Wayfinder/issues/198) | Confirmed, unfixed — discovered investigating #178; the Table 8.12 completion check and the repetition trigger travel on separate, unordered streams |
 
 When you fix one, update this table — it is meant to stay honest about where the engine and the spec disagree.
