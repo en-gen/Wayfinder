@@ -102,18 +102,28 @@ namespace Wayfinder.Grains.Scheduler
 
         // #31 (findings B2/B3): this used to call _scheduler.Shutdown(false) here. _scheduler is
         // NOT owned by this grain activation - ISchedulerFactory is registered as a process-wide DI
-        // singleton (QuartzSchedulerFactory : StdSchedulerFactory) built from a fixed
-        // quartz.scheduler.instanceName (QuartzSchedulerConfig.Volatile/Durable), so
-        // _schedulerFactory.GetScheduler() in OnActivateAsync above returns the SAME underlying
-        // Quartz IScheduler for every case's TimerEventSchedulerGrain activation in the silo - the
-        // one piece of this subsystem that really is a shared singleton, despite this grain itself
-        // being correctly Orleans-keyed per case instance. Calling Shutdown() here meant ANY single
-        // case's grain deactivating (idle collection after ~2h, forced collection, redeploy) tore
-        // down the shared Quartz scheduler out from under every OTHER case - and Quartz schedulers
-        // cannot be restarted once shut down, so it was a permanent, cross-case outage until the
-        // silo process itself restarted. A per-case-keyed grain must never destroy shared,
-        // unscoped infrastructure it doesn't exclusively own - so this override now only logs the
-        // deactivation and leaves the shared scheduler running for the rest of the silo's lifetime.
+        // singleton (QuartzSchedulerFactory : StdSchedulerFactory) built from whatever
+        // quartz.scheduler.instanceName this silo's config uses (QuartzSchedulerConfig.Volatile(name)
+        // - see its remarks; #197 made that name unique PER SILO, but every activation WITHIN one
+        // silo still resolves the same instanceName), so _schedulerFactory.GetScheduler() in
+        // OnActivateAsync above returns the SAME underlying Quartz IScheduler for every case's
+        // TimerEventSchedulerGrain activation in this silo - the one piece of this subsystem that
+        // really is a shared singleton, despite this grain itself being correctly Orleans-keyed per
+        // case instance. Calling Shutdown() here genuinely shut that shared IScheduler down (Quartz
+        // schedulers cannot be restarted once shut down) - but the outage this caused was NOT a
+        // permanent, whole-silo one: StdSchedulerFactory.GetScheduler() evicts a shut-down entry
+        // from Quartz's scheduler repository and lazily creates a fresh one, so any case activating
+        // AFTER the shutdown (a brand-new activation, or the SAME case reactivating after its own
+        // later deactivation) got a working scheduler again. What broke, and stayed broken for as
+        // long as the activation lived, was every OTHER case's grain that was ALREADY active at the
+        // moment of the Shutdown() call: _scheduler above is cached once in OnActivateAsync and
+        // never refreshed, so that stale reference kept pointing at the dead scheduler for the rest
+        // of that activation's lifetime - ScheduleTimer/CancelTimer would keep failing against it
+        // until the grain itself eventually deactivated and reactivated. Still bad enough (a
+        // long-lived activation could be broken indefinitely) that a per-case-keyed grain must never
+        // destroy shared, unscoped infrastructure it doesn't exclusively own - so this override now
+        // only logs the deactivation and leaves the shared scheduler running for the rest of the
+        // silo's lifetime.
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             _logger.LogInformation(

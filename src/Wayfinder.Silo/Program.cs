@@ -510,7 +510,7 @@ namespace Wayfinder.Silo
                 .AddRuleExecutor()
                 .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
                 .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
-                .AddQuartz(QuartzSchedulerConfig.Volatile);
+                .AddQuartz(QuartzSchedulerConfig.Volatile(QuartzSchedulerInstanceName(context)));
 
             // ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth against our
             // Zitadel + the identity middleware's services). See Wayfinder.Api's AddWayfinderApi for the full
@@ -518,5 +518,18 @@ namespace Wayfinder.Silo
             // middleware into the pipeline.
             services.AddWayfinderApi();
         }
+
+        // #197 - QuartzSchedulerConfig.Volatile used to hardcode quartz.scheduler.instanceName to
+        // "UnitTest" for every caller, including this production silo, so the shipped silo named
+        // its Quartz scheduler after a test AND would collide with any other silo sharing this
+        // process under Quartz's process-wide static SchedulerRepository (see QuartzSchedulerConfig
+        // remarks). ServiceId/ClusterId are the same identity ConfigureOrleans binds onto
+        // ClusterOptions just above (EnvironmentName/ApplicationName from the host's
+        // IHostingEnvironment) - stable for the life of the deployment/config, not re-derived per
+        // request or per restart, so a scheduler name built from them does not drift and orphan
+        // in-flight Quartz state across a restart if this ever moves off RAMJobStore onto a
+        // persistent JobStore (see the commented-out AdoJobStore block in QuartzSchedulerConfig).
+        private static string QuartzSchedulerInstanceName(HostBuilderContext context) =>
+            $"{context.HostingEnvironment.ApplicationName}.{context.HostingEnvironment.EnvironmentName}.Quartz";
     }
 }

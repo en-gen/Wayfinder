@@ -77,6 +77,20 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
         // overload equivalent to ISiloHostBuilder's old ConfigureServices(HostBuilderContext, ...)).
         private class TestSiloConfigurator : ISiloConfigurator
         {
+            // #197 - one Quartz instanceName per FIXTURE, not per call: this static field is
+            // initialized once (CLR type-initializer semantics), and every silo TestClusterBuilder
+            // spins up for THIS fixture's single TestCluster (TestClusterOptions.InitialSilosCount
+            // defaults to 2) shares it - preserving the existing within-cluster shared-scheduler
+            // behavior other tests rely on (see TimerEventSchedulerGrain.OnDeactivateAsync's
+            // remarks). What changes is that this name is now UNIQUE to ClusterFixture, distinct
+            // from every other fixture's own instanceName (RepetitionGuardClusterFixture, and any
+            // other Quartz-using fixture), so this fixture's TestCluster disposing can never shut
+            // down another, independently-lifecycled fixture's Quartz scheduler via Quartz's
+            // process-wide static SchedulerRepository - see QuartzSchedulerConfig's remarks for the
+            // full mechanism, and QuartzSchedulerInstanceNameCollisionTests for a regression test
+            // that reproduces the collision directly.
+            private static readonly string QuartzInstanceName = $"{nameof(ClusterFixture)}-{Guid.NewGuid():N}";
+
             public void Configure(ISiloBuilder silo)
             {
                 silo
@@ -128,7 +142,7 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .AddRuleExecutor()
                     .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
                     .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
-                    .AddQuartz(QuartzSchedulerConfig.Volatile);
+                    .AddQuartz(QuartzSchedulerConfig.Volatile(QuartzInstanceName));
             }
 
         }
