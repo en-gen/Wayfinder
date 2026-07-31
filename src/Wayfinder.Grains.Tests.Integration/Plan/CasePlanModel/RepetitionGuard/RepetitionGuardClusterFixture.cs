@@ -36,8 +36,12 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
     // IPlanItemBehaviorConfigurator resolves its ceiling once via constructor injection - there is
     // no per-test override mechanism within a single shared cluster. Mirrors
     // SiloFixture.ClusterFixture byte-for-byte except the one added Configure<RepetitionGuardOptions>
-    // call and a distinct ClusterId (avoids any ambiguity with the shared cluster, though
-    // TestCluster instances do not actually collide).
+    // call, a distinct ClusterId (avoids any ambiguity with the shared cluster, though
+    // TestCluster instances do not actually collide), and - #194 - ClusterFixture's
+    // FakeLoggerProvider wiring, deliberately NOT mirrored here: nothing in this fixture's own
+    // suite asserts on captured logs, and giving each isolated fixture its own capture instance
+    // (rather than reusing a shared one across unrelated clusters) is the smaller change if that
+    // ever changes.
     public class RepetitionGuardClusterFixture : IDisposable, IAsyncLifetime
     {
         // Small enough to assert on deterministically and quickly, large enough to distinguish

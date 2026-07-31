@@ -105,7 +105,22 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .ConfigureLogging(logging =>
                     {
                         IntegrationTestLogging.Configure(logging);
+
                         // #194 - added alongside, not instead of, the Serilog wiring above.
+                        // AddSerilog registers a provider-scoped filter tied to its own
+                        // LoggingLevelSwitch (Debug when WAYFINDER_TEST_SEQ is set, Information
+                        // otherwise - see IntegrationTestLogging), but that filter only ever
+                        // applies to SerilogLoggerProvider. Every OTHER provider, this one
+                        // included, falls back to Microsoft.Extensions.Logging's own global
+                        // MinLevel, which defaults to Information with nothing here raising it -
+                        // so LogCapture only ever sees Information and above (see
+                        // FakeLoggerProvider's own remarks, and FakeLogger.IsEnabled, which is kept
+                        // truthful to this ceiling rather than claiming to capture everything).
+                        // Deliberately NOT widened with an AddFilter<FakeLoggerProvider>(null,
+                        // LogLevel.Trace) override: measured on this suite, that turns Orleans'
+                        // own chatty Debug/Trace logging into ~12.5k captured entries (~8 MB) for
+                        // the whole run, against ~100 entries (tens of KB) at Information+ - not a
+                        // "small in-memory capture" at that point, and nothing today needs it.
                         logging.AddProvider(LogCapture);
                     });
 

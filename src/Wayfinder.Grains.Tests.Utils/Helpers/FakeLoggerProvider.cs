@@ -12,6 +12,16 @@ namespace Wayfinder.Grains.Tests.Utils.Helpers
     // name, exactly matching how the real Microsoft.Extensions.Logging LoggerFactory caches
     // ILogger<T> instances per category - so repeated CreateLogger calls for the same grain type
     // keep accumulating into the same capture rather than losing history to a fresh instance.
+    //
+    // CAPTURE CEILING - Information and above ONLY, deliberately: Microsoft.Extensions.Logging's
+    // global MinLevel defaults to Information, and IntegrationTestLogging's AddSerilog call only
+    // raises that for SerilogLoggerProvider itself, never for this provider - so Debug/Trace log
+    // calls never even reach a FakeLogger created here (see FakeLogger's own remarks for detail,
+    // and IsEnabled there, which is kept honest about this rather than claiming otherwise). This
+    // was widened once via `logging.AddFilter<FakeLoggerProvider>(null, LogLevel.Trace)` in
+    // ClusterFixture and measured: it turned a full integration run's capture into ~12.5k entries
+    // (~8 MB) of Orleans' own chatty Debug logging. Reverted - not a "small in-memory capture" at
+    // that point, and nothing today needs anything below Information.
     public sealed class FakeLoggerProvider : ILoggerProvider
     {
         private readonly ConcurrentDictionary<string, FakeLogger> _loggers =

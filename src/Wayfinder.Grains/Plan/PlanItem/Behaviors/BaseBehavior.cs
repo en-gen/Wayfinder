@@ -324,22 +324,23 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             }
             var result = ruleResult?.ValueOr(defaultResult) ?? defaultResult;
 
-            // #194 - the RuleEvaluated audit event raised below carries ruleResult.Message on its
-            // own Error property, but that is a journal entry, not a trace anyone can assert on
-            // from outside the grain's own state (and #184 established that not every read path
-            // even confirms its journal writes). Mirror PlanningTableGrain.EvaluateApplicabilityRule's
-            // identical-shape error logging here so an erroring rule expression leaves an
-            // observable, assertable signal independent of whether/when the audit event is ever
-            // read back.
+            // #194 - Executable.ExecuteAsBool already LogErrors this failure one layer down (with
+            // the exception object and the expression source), so this is NOT the only place the
+            // error is recorded - on unfixed code it was already double-logged, and this makes it
+            // triple (Executable's log + this log + the journaled RuleEvaluated.Error below). What
+            // that lower-layer log CANNOT tell you is which plan item's rule blew up - Executable
+            // only has the raw expression text, no element context. This line adds
+            // {Element}/{ElementScope}/{ElementInstanceId} so an erroring rule is traceable back to
+            // the specific PlanItem instance, not just "some expression, somewhere, failed."
             if (ruleResult?.IsError ?? false)
             {
                 Host.LogWithContext(logger => logger.LogError(
-                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | evaluation of {RuleType} resulted in error: {RuleError}",
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | Evaluation of {RuleType} resulted in error: {RuleError}",
                     Host.Definition.GetType().Name,
                     PlanItemDefinition.GetType().Name,
                     Host.Scope,
                     Host.InstanceId,
-                    typeof(TEvent).Name,
+                    rule.GetType().Name,
                     ruleResult.Message));
             }
 
