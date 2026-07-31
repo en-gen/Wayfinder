@@ -30,21 +30,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             PlanItemDefinition = planItemDefinition ?? throw new ArgumentNullException(nameof(planItemDefinition));
             StateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
 
-            // TryRepeatOnCompleteOrTerminate is registered per-TRIGGER, not per-state: Table 8.8
-            // attaches the no-entry-criteria RepetitionRule re-evaluation to the "complete" and
-            // "terminate" transitions specifically, and its "exit" row (exit criteria satisfied,
-            // or propagation from an outer Stage terminating) carries no such note - so an
-            // Exit-triggered arrival in Terminated must NOT re-evaluate. This matters doubly for
-            // parent cascades: a terminating Stage propagates Exit to its children (see
-            // HandleParentTransitioned), and respawning a child while its parent shuts down would
-            // be exactly backwards.
             StateMachine.Configure(PlanItemState.Completed)
-                .OnEntryAsync(HandleEnterTerminal)
-                .OnEntryFromAsync(PlanItemTransition.Complete, TryRepeatOnCompleteOrTerminate);
+                .OnEntryAsync(HandleEnterTerminal);
 
             StateMachine.Configure(PlanItemState.Terminated)
-                .OnEntryAsync(HandleEnterTerminal)
-                .OnEntryFromAsync(PlanItemTransition.Terminate, TryRepeatOnCompleteOrTerminate);
+                .OnEntryAsync(HandleEnterTerminal);
 
             StateMachine.OnTransitionedAsync(HandleTransitioned);
 
@@ -94,10 +84,19 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // "Stage and Task instances with a RepetitionRule that do not have any entry criteria,
         // will try to create a new instance every time an instance transitions into the Complete
         // or Terminate state. Under that condition the RepetitionRule is re-evaluated and if the
-        // Expression evaluates to TRUE, a new instance is created." Registered as a second entry
-        // action alongside HandleEnterTerminal, never folded into it - HandleEnterTerminal also
-        // backs CasePlanModelBehavior's Closed entry, which must NOT re-run this repetition check
-        // (Closed is not "Complete or Terminate").
+        // Expression evaluates to TRUE, a new instance is created."
+        //
+        // #198 - this used to run as a state ENTRY action (OnEntryFromAsync on Completed/
+        // Terminated), which Stateless invokes AFTER HandleTransitioned below has already
+        // published PlanItemTransitionedEvent - so a parent Stage's Table 8.12 completion check
+        // (StageBehavior.HandleChildTransitioned/TryAutoComplete) could observe this child as
+        // simply "terminal" and complete over it a message hop before the repetition request
+        // (PlanItemRepetitionCriteriaMetEvent, on a SEPARATE, unordered stream - see
+        // StreamProviderExtensions) ever arrived. Table 8.9's complete rows mark that exact
+        // combination <impossible>. Folded into HandleTransitioned instead, evaluated BEFORE the
+        // publish, so PlanItemTransitionedEvent.WillRepeat carries the verdict on the SAME event
+        // the parent already reacts to - no second stream to race. See
+        // docs/03-cmmn-execution-semantics.md section 8's implementation note.
         //
         // Scoped to "Stage and Task instances" per the spec text: EventListeners "cannot have
         // RepetitionRule" (5.4.11.3), and a Milestone's no-entry-criteria case is not granted
@@ -106,32 +105,28 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // excluded: it implements the CASE lifecycle (8.4.1), whose Table 8.6 defines no
         // repetition semantics, and it has no parent Stage listening for a repeat to instantiate.
         //
-        // Publish-before-Repeated ordering matches the entry-criterion repetition path
-        // (StageBehavior/TaskBehavior.HandleSentrySatisfied). The trailing ConfirmEvents() is
-        // Bug #61 discipline: this method runs as a state ENTRY action, i.e. AFTER
-        // HandleTransitioned already raised-and-confirmed the Transitioned event (Stateless
-        // invokes the transition callback before the destination state's entry actions), so the
-        // RepetitionRuleEvaluated/Repeated events raised here have no later confirm to ride on
-        // and would otherwise sit queued in TentativeState indefinitely.
-        private async Task TryRepeatOnCompleteOrTerminate()
+        // Gated on the EXACT (trigger, destination) pair Table 8.8 names - Complete->Completed or
+        // Terminate->Terminated - not on destination state alone: an Exit-triggered arrival in
+        // Terminated (exit criteria satisfied, or propagation from an outer Stage terminating -
+        // see HandleParentTransitioned) carries no such re-evaluation note, and respawning a child
+        // while its parent shuts down would be exactly backwards. PlanItemTransition.Complete and
+        // PlanItemTransition.Terminate each Permit exactly one destination in
+        // PlanItemStateMachine (Completed/Terminated respectively), so trigger alone would
+        // suffice; the destination check is kept as the same belt-and-braces read of Table 8.8
+        // the original per-state registration made structurally impossible to get wrong.
+        private async Task<bool> EvaluateRepetitionOnTerminalTransition(PlanItemStateMachine.Transition transition)
         {
-            if (!(PlanItemDefinition is Stage || PlanItemDefinition is BaseTask)) return;
-            if (PlanItemDefinition is Stage { IsCasePlanModel: true }) return;
-            if (Host.Definition.EntryCriteria.Any()) return;
-            if (GetItemControl()?.RepetitionRule == null) return;
+            var isEligibleTransition =
+                (transition.Trigger == PlanItemTransition.Complete && transition.Destination == PlanItemState.Completed) ||
+                (transition.Trigger == PlanItemTransition.Terminate && transition.Destination == PlanItemState.Terminated);
+            if (!isEligibleTransition) return false;
 
-            if (await EvaluateRepetitionRule())
-            {
-                await Host.Publish(new PlanItemRepetitionCriteriaMetEvent(
-                    Host.Scope,
-                    Host.InstanceId,
-                    Host.DefinitionId,
-                    Host.State.Repetition));
+            if (!(PlanItemDefinition is Stage || PlanItemDefinition is BaseTask)) return false;
+            if (PlanItemDefinition is Stage { IsCasePlanModel: true }) return false;
+            if (Host.Definition.EntryCriteria.Any()) return false;
+            if (GetItemControl()?.RepetitionRule == null) return false;
 
-                Host.RaiseEvent(new Repeated());
-            }
-
-            await Host.ConfirmEvents();
+            return await EvaluateRepetitionRule();
         }
 
         private async Task HandleTransitioned(PlanItemStateMachine.Transition transition)
@@ -167,6 +162,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 ? transition.Parameters[0] as string
                 : null;
 
+            // #198 - decided BEFORE the publish below, not after: see
+            // EvaluateRepetitionOnTerminalTransition's remarks. Confirmed unconditionally
+            // immediately after (Bug #61 discipline): when this transition was eligible,
+            // EvaluateRepetitionRule raised a RepetitionRuleEvaluated audit event that has no
+            // other confirm to ride on and would otherwise sit queued in TentativeState
+            // indefinitely, regardless of which way the rule evaluated.
+            var willRepeat = await EvaluateRepetitionOnTerminalTransition(transition);
+            await Host.ConfirmEvents();
+
             await Host.Publish(new PlanItemTransitionedEvent(
                 Host.Scope,
                 Host.InstanceId,
@@ -174,7 +178,27 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 transition.Trigger,
                 transition.Source,
                 transition.Destination,
-                exitCriterionRef));
+                exitCriterionRef,
+                willRepeat));
+
+            // #198 - the actual repetition request still travels on its own stream (a parent
+            // correlates it back to this child via SourceInstanceId/PlanItemInstanceId - see
+            // StageBehavior.HandleChildRepeated), unchanged from before this fix: what changed is
+            // only WHEN the verdict backing it is decided and that the parent no longer has to
+            // wait for THIS event to find out one is coming. Publish-before-Repeated ordering
+            // matches the entry-criterion repetition path (StageBehavior/TaskBehavior.
+            // HandleSentrySatisfied).
+            if (willRepeat)
+            {
+                await Host.Publish(new PlanItemRepetitionCriteriaMetEvent(
+                    Host.Scope,
+                    Host.InstanceId,
+                    Host.DefinitionId,
+                    Host.State.Repetition));
+
+                Host.RaiseEvent(new Repeated());
+                await Host.ConfirmEvents();
+            }
         }
 
         private Task HandleUnhandledTrigger(PlanItemState state, PlanItemTransition trigger)

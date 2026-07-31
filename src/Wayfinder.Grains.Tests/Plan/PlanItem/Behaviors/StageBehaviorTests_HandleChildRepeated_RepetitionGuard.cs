@@ -20,7 +20,8 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 {
     // ADO #67 - RepetitionGuardOptions.MaxRepetitionsPerPlanItem enforcement, exercised directly
     // against HandleChildRepeated: the single choke point every repetition path (the no-entry-
-    // criteria Complete/Terminate re-evaluation in BaseBehavior.TryRepeatOnCompleteOrTerminate,
+    // criteria Complete/Terminate re-evaluation in BaseBehavior.HandleTransitioned/
+    // EvaluateRepetitionOnTerminalTransition,
     // AND the entry-criterion OnPart re-satisfaction path in HandleSentrySatisfied) funnels
     // through - via PlanItemRepetitionCriteriaMetEvent - before a repeated child is ever spawned.
     // See RepetitionGuardFootgunIntegrationTests for the full end-to-end #19 foot-gun proof

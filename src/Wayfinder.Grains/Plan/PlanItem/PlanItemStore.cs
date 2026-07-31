@@ -202,6 +202,28 @@ namespace Wayfinder.Grains.Plan.PlanItem
             }
         }
 
+        // #198 - same delegation shape as Apply(ChildCreated)/Apply(ChildRepeated) above: the
+        // pending-repetition-verdict set lives on the nested StageBehaviorStore, not here.
+        public void Apply(RepetitionPending @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
+        public void Apply(RepetitionResolved @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
         public void Apply(TimerStartTriggerOccurred @event)
         {
             Updated = @event.Updated;

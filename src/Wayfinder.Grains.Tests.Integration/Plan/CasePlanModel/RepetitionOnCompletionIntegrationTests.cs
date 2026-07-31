@@ -54,20 +54,17 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         }
 
         // #198 (found running the #178 verification suite at scale - not part of the original D7
-        // scenario) - this test's own case shape is EXACTLY the #198 race's shape: a single
+        // scenario) - this test's own case shape was EXACTLY the #198 race's shape: a single
         // no-entry-criteria repeating child under a CasePlanModel that defaults AutoComplete to
-        // FALSE (never set here). Completing rep 0 both (1) re-evaluates its RepetitionRule and
-        // publishes PlanItemRepetitionCriteriaMetEvent (BaseBehavior.TryRepeatOnCompleteOrTerminate)
-        // and (2) triggers the parent's Table 8.12 completion check
-        // (StageBehavior.HandleChildTransitioned) - on two separate, unordered streams. With this
-        // Stage's only child now terminal and no PlanningTable, autoComplete=FALSE's Branch 1 is
-        // satisfied, so the CasePlanModel can legitimately complete before rep 1's repetition
-        // request is delivered - and once #178 correctly refuses a late spawn into an
-        // already-Completed container, the rep1Grain poll below times out. Quarantined rather
-        // than fixed, exactly like KnownGapScenarios.TaskRepetition__… in the Conformance suite
-        // (same underlying defect, different sample): #198 belongs at the Table 8.12
-        // completion-evaluation seam, not here and not in #178.
-        [Fact(Skip = "#198 - this case's CasePlanModel (AutoComplete defaults to false, one no-entry-criteria repeating child) races StageBehavior.HandleChildTransitioned's Table 8.12 completion check against the child's own repetition publish on two separate, unordered streams - the CasePlanModel can legitimately complete before the repetition request is delivered, and #178's correct refusal of the resulting late spawn then times out the rep1Grain poll below. Same root cause as KnownGapScenarios.TaskRepetition__… in the Conformance suite. See #198.")]
+        // FALSE (never set here). Completing rep 0 used to both (1) re-evaluate its RepetitionRule
+        // and publish PlanItemRepetitionCriteriaMetEvent and (2) trigger the parent's Table 8.12
+        // completion check on two separate, unordered streams, letting the CasePlanModel
+        // legitimately complete before rep 1's repetition request was delivered. Fixed by #198:
+        // BaseBehavior.HandleTransitioned now decides the RepetitionRule re-evaluation BEFORE
+        // publishing rep 0's own PlanItemTransitionedEvent and embeds the verdict on it
+        // (WillRepeat), so StageBehavior.EvaluateStageCompletionCriteria defers the completion
+        // check until rep 1 actually exists instead of racing a second stream to find out.
+        [Fact]
         public async Task TaskComplete__Given_NoEntryCriteriaRepeatableTask__Then_FirstEvalDiscardedAndRepetitionSpawnedOnComplete()
         {
             var caseInstanceId = Guid.NewGuid();
@@ -114,6 +111,15 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
                 "the repetition is a fresh instance and follows the same Available -> Enabled route as the original");
             rep1Snapshot.Repeatable.Should().BeFalse(
                 "the repetition's own first evaluation is equally discarded (8.6.4 applies to every instantiation)");
+
+            // #198 - Table 8.9's complete rows: a Completed parent may never coexist with a
+            // Stage/Task child in Available/Enabled/Active/Suspended. rep1 is exactly such a
+            // child (Enabled, asserted above), so the owning CasePlanModel must still be Active -
+            // this is the assertion the original #198 quarantine flagged as missing: the test used
+            // to check only that a second instance existed, never that the container's own state
+            // was still consistent with that instance's existence.
+            (await caseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
+                "Table 8.9: the parent must not have completed over the live repetition instance (<impossible> cell)");
         }
 
         [Fact]
@@ -129,12 +135,13 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             await rep0Grain.Trigger(PlanItemTransition.Complete);
 
             // ADO #174 - Repeated needs no wait at all (not even the scaled window below):
-            // BaseBehavior.TryRepeatOnCompleteOrTerminate is registered as a Complete-transition
-            // entry action, and Trigger() awaits Stateless's entire FireAsync (transition + entry
-            // actions) before returning - so the RepetitionRule re-evaluation, and whether Repeated
-            // gets raised, have already happened, synchronously, by the time this Trigger call
-            // above returns (see the sibling flagship test's identical no-wait assertion of
-            // rep0After.Repeatable/Repeated right after its own Trigger(Complete)).
+            // BaseBehavior.HandleTransitioned (see #198's EvaluateRepetitionOnTerminalTransition)
+            // decides and acts on the RepetitionRule re-evaluation as part of the Complete
+            // transition itself, and Trigger() awaits Stateless's entire FireAsync before
+            // returning - so whether Repeated gets raised has already happened, synchronously, by
+            // the time this Trigger call above returns (see the sibling flagship test's identical
+            // no-wait assertion of rep0After.Repeatable/Repeated right after its own
+            // Trigger(Complete)).
             (await rep0Grain.GetSnapshot()).Repeated.Should().BeFalse();
 
             // absence assertion: allow the (hypothetical) repetition event time to propagate,
