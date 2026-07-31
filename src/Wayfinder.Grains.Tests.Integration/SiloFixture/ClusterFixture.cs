@@ -6,6 +6,7 @@ using Wayfinder.Grains.Infrastructure.Quartz;
 using Wayfinder.Grains.Interfaces.Model;
 using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
 using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -25,8 +26,20 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
 {
     public class ClusterFixture : IDisposable, IAsyncLifetime
     {
+        // Issue #194 - a fixture-lifetime capture provider wired in ALONGSIDE Serilog below (see
+        // IntegrationTestLogging.Configure's remarks: don't touch that shared method, every other
+        // fixture keeps its Serilog-only wiring untouched). Static because TestSiloConfigurator is
+        // instantiated by TestClusterBuilder itself (no constructor args this fixture controls),
+        // not because the capture is meant to be process-global - there is exactly one ClusterFixture
+        // instance per test run (xunit collection fixture), so static here is equivalent to instance
+        // in practice. PlanningTableGrainTests (the only consumer today) clears it immediately
+        // before the specific call it wants to assert on, since this collection's tests all share
+        // both the cluster and this capture and run sequentially, never in parallel with each other.
+        private static readonly FakeLoggerProvider LogCapture = new FakeLoggerProvider();
+
         public TestCluster Cluster { get; private set; }
         public IClusterClient ClusterClient { get; private set; }
+        public FakeLoggerProvider Logs => LogCapture;
 
         private bool _disposed = false;
 
@@ -89,7 +102,12 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(IntegrationTestLogging.Configure);
+                    .ConfigureLogging(logging =>
+                    {
+                        IntegrationTestLogging.Configure(logging);
+                        // #194 - added alongside, not instead of, the Serilog wiring above.
+                        logging.AddProvider(LogCapture);
+                    });
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,

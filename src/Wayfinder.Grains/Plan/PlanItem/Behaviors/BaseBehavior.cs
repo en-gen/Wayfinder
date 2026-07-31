@@ -324,6 +324,25 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             }
             var result = ruleResult?.ValueOr(defaultResult) ?? defaultResult;
 
+            // #194 - the RuleEvaluated audit event raised below carries ruleResult.Message on its
+            // own Error property, but that is a journal entry, not a trace anyone can assert on
+            // from outside the grain's own state (and #184 established that not every read path
+            // even confirms its journal writes). Mirror PlanningTableGrain.EvaluateApplicabilityRule's
+            // identical-shape error logging here so an erroring rule expression leaves an
+            // observable, assertable signal independent of whether/when the audit event is ever
+            // read back.
+            if (ruleResult?.IsError ?? false)
+            {
+                Host.LogWithContext(logger => logger.LogError(
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | evaluation of {RuleType} resulted in error: {RuleError}",
+                    Host.Definition.GetType().Name,
+                    PlanItemDefinition.GetType().Name,
+                    Host.Scope,
+                    Host.InstanceId,
+                    typeof(TEvent).Name,
+                    ruleResult.Message));
+            }
+
             var @event = Activator.CreateInstance<TEvent>();
             @event.Result = result;
             @event.Error = ruleResult?.Message;

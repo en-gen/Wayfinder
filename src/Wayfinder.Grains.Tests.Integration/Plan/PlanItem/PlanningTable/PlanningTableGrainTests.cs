@@ -10,6 +10,7 @@ using Wayfinder.Grains.Plan.PlanningTable.Events;
 using Wayfinder.Grains.Tests.Integration.SiloFixture;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -20,10 +21,12 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
     public class PlanningTableGrainTests
     {
         private readonly IClusterClient _clusterClient;
+        private readonly FakeLoggerProvider _logs;
 
         public PlanningTableGrainTests(ClusterFixture fixture)
         {
             _clusterClient = fixture.ClusterClient;
+            _logs = fixture.Logs;
 
             CaseRequestContext.TenantId = Guid.Parse("10000000-0000-0000-0000-000000000000");
             CaseRequestContext.UserId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -155,11 +158,25 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.PlanItem.PlanningTable
 
             await subject.Define(caseDefinitionId, definition);
 
+            // #194 - cleared immediately before the call under test: this fixture's FakeLoggerProvider
+            // is shared across every test in ClusterCollection (see ClusterFixture's remarks), so
+            // earlier tests' log entries must not leak into this assertion.
+            _logs.Clear();
+
             var result = await subject.GetPlannableItems();
 
             result.Should()
                 .ContainSingle("an erroring ApplicabilityRule must fall back to its spec default of TRUE, not be silently excluded")
                 .And.Contain(expectedResult);
+
+            // #194 - the engine "handling" this error (falling back to the spec default above) is
+            // not enough on its own: prove it also said so, independent of the #184 read-path
+            // journal (this method deliberately raises no event on the read path at all).
+            _logs.Entries.Should().ContainSingle(e =>
+                    e.Category == typeof(Wayfinder.Grains.Plan.PlanningTable.PlanningTableGrain).FullName &&
+                    e.Level == LogLevel.Error,
+                    "an erroring ApplicabilityRule condition must be logged, not vanish silently (#194)")
+                .Which.Message.Should().Contain("Evaluation of applicability rule resulted in error");
         }
 
         [Theory, AutoData]
