@@ -387,6 +387,94 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit, exitCriterion.Id), Times.Once);
         }
 
+        // ADO #186 - unlike the CasePlanModel (StageBehaviorTests_HandleSentrySatisfied's own
+        // repro), TaskBehavior's CanFire(Exit) gate cannot go false in STEADY STATE:
+        // PlanItemStateMachine.ConfigureForStageOrTask permits Exit unconditionally from every
+        // state where the ExitCriteria subscription is armed (Available/Enabled/Disabled/Active/
+        // Suspended/Failed). The gap here is reachable only by a genuine delivery/unsubscribe
+        // RACE - BaseBehavior.HandleEnterTerminal unsubscribes ExitCriteria on ENTRY to Completed/
+        // Terminated, not before, so a SentrySatisfiedEvent already in flight when that entry
+        // action runs can still be delivered on a LATER grain turn, after the Task has already
+        // landed in Completed/Terminated. That interleaving (two overlapping grain turns racing
+        // against a mid-flight unsubscribe) is not something this synchronous unit harness can
+        // honestly reproduce - there is no way to invoke HandleSentrySatisfied "one turn late"
+        // here. What CAN be pinned honestly is the postcondition the race produces: this method,
+        // called with a genuine ExitCriterion satisfaction while the Task is ALREADY in a state
+        // Table 8.8 permits no `exit` edge from (Completed has none in ConfigureForStageOrTask -
+        // BaseBehavior only wires entry actions there, no Permits), must still journal the fact
+        // and durably confirm it, exactly as StageBehavior's CasePlanModel repro does.
+        [Fact]
+        public async Task HandleSentrySatisfied__When_ExitCriterionButAlreadyCompleted__Then_JournaledButTransitionWithheld()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var scope = ShortGuid.NewGuid();
+            var sentryDefinitionId = ShortGuid.NewGuid();
+
+            var task = new HumanTask();
+
+            var exitCriterion = new ExitCriterion
+            {
+                SentryRef = sentryDefinitionId
+            };
+
+            var pi = new Interfaces.Model.PlanItem
+            {
+                DefinitionRef = task.Id,
+                ExitCriteria =
+                {
+                    exitCriterion
+                }
+            };
+
+            // Represents the state a stale, already-in-flight SentrySatisfiedEvent is delivered
+            // into after the race described above - not a literal replay of the race's timing,
+            // just its observable postcondition (same "set initialState directly" convention this
+            // test file already uses throughout).
+            var testStore = new TestPlanItemStore(piDef: task, def: pi, initialState: PlanItemState.Completed);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.CaseInstanceId)
+                .Returns(caseInstanceId);
+            mockHost.Setup(x => x.Definition)
+                .Returns(pi);
+            mockHost.Setup(x => x.Scope)
+                .Returns(scope);
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            mockMachine.Object.CanFire(PlanItemTransition.Exit).Should().BeFalse(
+                "Table 8.8 permits no `exit` edge out of Completed - this is the precondition for the repro");
+
+            var subject = new TaskBehavior<HumanTask>(mockHost.Object, task, mockMachine.Object);
+
+            await (Task)typeof(TaskBehavior<HumanTask>)
+                .GetMethod("HandleSentrySatisfied", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[]
+                {
+                    new SentrySatisfiedEvent(
+                        scope,
+                        sentryDefinitionId,
+                        true),
+                    (StreamSequenceToken) null
+                });
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ExitCriterionSatisfied>()), Times.Once,
+                "#186: a genuinely satisfied exit criterion must be journaled even when the resulting " +
+                "transition cannot fire");
+            mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>()), Times.Never);
+            mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>(), It.IsAny<string>()), Times.Never);
+
+            // BLOCKER caught in review: with no FireAsync, BaseBehavior.HandleTransitioned never
+            // runs and never confirms - HandleSentrySatisfied's own trailing ConfirmEvents() is the
+            // only thing standing between this raise and loss to an idle deactivation (#160).
+            mockHost.Verify(x => x.ConfirmEvents(), Times.Once,
+                "#186: the journaled fact must be durably confirmed on the no-transition path");
+        }
+
         [Fact]
         public async Task HandleSentrySatisfied__When_PreviouslyRepeated__Then_RaiseEventDoNotStart()
         {
