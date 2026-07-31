@@ -280,11 +280,16 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 // branch above and StageBehavior.HandleSentrySatisfied's identical fix (see that
                 // method's remarks for the full rationale: the transition alone is conditional on
                 // CanFire, not the fact of the satisfaction). TaskBehavior's own CanFire(Exit) gate
-                // is unreachable in practice today - PlanItemStateMachine.ConfigureForStageOrTask
+                // is unreachable in STEADY STATE - PlanItemStateMachine.ConfigureForStageOrTask
                 // permits Exit unconditionally from every state where the ExitCriteria subscription
-                // can still be live (Available/Enabled/Disabled/Active/Suspended/Failed) - but this
-                // method shares its shape with StageBehavior's, where the gap IS reachable via the
-                // CasePlanModel subclass, so both must stay symmetric.
+                // can still be live (Available/Enabled/Disabled/Active/Suspended/Failed) - but it is
+                // still reachable by a delivery/unsubscribe RACE: BaseBehavior.HandleEnterTerminal
+                // unsubscribes ExitCriteria on ENTRY to Completed/Terminated, not before, so a
+                // SentrySatisfiedEvent already in flight when that entry action runs can still be
+                // delivered on a later grain turn, landing in a state where CanFire(Exit) is false.
+                // This method shares its shape with StageBehavior's regardless, where the gap is
+                // reachable in STEADY STATE too (via the CasePlanModel subclass), so both must stay
+                // symmetric.
                 Host.RaiseEvent(new ExitCriterionSatisfied
                 {
                     SourceScope = @event.SourceScope,
@@ -302,6 +307,17 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
                 }
             }
+
+            // ADO #186 - see StageBehavior.HandleSentrySatisfied's identical trailing confirm for
+            // the full rationale. The RaiseEvent calls above have no guaranteed confirm to ride on:
+            // on the FireAsync paths BaseBehavior.HandleTransitioned already confirms, making this
+            // a harmless no-op, but whenever this method falls through without ever calling
+            // FireAsync - CanFire(Exit) == false, or the EntryCriterion branch reaching neither the
+            // Available-state Enable/Start arm nor a successful repetition re-evaluation - nothing
+            // else confirms, and the raised event sits unconfirmed in TentativeState (#160) until
+            // lost to an idle deactivation. Matches MilestoneBehavior.HandleSentrySatisfied's own
+            // unconditional trailing confirm.
+            await Host.ConfirmEvents();
         }
     }
 }

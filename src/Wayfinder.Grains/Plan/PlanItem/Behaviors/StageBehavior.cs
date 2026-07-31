@@ -426,6 +426,23 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     }
                 }
             }
+
+            // ADO #186 - the RaiseEvent calls above have no guaranteed confirm to ride on. On the
+            // FireAsync paths, BaseBehavior.HandleTransitioned already confirms (it raises
+            // Transitioned and awaits Host.ConfirmEvents() before this method's own await resumes),
+            // so this is a harmless no-op there - Host.State => TentativeState reads back a queue
+            // that is already empty. But whenever this method returns WITHOUT ever calling
+            // FireAsync - the exact CanFire(ExitCriterionTransition) == false case #186 exists to
+            // journal, and identically the EntryCriterion branch reaching neither the
+            // Available-state Enable/Start arm nor a successful repetition re-evaluation - nothing
+            // upstream confirms at all. The event then sits unconfirmed in TentativeState (#160)
+            // until whatever next activity happens to confirm something else, and is lost outright
+            // if this grain deactivates idle before that happens. MilestoneBehavior.
+            // HandleSentrySatisfied already ends on exactly this same unconditional trailing
+            // confirm, for the same reason (see BaseBehavior's remarks on Bug #61 discipline) -
+            // this brings StageBehavior in line with that precedent rather than introducing a new
+            // pattern.
+            await Host.ConfirmEvents();
         }
 
         protected override async Task HandleParentTransitioned(PlanItemTransitionedEvent @event, StreamSequenceToken token = null)

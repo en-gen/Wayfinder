@@ -394,8 +394,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
         // PlanItemStateMachine.ConfigureForStageOrTask Permits Exit unconditionally from every
         // state where the ExitCriteria stream subscription is still live (Available, Enabled,
         // Disabled, Active, Suspended, Failed - see BaseBehavior.HandleEnterTerminal, which only
-        // unsubscribes on Completed/Terminated entry), so CanFire(Exit) can never actually be
-        // false there - the gap was unreachable for that type.
+        // unsubscribes on Completed/Terminated entry), so CanFire(Exit) can never be false there
+        // IN STEADY STATE - the gap is unreachable for that type absent a race. (It is still
+        // reachable by a delivery/unsubscribe race: HandleEnterTerminal unsubscribes on ENTRY to
+        // Completed/Terminated, not before, so a SentrySatisfiedEvent already in flight when that
+        // entry action runs can still be delivered on a later grain turn, landing in a state where
+        // CanFire(Exit) is false. That race is what actually justifies fixing TaskBehavior
+        // alongside StageBehavior, even though only the latter has a steady-state repro below.)
         //
         // The CasePlanModel is a different story: CasePlanModelBehavior overrides
         // ExitCriterionTransition to Terminate (Table 8.6 has no `exit` row for it), and
@@ -404,16 +409,20 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
         // is armed once, on entry to Active from Create (CasePlanModelBehavior.
         // HandleEnterActiveFromCreate), and is never re-armed or torn down on Suspend/Fault - only
         // HandleEnterTerminal (Completed/Terminated/Closed entry) ever unsubscribes it. So a
-        // genuinely satisfied exit criterion CAN reach this method while CanFire(Terminate) is
-        // false: SentryGrain.HandleOnPartOccurred/HandleCaseWideCaseFileItemTransitioned publish
-        // SentrySatisfiedEvent purely from OnPart/IfPart evaluation, with no check at all on the
-        // referencing PlanItem's own current state - so nothing upstream of this method prevents
-        // the delivery. This is the scenario that made the bug reachable (proven here by driving
+        // genuinely satisfied exit criterion CAN reach this method IN STEADY STATE while
+        // CanFire(Terminate) is false: SentryGrain.HandleOnPartOccurred/
+        // HandleCaseWideCaseFileItemTransitioned publish SentrySatisfiedEvent purely from
+        // OnPart/IfPart evaluation, with no check at all on the referencing PlanItem's own current
+        // state - so nothing upstream of this method prevents the delivery. This is the scenario
+        // that made the bug reachable without needing to contrive a race (proven here by driving
         // the CasePlanModel into Suspended/Failed for real before invoking the handler).
         //
         // Post-fix: the satisfaction must still be journaled (ExitCriterionSatisfied raised
         // exactly once) even though the transition itself correctly stays withheld (CanFire is
-        // still false, so no FireAsync) - the fact and the transition are no longer coupled.
+        // still false, so no FireAsync) - the fact and the transition are no longer coupled. The
+        // journaling must also be DURABLE, not merely queued: see the trailing ConfirmEvents()
+        // assertion below - HandleSentrySatisfied has no confirm on this exact no-FireAsync path
+        // other than the one it now performs itself at the very end of the method.
         [Theory]
         [InlineData(PlanItemState.Suspended, PlanItemTransition.Suspend)]
         [InlineData(PlanItemState.Failed, PlanItemTransition.Fault)]
@@ -451,8 +460,10 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 "Table 8.6 permits no `terminate` edge out of this state - this is the precondition for the repro");
 
             // Reset invocation history so the Verify calls below assert only what
-            // HandleSentrySatisfied itself does, not the setup transition above.
+            // HandleSentrySatisfied itself does, not the setup transition above (which already
+            // drove its own RaiseEvent(Transitioned)/ConfirmEvents/Publish through HandleTransitioned).
             mockMachine.Invocations.Clear();
+            mockHost.Invocations.Clear();
 
             await (Task)typeof(StageBehavior)
                 .GetMethod("HandleSentrySatisfied", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -476,6 +487,16 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             // out of Suspended/Failed, and that part of the CanFire gate is correct and unchanged.
             mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>()), Times.Never);
             mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>(), It.IsAny<string>()), Times.Never);
+
+            // BLOCKER caught in review: on this exact CanFire == false path, no FireAsync happens,
+            // so BaseBehavior.HandleTransitioned never runs and never confirms - the raise above is
+            // the last thing that happens. Without HandleSentrySatisfied's own trailing
+            // ConfirmEvents(), the just-raised ExitCriterionSatisfied would sit unconfirmed in
+            // TentativeState (#160) and be lost to an idle deactivation, achieving nothing over the
+            // pre-fix silent drop. This is the assertion that actually proves durability.
+            mockHost.Verify(x => x.ConfirmEvents(), Times.Once,
+                "#186: the journaled fact must be durably confirmed on the no-transition path, not merely " +
+                "queued in TentativeState - otherwise it is lost exactly like #160 describes");
         }
 
         [Fact]
