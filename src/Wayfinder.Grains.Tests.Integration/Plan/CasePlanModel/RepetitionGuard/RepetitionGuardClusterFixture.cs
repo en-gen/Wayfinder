@@ -161,6 +161,14 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
         // Configure<RepetitionGuardOptions> call in ConfigureServices below.
         private class TestSiloConfigurator : ISiloConfigurator
         {
+            // #197 - see SiloFixture.ClusterFixture.TestSiloConfigurator's identical remarks: one
+            // Quartz instanceName per fixture (this static field, initialized once, shared by every
+            // silo in THIS fixture's single TestCluster), unique to RepetitionGuardClusterFixture so
+            // it can never collide with ClusterFixture's or any other fixture's own instanceName via
+            // Quartz's process-wide static SchedulerRepository.
+            private static readonly string QuartzInstanceName =
+                $"{nameof(RepetitionGuardClusterFixture)}-{Guid.NewGuid():N}";
+
             public void Configure(ISiloBuilder silo)
             {
                 silo
@@ -197,7 +205,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
                     .Configure<RepetitionGuardOptions>(o => o.MaxRepetitionsPerPlanItem = LowCeiling)
                     .AddSingleton<IPlanItemBehaviorConfigurator, PlanItemBehaviorConfiguratorService>()
                     .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
-                    .AddQuartz(QuartzSchedulerConfig.Volatile);
+                    .AddQuartz(QuartzSchedulerConfig.Volatile(QuartzInstanceName));
             }
 
         }
