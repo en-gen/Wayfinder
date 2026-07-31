@@ -166,5 +166,121 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors.Stores
 
             subject.PendingRepetitions.Should().BeEmpty();
         }
+
+        // #198 - the commutative outstanding/settled verdict pair (StageBehaviorStore's own
+        // remarks have the full rationale). The ORDINARY order: a terminal child's
+        // PlanItemTransitionedEvent{WillRepeat=true} marks pending BEFORE the matching
+        // PlanItemRepetitionCriteriaMetEvent resolves it.
+        [Theory, AutoData]
+        public void Apply__RepetitionPending_ThenRepetitionResolved__Then_ClearsOutstandingAndSettles(string sourceInstanceId)
+        {
+            var subject = new StageBehaviorStore();
+
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceId });
+            subject.HasOutstandingRepetitionVerdict(sourceInstanceId).Should().BeTrue(
+                "a terminal child that will repeat must defer Table 8.12 completion until its request resolves");
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeTrue();
+
+            subject.Apply(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
+
+            subject.HasOutstandingRepetitionVerdict(sourceInstanceId).Should().BeFalse();
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse();
+            subject.IsRepetitionVerdictSettled(sourceInstanceId).Should().BeTrue();
+        }
+
+        // #198 (BLOCKER regression, review round 2) - the REORDERED arrival: on develop,
+        // PlanItemTransitionedEvent and PlanItemRepetitionCriteriaMetEvent travel on separate,
+        // unordered streams (AddMemoryStreams hash-maps the two namespaces onto different queues
+        // with independent pulling agents), and the repetition-met event routinely arrives and
+        // resolves FIRST - measured at a majority (~60-75%) of runs, not an edge case. The
+        // original single-set design ("add on pending, remove on resolve") was not commutative
+        // under this ordering: Apply(RepetitionResolved) running before the matching
+        // Apply(RepetitionPending) would leave a mark added with NOTHING left to ever remove it -
+        // AnyOutstandingRepetitionVerdicts stuck true, Table 8.12 permanently disabled for that
+        // container. This is the single test that would have caught it: resolve BEFORE marking,
+        // and assert the mark is correctly a no-op instead of stranding.
+        [Theory, AutoData]
+        public void Apply__RepetitionResolved_ThenRepetitionPending__Then_DoesNotStrandTheMark(string sourceInstanceId)
+        {
+            var subject = new StageBehaviorStore();
+
+            // the repetition-met event arrives and resolves FIRST - nothing was ever marked pending
+            subject.Apply(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
+            subject.IsRepetitionVerdictSettled(sourceInstanceId).Should().BeTrue();
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse();
+
+            // the terminal transition event's WillRepeat=true mark arrives SECOND, late
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceId });
+
+            subject.HasOutstandingRepetitionVerdict(sourceInstanceId).Should().BeFalse(
+                "a mark arriving AFTER its own resolution has nothing left to resolve it - adding it " +
+                "would strand Table 8.12 for this container forever (#198 review round 2 blocker)");
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse(
+                "the reordered arrival must converge to the SAME outcome as the ordinary order - " +
+                "never permanently outstanding");
+        }
+
+        // #198 (review round 2) - the inverted MarkRepetitionPending idempotency guard this same
+        // fix closes: an at-least-once REDELIVERY of the terminal PlanItemTransitionedEvent
+        // arriving AFTER its own resolution (whichever order the FIRST delivery and the
+        // resolution happened in) must also not re-add a mark with nothing left to resolve it.
+        [Theory, AutoData]
+        public void Apply__RepetitionPendingRedeliveredAfterSettlement__Then_DoesNotReAddToOutstanding(string sourceInstanceId)
+        {
+            var subject = new StageBehaviorStore();
+
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceId });
+            subject.Apply(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse();
+
+            // a stream redelivery of the SAME PlanItemTransitionedEvent, arriving after settlement
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceId });
+
+            subject.HasOutstandingRepetitionVerdict(sourceInstanceId).Should().BeFalse(
+                "a redelivered mark for an already-settled source instance must stay a no-op");
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse();
+        }
+
+        // Table 8.9's <impossible> cell requires ALL outstanding verdicts to clear, not just one -
+        // two repeating children can race independently, and completion must wait for both.
+        [Theory, AutoData]
+        public void AnyOutstandingRepetitionVerdicts__Given_TwoOutstandingMarks__Then_TrueUntilBothResolve(
+            string sourceInstanceIdA, string sourceInstanceIdB)
+        {
+            var subject = new StageBehaviorStore();
+
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceIdA });
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceIdB });
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeTrue();
+
+            subject.Apply(new RepetitionResolved { SourceInstanceId = sourceInstanceIdA });
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeTrue(
+                "B is still outstanding - completion must not proceed while EITHER child's verdict " +
+                "is unresolved");
+
+            subject.Apply(new RepetitionResolved { SourceInstanceId = sourceInstanceIdB });
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse();
+        }
+
+        // #198 (should-fix, review round 2) - StageBehavior.ClearOutstandingRepetitionVerdictsOnTerminalEntry's
+        // write side: a blanket clear on entry to Completed/Terminated/Failed, closing both a
+        // dead-state leak once nothing will ever consult the outstanding set again, and a
+        // permanent Table-8.12-completion-blocking strand when DrainPendingRepetitions hits the
+        // #67 ceiling mid-batch (drain is never auto-retried on Reactivate).
+        [Theory, AutoData]
+        public void Apply__When_OutstandingRepetitionVerdictsCleared__Then_OutstandingClearedButNotSettled(string sourceInstanceId)
+        {
+            var subject = new StageBehaviorStore();
+            subject.Apply(new RepetitionPending { SourceInstanceId = sourceInstanceId });
+
+            subject.Apply(new OutstandingRepetitionVerdictsCleared());
+
+            subject.AnyOutstandingRepetitionVerdicts.Should().BeFalse();
+            // deliberately NOT settled: a still-in-flight, unrelated resolution for this id must
+            // still be free to settle it normally afterward (Apply(RepetitionResolved) is
+            // idempotent either way) - this clear only drops the OUTSTANDING mark, it does not
+            // manufacture a tombstone.
+            subject.IsRepetitionVerdictSettled(sourceInstanceId).Should().BeFalse();
+        }
     }
 }

@@ -42,6 +42,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         private const string Scope = "CPM";
         private const string TaskDefinitionId = "TaskA";
         private const string TaskPlanItemId = "PlanItemTask";
+        private const string RequiredPlanItemId = "PlanItemRequired";
 
         private readonly IClusterClient _clusterClient;
 
@@ -62,8 +63,10 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         // legitimately complete before rep 1's repetition request was delivered. Fixed by #198:
         // BaseBehavior.HandleTransitioned now decides the RepetitionRule re-evaluation BEFORE
         // publishing rep 0's own PlanItemTransitionedEvent and embeds the verdict on it
-        // (WillRepeat), so StageBehavior.EvaluateStageCompletionCriteria defers the completion
-        // check until rep 1 actually exists instead of racing a second stream to find out.
+        // (WillRepeat), so StageBehavior.TryCompleteStage defers the completion check - via a
+        // commutative outstanding/settled verdict pair on StageBehaviorStore that converges
+        // regardless of which of the two streams actually arrives first - instead of racing a
+        // second, unordered stream to find out.
         [Fact]
         public async Task TaskComplete__Given_NoEntryCriteriaRepeatableTask__Then_FirstEvalDiscardedAndRepetitionSpawnedOnComplete()
         {
@@ -151,6 +154,123 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             var caseSnapshot = await caseGrain.GetSnapshot();
             caseSnapshot.BehaviorExtension.Children[TaskPlanItemId].Should().HaveCount(1,
                 "a FALSE re-evaluation on Complete must not spawn a repetition");
+        }
+
+        // #198 (review round 2) - every other assertion in this file (and in
+        // KnownGapScenarios/RepetitionRedeliveryIntegrationTests) only ever checks "the container
+        // is Active while the repetition is live", which a PERMANENTLY WEDGED container (the
+        // original single-set design's blocker regression - see StageBehaviorStoreTests'
+        // Apply__RepetitionResolved_ThenRepetitionPending__… for the deterministic version of this
+        // same bug) satisfies exactly as well as a correctly-deferring one. This test instead
+        // FORCES the question: it adds a second, REQUIRED, non-repeating child alongside the
+        // repeating one, drives both to complete, then actively polls manual completion (Table
+        // 8.12's Manual Completion OR-branch, which - per the pre-existing D4 finding pinned by
+        // KnownGapScenarios.StageCompletion__Given_AutoCompleteFalseAndNonRequiredChildActive__… -
+        // does NOT require the non-required repeating child to be terminal) until it succeeds or a
+        // bounded timeout expires. A correctly-deferring container succeeds shortly after the race
+        // resolves, whichever order it went; a wedged one never succeeds at all - this is the
+        // assertion that can actually tell the two apart, which is why the task explicitly asks
+        // for many repeated runs of this one (the #198 race is probabilistic - a single green run
+        // proves nothing).
+        [Fact]
+        public async Task TaskComplete__Given_RequiredAndRepeatingChildren__Then_ContainerEventuallyCompletesNotWedged()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var caseGrain = await CreateCaseWithRequiredAndRepeatingChildren(caseInstanceId);
+
+            var requiredGrain = await FindRepetitionGrain(caseInstanceId, RequiredPlanItemId, repetition: 0);
+            requiredGrain.Should().NotBeNull();
+            await requiredGrain.Trigger(PlanItemTransition.ManualStart);
+            await requiredGrain.Trigger(PlanItemTransition.Complete);
+
+            var repeatingGrain = await FindRepetitionGrain(caseInstanceId, TaskPlanItemId, repetition: 0);
+            repeatingGrain.Should().NotBeNull();
+            await repeatingGrain.Trigger(PlanItemTransition.ManualStart);
+            // races BaseBehavior.HandleTransitioned's WillRepeat-carrying PlanItemTransitionedEvent
+            // against the corresponding PlanItemRepetitionCriteriaMetEvent on develop's real,
+            // unordered memory streams - either order is possible and both must converge.
+            await repeatingGrain.Trigger(PlanItemTransition.Complete);
+
+            Exception lastFailure = null;
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    await caseGrain.Trigger(PlanItemTransition.Complete);
+                    lastFailure = null;
+                    break;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    lastFailure = ex;
+                    await Task.Delay(TimeSpan.FromMilliseconds(50));
+                }
+            }
+
+            lastFailure.Should().BeNull(
+                "#198: once the repeating child's repetition request resolves (whichever order it " +
+                "raced the terminal transition event in), Table 8.12's Manual Completion branch " +
+                "must become - and STAY - achievable within a bounded window, not permanently " +
+                "blocked (see StageBehaviorStore's outstanding/settled verdict pair)");
+
+            (await caseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Completed,
+                "the container must actually reach Completed once forced, not merely fail to throw");
+        }
+
+        private async Task<ICaseGrain> CreateCaseWithRequiredAndRepeatingChildren(Guid caseInstanceId)
+        {
+            var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
+
+            var requiredTaskDefinition = new HumanTask { Id = $"{TaskDefinitionId}Required", IsBlocking = true };
+            var repeatingTaskDefinition = new HumanTask { Id = TaskDefinitionId, IsBlocking = true };
+
+            var @case = new CaseModel
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRoles(),
+                CasePlanModel = new Stage
+                {
+                    Id = Scope,
+                    PlanItemDefinitions = { requiredTaskDefinition, repeatingTaskDefinition },
+                    PlanItems =
+                    {
+                        new Interfaces.Model.PlanItem
+                        {
+                            Id = RequiredPlanItemId,
+                            DefinitionRef = requiredTaskDefinition.Id,
+                            ItemControl = new PlanItemControl
+                            {
+                                RequiredRule = Rules.IsRequiredRule
+                            }
+                        },
+                        // deliberately NOT required: Table 8.12's Manual Completion branch drops
+                        // the "no Active children" conjunct for non-required children (D4) - this
+                        // is what lets manual completion succeed while this child's own
+                        // repetition-1 instance is still Enabled, isolating the
+                        // outstanding-verdict guard as the ONLY thing under test here.
+                        new Interfaces.Model.PlanItem
+                        {
+                            Id = TaskPlanItemId,
+                            DefinitionRef = repeatingTaskDefinition.Id,
+                            ItemControl = new PlanItemControl
+                            {
+                                RepetitionRule = Rules.IsRepeatableRule
+                            }
+                        }
+                    }
+                }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, Scope);
+            await caseGrain.Create(caseDefinitionId);
+            await caseGrain.Trigger(PlanItemTransition.Create);
+
+            return caseGrain;
         }
 
         private async Task<ICaseGrain> CreateCase(Guid caseInstanceId, RepetitionRule repetitionRule)

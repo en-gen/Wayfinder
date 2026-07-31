@@ -168,7 +168,38 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // EvaluateRepetitionRule raised a RepetitionRuleEvaluated audit event that has no
             // other confirm to ride on and would otherwise sit queued in TentativeState
             // indefinitely, regardless of which way the rule evaluated.
-            var willRepeat = await EvaluateRepetitionOnTerminalTransition(transition);
+            //
+            // #198 (blocker, review round 2) - wrapped: EvaluateRepetitionOnTerminalTransition can
+            // make a REAL cross-grain call (EvaluateRepetitionRule -> IExpressionGrain.
+            // ExecuteAsBool), which can throw (a timeout, the target grain failing to activate,
+            // etc.) rather than merely returning an error result the way a malformed expression
+            // does (see EvaluateRule's own remarks on that, different, already-handled case). This
+            // evaluation now runs BEFORE the publish below - moving it earlier is the entire point
+            // of this fix - so an unwrapped exception here would escape HandleTransitioned
+            // entirely and the publish would never happen at all: the child would be durably
+            // Completed/Terminated while its parent, and every Sentry with an OnPart on it, never
+            // learn the transition occurred. That is a strictly worse failure than a missed
+            // repetition - degrade to willRepeat=false and still publish; a repetition that should
+            // have fired but didn't is the SAME class of narrow, already-accepted residual risk as
+            // this class's other synchronous-turn crash windows (see e.g.
+            // StageBehavior.SpawnRepetitionOrRefuseCeiling's own CreateChild-ordering remarks), not
+            // a new one - a silently undelivered transition would have been a new one.
+            bool willRepeat;
+            try
+            {
+                willRepeat = await EvaluateRepetitionOnTerminalTransition(transition);
+            }
+            catch (Exception ex)
+            {
+                Host.LogWithContext(logger => logger.LogError(ex,
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | evaluating the no-entry-criteria RepetitionRule re-evaluation for this {StandardEvent} transition threw - degrading to WillRepeat=false so the transition itself still publishes (#198)",
+                    Host.Definition.GetType().Name,
+                    PlanItemDefinition.GetType().Name,
+                    Host.Scope,
+                    Host.InstanceId,
+                    transition.Trigger));
+                willRepeat = false;
+            }
             await Host.ConfirmEvents();
 
             await Host.Publish(new PlanItemTransitionedEvent(

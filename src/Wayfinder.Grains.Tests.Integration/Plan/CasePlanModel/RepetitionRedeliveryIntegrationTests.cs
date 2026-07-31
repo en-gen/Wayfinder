@@ -66,10 +66,11 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         // AutoComplete defaults to false (never set here), no PlanningTable. Fixed by #198:
         // BaseBehavior.HandleTransitioned now decides rep 0's RepetitionRule re-evaluation BEFORE
         // publishing its own PlanItemTransitionedEvent and embeds the verdict on it (WillRepeat),
-        // so StageBehavior.EvaluateStageCompletionCriteria defers the parent's Table 8.12
-        // completion check until rep 1 actually exists - the CasePlanModel can no longer complete
-        // in the gap before the repetition request is delivered, so PollUntilChildCount below
-        // reliably reaches count 2 and this test reaches its own redelivery simulation.
+        // so StageBehavior.TryCompleteStage defers the parent's Table 8.12 completion check via a
+        // commutative outstanding/settled verdict pair on StageBehaviorStore that converges
+        // regardless of arrival order - the CasePlanModel can no longer complete in the gap before
+        // the repetition request is delivered, so PollUntilChildCount below reliably reaches count
+        // 2 and this test reaches its own redelivery simulation.
         [Fact]
         public async Task HandleChildRepeated__Given_SameRepetitionCriteriaMetEventDeliveredTwice__Then_ExactlyOneChildIsCreated()
         {

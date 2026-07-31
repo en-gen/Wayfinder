@@ -171,6 +171,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Returns(parentInstanceId);
             mockHost.Setup(x => x.Definition)
                 .Returns(pi);
+            // #198 (review round 2) - the Terminated-entry path this test drives now also runs
+            // StageBehavior.ClearOutstandingRepetitionVerdictsOnTerminalEntry, which reads
+            // Host.State.BehaviorExtension (StageStore) - matching the mock setup every sibling
+            // test that touches StageStore already uses (see e.g.
+            // StageBehaviorTests_HandleChildRepeated_RepetitionGuard.cs).
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 

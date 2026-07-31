@@ -119,44 +119,110 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
             }
         }
 
-        // #198 - source instance ids of direct children whose PlanItemTransitionedEvent arrived
-        // with Destination.IsTerminal() and WillRepeat=true (BaseBehavior.HandleTransitioned),
-        // but whose actual repetition request has not yet been definitively resolved by
-        // HandleChildRepeated - spawned, refused by the #67 ceiling, refused because this
-        // container is terminal/Failed, or (while genuinely Suspended) still buffered awaiting
-        // drain. StageBehavior.EvaluateStageCompletionCriteria (Table 8.12) must not complete
-        // this container while this set is non-empty: Table 8.9's complete rows mark a Stage/Task
-        // child in Available/Enabled/Active/Suspended as <impossible> alongside a Completed
-        // parent, and an entry here IS exactly that child, merely not yet durably created. See
-        // docs/03-cmmn-execution-semantics.md section 8's implementation note and RepetitionPending/
-        // RepetitionResolved's own remarks.
+        // #198 (review round 2 - the original single-set design assumed
+        // PlanItemTransitionedEvent{WillRepeat=true} always reaches this Stage BEFORE the
+        // corresponding PlanItemRepetitionCriteriaMetEvent. It does not: both travel on separate,
+        // unordered streams - the SAME root cause #198 exists to close - so the repetition-met
+        // event routinely arrives FIRST. A single "add on pending, remove on resolve" set is not
+        // commutative under that reordering: if resolution is processed before the matching
+        // "pending" mark ever arrives, Apply(RepetitionPending) would add an entry with nothing
+        // left to ever remove it, wedging Table 8.12 for this container forever - exactly the
+        // "worse than the bug" failure this mechanism exists to avoid.
         //
-        // A HashSet, not a growing log like _repetitionSourceInstanceIds above: entries here are
-        // transient (added on a terminal WillRepeat=true transition, removed the moment the
-        // corresponding request resolves), not a permanent redelivery guard, so pruning on
-        // resolution is correct here in a way it would NOT be for that field.
+        // Fixed with TWO sets forming a commutative, order-independent verdict tracker per source
+        // instance id:
+        //   - _outstandingRepetitionVerdictSourceInstanceIds: a "pending" mark IS currently
+        //     outstanding for this id - StageBehavior.TryCompleteStage (Table
+        //     8.12) must not complete while this is non-empty (Table 8.9's complete rows mark a
+        //     Stage/Task child in Available/Enabled/Active/Suspended as <impossible> alongside a
+        //     Completed parent, and an entry here IS exactly that child, merely not yet durably
+        //     created).
+        //   - _settledRepetitionVerdictSourceInstanceIds: a PERMANENT tombstone - this id's
+        //     repetition request has been definitively resolved (spawned, #67-ceiling-refused, or
+        //     #178 terminal/Failed-refused), no matter which order the two events arrived in.
+        //     Apply(RepetitionPending) below consults this BEFORE adding to the outstanding set:
+        //     if resolution already happened, marking pending now would have nothing left to
+        //     resolve it, so it is correctly a no-op instead. This is also what makes an
+        //     at-least-once REDELIVERY of the terminal PlanItemTransitionedEvent itself safe: a
+        //     redelivery arriving after its own resolution finds the tombstone and no-ops, rather
+        //     than re-adding a mark that (its one resolving event already consumed) would never
+        //     be removed again.
+        // Never pruned, same rationale as _repetitionSourceInstanceIds' own accepted unbounded
+        // growth above: pruning a tombstone would reopen exactly the reordering/redelivery window
+        // it exists to close for a mark that arrives arbitrarily late.
+        //
+        // Enforced HERE, in the Apply methods, not merely as a pre-check in the StageBehavior
+        // methods that raise these events: Apply is what a reactivated grain replays from the
+        // journal, so this is the actual source of correctness, not an optimization.
         [Id(3)]
-        private readonly ICollection<string> _pendingRepetitionVerdictSourceInstanceIds = new HashSet<string>();
+        private readonly ICollection<string> _outstandingRepetitionVerdictSourceInstanceIds = new HashSet<string>();
 
-        public bool HasPendingRepetitionVerdict(string sourceInstanceId) =>
-            sourceInstanceId != null && _pendingRepetitionVerdictSourceInstanceIds.Contains(sourceInstanceId);
+        [Id(4)]
+        private readonly ICollection<string> _settledRepetitionVerdictSourceInstanceIds = new HashSet<string>();
 
-        public bool AnyRepetitionVerdictsPending => _pendingRepetitionVerdictSourceInstanceIds.Count > 0;
+        public bool HasOutstandingRepetitionVerdict(string sourceInstanceId) =>
+            sourceInstanceId != null && _outstandingRepetitionVerdictSourceInstanceIds.Contains(sourceInstanceId);
+
+        public bool AnyOutstandingRepetitionVerdicts => _outstandingRepetitionVerdictSourceInstanceIds.Count > 0;
+
+        public bool IsRepetitionVerdictSettled(string sourceInstanceId) =>
+            sourceInstanceId != null && _settledRepetitionVerdictSourceInstanceIds.Contains(sourceInstanceId);
 
         public void Apply(RepetitionPending @event)
         {
-            if (@event.SourceInstanceId != null)
-            {
-                _pendingRepetitionVerdictSourceInstanceIds.Add(@event.SourceInstanceId);
-            }
+            if (@event.SourceInstanceId == null) return;
+
+            // Commutative order (see the class remarks above): if this source instance's
+            // repetition request was ALREADY settled - the resolving event arrived first, or
+            // this is a stale redelivery of a PlanItemTransitionedEvent whose resolution already
+            // happened - there is nothing left to wait for. Adding it now would strand it.
+            if (_settledRepetitionVerdictSourceInstanceIds.Contains(@event.SourceInstanceId)) return;
+
+            _outstandingRepetitionVerdictSourceInstanceIds.Add(@event.SourceInstanceId);
         }
 
         public void Apply(RepetitionResolved @event)
         {
-            if (@event.SourceInstanceId != null)
-            {
-                _pendingRepetitionVerdictSourceInstanceIds.Remove(@event.SourceInstanceId);
-            }
+            if (@event.SourceInstanceId == null) return;
+
+            _outstandingRepetitionVerdictSourceInstanceIds.Remove(@event.SourceInstanceId);
+            _settledRepetitionVerdictSourceInstanceIds.Add(@event.SourceInstanceId);
+        }
+
+        // #198 (should-fix, review round 2) - drops every currently-outstanding mark without
+        // settling it, for use ONLY on entry to a state from which this container can never again
+        // legitimately evaluate Table 8.12 (Completed, Terminated) or from which the #178
+        // buffered-repetition drain is deliberately never auto-retried (Failed - see
+        // StageBehavior's own remarks on why Reactivate does not re-run DrainPendingRepetitions).
+        // Two concrete strandings this closes:
+        //   1. A mark whose resolving event will genuinely never arrive once this container is
+        //      terminal has no other way to be cleared - not a live bug (Table 8.12 never runs
+        //      again for a terminal container either way), but leaves dead state sitting in the
+        //      durable store forever otherwise.
+        //   2. StageBehavior.DrainPendingRepetitions hitting the #67 ceiling mid-batch (Fault) or
+        //      catching a transient CreateChild failure leaves the REMAINING un-drained buffer
+        //      entries - and this store's marks for them - permanently stranded once this
+        //      container reactivates from Failed (drain is not re-run on Reactivate, by design).
+        //      Without this clear, THAT durable emptiness of the #178 buffer would silently
+        //      become a durable, permanent block on Table 8.12 for the whole container - a much
+        //      larger blast radius than #178's own accepted "those specific children never spawn"
+        //      limitation.
+        // Deliberately does NOT settle the cleared ids: once this container is terminal, nothing
+        // ever consults _outstandingRepetitionVerdictSourceInstanceIds again, so there is nothing
+        // for a settlement tombstone to protect here. A LEGITIMATE resolution for one of these ids
+        // that is still in flight (e.g. a Failed-refuse for an unrelated, still-live repetition
+        // request) settles itself normally via Apply(RepetitionResolved) regardless of whether
+        // this method already cleared it - Remove/Add on a HashSet are idempotent no-ops when the
+        // entry is already absent/present.
+        //
+        // Journaled like every other mutation here (via OutstandingRepetitionVerdictsCleared),
+        // NOT a bare in-place Clear() a caller could invoke directly - this store is JournaledGrain
+        // state, so any mutation not driven by an Apply(TEvent) would silently fail to replay on
+        // reactivation (see StageBehavior.ClearOutstandingRepetitionVerdictsOnTerminalEntry, which
+        // raises the event and confirms it).
+        public void Apply(OutstandingRepetitionVerdictsCleared @event)
+        {
+            _outstandingRepetitionVerdictSourceInstanceIds.Clear();
         }
     }
 }
