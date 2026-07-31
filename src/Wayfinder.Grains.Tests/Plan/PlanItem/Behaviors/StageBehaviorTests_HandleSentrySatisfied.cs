@@ -386,6 +386,98 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit, exitCriterion.Id), Times.Once);
         }
 
+        // ADO #186 - HandleSentrySatisfied's ExitCriterion branch used to be guarded by BOTH
+        // "criterion is ExitCriterion" AND "StateMachine.CanFire(ExitCriterionTransition)", while
+        // the EntryCriterion branch above is guarded only by the type test - the RaiseEvent sat
+        // INSIDE the CanFire gate, so a genuine satisfaction that arrived while the transition
+        // could not fire journaled nothing at all. For an ordinary Stage/Task,
+        // PlanItemStateMachine.ConfigureForStageOrTask Permits Exit unconditionally from every
+        // state where the ExitCriteria stream subscription is still live (Available, Enabled,
+        // Disabled, Active, Suspended, Failed - see BaseBehavior.HandleEnterTerminal, which only
+        // unsubscribes on Completed/Terminated entry), so CanFire(Exit) can never actually be
+        // false there - the gap was unreachable for that type.
+        //
+        // The CasePlanModel is a different story: CasePlanModelBehavior overrides
+        // ExitCriterionTransition to Terminate (Table 8.6 has no `exit` row for it), and
+        // PlanItemStateMachine.ConfigureForCasePlanModel's Suspended/Failed blocks permit ONLY
+        // Reactivate and Close out of those states - NOT Terminate. Its ExitCriteria subscription
+        // is armed once, on entry to Active from Create (CasePlanModelBehavior.
+        // HandleEnterActiveFromCreate), and is never re-armed or torn down on Suspend/Fault - only
+        // HandleEnterTerminal (Completed/Terminated/Closed entry) ever unsubscribes it. So a
+        // genuinely satisfied exit criterion CAN reach this method while CanFire(Terminate) is
+        // false: SentryGrain.HandleOnPartOccurred/HandleCaseWideCaseFileItemTransitioned publish
+        // SentrySatisfiedEvent purely from OnPart/IfPart evaluation, with no check at all on the
+        // referencing PlanItem's own current state - so nothing upstream of this method prevents
+        // the delivery. This is the scenario that made the bug reachable (proven here by driving
+        // the CasePlanModel into Suspended/Failed for real before invoking the handler).
+        //
+        // Post-fix: the satisfaction must still be journaled (ExitCriterionSatisfied raised
+        // exactly once) even though the transition itself correctly stays withheld (CanFire is
+        // still false, so no FireAsync) - the fact and the transition are no longer coupled.
+        [Theory]
+        [InlineData(PlanItemState.Suspended, PlanItemTransition.Suspend)]
+        [InlineData(PlanItemState.Failed, PlanItemTransition.Fault)]
+        public async Task HandleSentrySatisfied__When_CasePlanModelExitCriterionButCannotFireTerminate__Then_JournaledButTransitionWithheld(
+            PlanItemState unreachableState, PlanItemTransition transitionIntoState)
+        {
+            var scope = ShortGuid.NewGuid();
+            var sentryDefinitionId = ShortGuid.NewGuid();
+
+            var casePlanModel = new Stage { Id = "CPM", IsCasePlanModel = true };
+
+            var exitCriterion = new ExitCriterion { SentryRef = sentryDefinitionId };
+            var caseDefinition = new Interfaces.Model.Case();
+            caseDefinition.ExitCriteria.Add(exitCriterion);
+
+            var testStore = new TestPlanItemStore(piDef: casePlanModel, initialState: PlanItemState.Active);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Scope).Returns(scope);
+            mockHost.Setup(x => x.Definition).Returns(caseDefinition);
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new CasePlanModelBehavior(mockHost.Object, casePlanModel, mockMachine.Object);
+
+            // Drive the CasePlanModel for real into a state where Table 8.6 permits no `terminate`
+            // edge (Reactivate/Close only), while leaving the ExitCriteria subscription live -
+            // nothing unsubscribes it outside of HandleEnterTerminal (Completed/Terminated/Closed).
+            await mockMachine.Object.FireAsync(transitionIntoState);
+            testStore.PlanItemState.Should().Be(unreachableState);
+            mockMachine.Object.CanFire(PlanItemTransition.Terminate).Should().BeFalse(
+                "Table 8.6 permits no `terminate` edge out of this state - this is the precondition for the repro");
+
+            // Reset invocation history so the Verify calls below assert only what
+            // HandleSentrySatisfied itself does, not the setup transition above.
+            mockMachine.Invocations.Clear();
+
+            await (Task)typeof(StageBehavior)
+                .GetMethod("HandleSentrySatisfied", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(subject, new object[]
+                {
+                    new SentrySatisfiedEvent(
+                        scope,
+                        sentryDefinitionId,
+                        true),
+                    (StreamSequenceToken)null
+                });
+
+            // #186 fix: a genuine ExitCriterion satisfaction reached this method (the subscription
+            // was live and the criterion matched) - it must be journaled regardless of whether the
+            // resulting transition can fire, exactly like the EntryCriterion branch above.
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ExitCriterionSatisfied>()), Times.Once,
+                "#186: a genuinely satisfied exit criterion must be journaled even when the resulting " +
+                "transition cannot fire - the fact and the transition are independent");
+
+            // The transition itself must still be withheld: Table 8.6 permits no `terminate` edge
+            // out of Suspended/Failed, and that part of the CanFire gate is correct and unchanged.
+            mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>()), Times.Never);
+            mockMachine.Verify(x => x.FireAsync(It.IsAny<PlanItemTransition>(), It.IsAny<string>()), Times.Never);
+        }
+
         [Fact]
         public async Task HandleSentrySatisfied__When_PreviouslyRepeated__Then_RaiseEventDoNotStart()
         {

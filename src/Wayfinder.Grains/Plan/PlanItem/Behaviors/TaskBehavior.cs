@@ -274,9 +274,17 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     Host.RaiseEvent(new Repeated());
                 }
             }
-            else if (criterion is ExitCriterion &&
-                     StateMachine.CanFire(PlanItemTransition.Exit))
+            else if (criterion is ExitCriterion)
             {
+                // ADO #186 - journal the satisfaction unconditionally, mirroring the EntryCriterion
+                // branch above and StageBehavior.HandleSentrySatisfied's identical fix (see that
+                // method's remarks for the full rationale: the transition alone is conditional on
+                // CanFire, not the fact of the satisfaction). TaskBehavior's own CanFire(Exit) gate
+                // is unreachable in practice today - PlanItemStateMachine.ConfigureForStageOrTask
+                // permits Exit unconditionally from every state where the ExitCriteria subscription
+                // can still be live (Available/Enabled/Disabled/Active/Suspended/Failed) - but this
+                // method shares its shape with StageBehavior's, where the gap IS reachable via the
+                // CasePlanModel subclass, so both must stay symmetric.
                 Host.RaiseEvent(new ExitCriterionSatisfied
                 {
                     SourceScope = @event.SourceScope,
@@ -284,12 +292,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     OnPartOccurred = @event.OnPartOccurred
                 });
 
-                // D10 - carries this ExitCriterion's own id alongside the Exit trigger (Stateless
-                // parameterized fire - see PlanItemStateMachine.FireAsync(PlanItemTransition,
-                // string) / BaseBehavior.HandleTransitioned) so a PlanItemOnPart naming THIS
-                // criterion via exitCriterionRef can finally match the resulting
-                // PlanItemTransitionedEvent - see SentryGrain's class remarks.
-                await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
+                if (StateMachine.CanFire(PlanItemTransition.Exit))
+                {
+                    // D10 - carries this ExitCriterion's own id alongside the Exit trigger (Stateless
+                    // parameterized fire - see PlanItemStateMachine.FireAsync(PlanItemTransition,
+                    // string) / BaseBehavior.HandleTransitioned) so a PlanItemOnPart naming THIS
+                    // criterion via exitCriterionRef can finally match the resulting
+                    // PlanItemTransitionedEvent - see SentryGrain's class remarks.
+                    await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
+                }
             }
         }
     }

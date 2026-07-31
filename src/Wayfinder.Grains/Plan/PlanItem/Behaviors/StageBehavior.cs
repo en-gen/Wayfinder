@@ -386,9 +386,22 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     Host.RaiseEvent(new Repeated());
                 }
             }
-            else if (criterion is ExitCriterion &&
-                     StateMachine.CanFire(ExitCriterionTransition))
+            else if (criterion is ExitCriterion)
             {
+                // ADO #186 - journal the satisfaction unconditionally, mirroring the EntryCriterion
+                // branch above: the sentry genuinely fired regardless of whether the resulting
+                // transition can be taken right now. Previously this raise sat INSIDE the
+                // CanFire(ExitCriterionTransition) guard, so a genuine satisfaction that arrived
+                // while the transition could not fire journaled nothing at all - invisible to any
+                // future replay (JournaledGrain is a pure fold). Concretely reachable via the
+                // CasePlanModel (ExitCriterionTransition overridden to Terminate below): Table 8.6
+                // permits no `terminate` edge out of Suspended or Failed, yet the ExitCriteria
+                // subscription (armed once, on entry to Active from Create - see
+                // CasePlanModelBehavior.HandleEnterActiveFromCreate) stays live through both, and
+                // SentryGrain publishes SentrySatisfiedEvent purely from OnPart/IfPart evaluation
+                // with no check at all on the referencing PlanItem's own state. Only the TRANSITION
+                // is conditional on CanFire; the journaled FACT that the criterion was satisfied is
+                // not - same discipline as #183's mirror-image fix on the entry side.
                 Host.RaiseEvent(new ExitCriterionSatisfied
                 {
                     SourceScope = @event.SourceScope,
@@ -396,18 +409,21 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     OnPartOccurred = @event.OnPartOccurred
                 });
 
-                // D10 - only the Exit trigger carries a parameterized ExitCriterionRef (see
-                // PlanItemStateMachine.FireAsync(PlanItemTransition, string) / BaseBehavior.
-                // HandleTransitioned). ExitCriterionTransition is Terminate for the CasePlanModel
-                // (CasePlanModelBehavior's override - Table 8.6 has no `exit` row for it), which
-                // has no such registered trigger parameter, so that path keeps firing plain.
-                if (ExitCriterionTransition == PlanItemTransition.Exit)
+                if (StateMachine.CanFire(ExitCriterionTransition))
                 {
-                    await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
-                }
-                else
-                {
-                    await StateMachine.FireAsync(ExitCriterionTransition);
+                    // D10 - only the Exit trigger carries a parameterized ExitCriterionRef (see
+                    // PlanItemStateMachine.FireAsync(PlanItemTransition, string) / BaseBehavior.
+                    // HandleTransitioned). ExitCriterionTransition is Terminate for the CasePlanModel
+                    // (CasePlanModelBehavior's override - Table 8.6 has no `exit` row for it), which
+                    // has no such registered trigger parameter, so that path keeps firing plain.
+                    if (ExitCriterionTransition == PlanItemTransition.Exit)
+                    {
+                        await StateMachine.FireAsync(PlanItemTransition.Exit, criterion.Id);
+                    }
+                    else
+                    {
+                        await StateMachine.FireAsync(ExitCriterionTransition);
+                    }
                 }
             }
         }
