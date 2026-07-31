@@ -15,7 +15,7 @@
     <!-- Command/query handlers call grains through IClusterClient (constructor-injected). Wayfinder.Grains
          already carries Microsoft.Orleans.Sdk transitively, but the Application layer depends on the
          Orleans client surface directly, so it is named explicitly here too. -->
-    <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
   </ItemGroup>
 
   <ItemGroup>
