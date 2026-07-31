@@ -224,6 +224,16 @@ namespace Wayfinder.Grains.Plan.PlanItem
             }
         }
 
+        public void Apply(OutstandingRepetitionVerdictsCleared @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
         public void Apply(TimerStartTriggerOccurred @event)
         {
             Updated = @event.Updated;

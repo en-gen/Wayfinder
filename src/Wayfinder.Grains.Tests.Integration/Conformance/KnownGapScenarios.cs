@@ -138,9 +138,11 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
         // delivered - is now closed at its source: BaseBehavior.HandleTransitioned decides the
         // no-entry-criteria RepetitionRule re-evaluation BEFORE publishing
         // PlanItemTransitionedEvent and embeds the verdict as WillRepeat, so the parent's
-        // completion check (StageBehavior.EvaluateStageCompletionCriteria) defers - via
-        // StageBehaviorStore.PendingRepetitionSourceInstanceIds - on the SAME event that reports
-        // the child as terminal, rather than racing a second, unordered stream to find out.
+        // completion check (StageBehavior.TryCompleteStage) defers - via
+        // StageBehaviorStore's commutative outstanding/settled verdict pair - regardless of which
+        // of the two streams (PlanItemTransitionedEvent or PlanItemRepetitionCriteriaMetEvent)
+        // actually arrives first (review round 2: both orderings occur routinely on develop, since
+        // the two events travel on separate, unordered streams).
         //
         // The assertion below now also checks the CasePlanModel's own state while the second
         // instance is live - the exact thing the original scenario's instances==2-only assertion

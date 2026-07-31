@@ -204,5 +204,15 @@ namespace Wayfinder.Grains.Plan.Case
                 stageStore.Apply(@event);
             }
         }
+
+        public void Apply(OutstandingRepetitionVerdictsCleared @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
     }
 }

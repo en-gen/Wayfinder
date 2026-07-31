@@ -17,7 +17,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 {
     public class StageBehavior : BaseBehavior<Stage>
     {
-        private StageBehaviorStore StageStore => Host.State.BehaviorExtension as StageBehaviorStore ?? throw new InvalidOperationException();
+        // protected (not private): #198 review round 2 - CasePlanModelBehavior's own
+        // ManualCompletionCriteriaSatisfied override needs the same AnyOutstandingRepetitionVerdicts
+        // guard this class's own version uses, and it does not call base (its completion criteria
+        // are the CASE lifecycle's own, not Table 8.12's Stage column - see its remarks).
+        protected StageBehaviorStore StageStore => Host.State.BehaviorExtension as StageBehaviorStore ?? throw new InvalidOperationException();
 
         // ADO #66 - override point for the CasePlanModel/ordinary-Stage-or-Task asymmetry
         // ~~~~~
@@ -80,6 +84,35 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 // omitting the hook).
                 .OnEntryFromAsync(PlanItemTransition.Resume, DrainPendingRepetitions)
                 .OnEntryFromAsync(PlanItemTransition.ParentResume, DrainPendingRepetitions);
+
+            // #198 (should-fix, review round 2) - see ClearOutstandingRepetitionVerdictsOnTerminalEntry's
+            // own remarks for why Completed/Terminated/Failed (not just Completed/Terminated) all
+            // need this. Registered here, alongside BaseBehavior's own OnEntryAsync(HandleEnterTerminal)
+            // for the SAME two states - Stateless accumulates multiple entry actions per state
+            // rather than replacing them, so both run.
+            StateMachine.Configure(PlanItemState.Completed)
+                .OnEntryAsync(ClearOutstandingRepetitionVerdictsOnTerminalEntry);
+
+            StateMachine.Configure(PlanItemState.Terminated)
+                .OnEntryAsync(ClearOutstandingRepetitionVerdictsOnTerminalEntry);
+
+            StateMachine.Configure(PlanItemState.Failed)
+                .OnEntryAsync(ClearOutstandingRepetitionVerdictsOnTerminalEntry);
+        }
+
+        // #198 (should-fix, review round 2) - see StageBehaviorStore.Apply(OutstandingRepetitionVerdictsCleared)
+        // for the full rationale (dead-state hygiene on ordinary terminal entry, and closing a
+        // genuine Table-8.12-completion-blocking strand when DrainPendingRepetitions hits the #67
+        // ceiling mid-batch, since drain is deliberately never auto-retried on Reactivate). Runs
+        // on entry to Completed, Terminated, AND Failed (constructor above) - unlike
+        // HandleEnterTerminal (BaseBehavior), which only needs Completed/Terminated since exit-
+        // criteria subscriptions are irrelevant to a Failed, still-recoverable container.
+        private async Task ClearOutstandingRepetitionVerdictsOnTerminalEntry()
+        {
+            if (!StageStore.AnyOutstandingRepetitionVerdicts) return;
+
+            Host.RaiseEvent(new OutstandingRepetitionVerdictsCleared());
+            await Host.ConfirmEvents();
         }
 
         public override Task Activate() =>
@@ -278,8 +311,9 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // PlanItems.Any() == true and this block never runs for it at all. Whether that
             // repetition-0 child happens to reach a terminal state synchronously within the
             // fan-out (and whether its own next-repetition spawn - published asynchronously via
-            // PlanItemRepetitionCriteriaMetEvent, see BaseBehavior.TryRepeatOnCompleteOrTerminate
-            // - has been observed by this Stage yet) is completely irrelevant here, because this
+            // PlanItemRepetitionCriteriaMetEvent, see BaseBehavior.HandleTransitioned/
+            // EvaluateRepetitionOnTerminalTransition - has been observed by this Stage yet) is
+            // completely irrelevant here, because this
             // branch is unreachable whenever PlanItems is non-empty. That pre-existing
             // interaction between HandleChildTransitioned's own reactive evaluation and a
             // not-yet-delivered repetition event is unchanged by this fix either way.
@@ -291,12 +325,18 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // children, so this call is skipped entirely for that combination and the Stage
             // waits, exactly as it does today, for an external Trigger(Complete).
             //
-            // Reuses TryAutoComplete - the exact predicate-and-act HandleChildTransitioned's own
-            // AutoComplete branch calls - so the two call sites can never drift onto different
-            // definitions of "complete".
+            // Routed through TryCompleteStage (#198 review round 2 - previously
+            // called TryAutoComplete directly here), not just TryAutoComplete: the same
+            // predicate-and-act HandleChildTransitioned's own completion check calls, through the
+            // SAME entry point, so the two call sites can never drift onto different definitions
+            // of "complete" - which is exactly what calling TryAutoComplete directly here risked
+            // reintroducing once TryCompleteStage's own #198 pending-verdict guard
+            // existed only on ONE of the two paths. Safe/inert here regardless: no children exist
+            // yet at this point (PlanItems.Any() is false, gating this whole block), so
+            // StageStore.AnyOutstandingRepetitionVerdicts is necessarily false too.
             if (PlanItemDefinition.AutoComplete && !PlanItemDefinition.PlanItems.Any())
             {
-                await TryAutoComplete(await GetChildSnapshots());
+                await TryCompleteStage(await GetChildSnapshots());
             }
         }
 
@@ -592,35 +632,49 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 // #198 - this child's own PlanItemTransitionedEvent already carries its
                 // repetition verdict (BaseBehavior.HandleTransitioned/
                 // EvaluateRepetitionOnTerminalTransition), decided BEFORE this event was
-                // published. Record it before ever evaluating Table 8.12 below, so the
-                // AutoComplete/Branch 1 dispatch that follows already sees the pending set
-                // non-empty and defers - see EvaluateStageCompletionCriteria and
-                // ResolveRepetitionPending's remarks for how/when this resolves.
+                // published. Record it before ever evaluating Table 8.12 below.
+                //
+                // Review round 2 - this DOES NOT mean the mark always lands before the
+                // corresponding PlanItemRepetitionCriteriaMetEvent: that event and THIS one
+                // travel on separate, unordered streams (the SAME root cause #198 exists to
+                // close), so the repetition-met event routinely arrives at HandleChildRepeated
+                // FIRST and resolves before this mark is ever raised. MarkRepetitionPending (and,
+                // beneath it, StageBehaviorStore.Apply(RepetitionPending)) is written to be a
+                // no-op in that case - see their own remarks - so EITHER arrival order converges
+                // on the same outcome: never permanently outstanding.
                 if (@event.WillRepeat)
                 {
                     await MarkRepetitionPending(@event.SourceInstanceId);
                 }
 
-                await EvaluateStageCompletionCriteria(childSnapshots);
+                await TryCompleteStage(childSnapshots);
             }
         }
 
         // Table 8.12 - Stage instance termination criteria: the two AutoComplete-gated
         // OR-branches, factored out of HandleChildTransitioned so this and the #198 resolution
         // retry below (ResolveRepetitionPending, StageBehavior.SpawnRepetitionOrRefuseCeiling)
-        // share exactly one definition rather than two that could drift.
+        // share exactly one definition rather than two that could drift. ALSO the entry point
+        // HandleEnterActiveFromStart's own zero-children autoComplete=TRUE case routes through
+        // (review round 2 - it used to call TryAutoComplete directly), so there is exactly one
+        // place Table 8.12's automatic criteria are ever evaluated.
         //
         // #198 guard: Table 8.9's complete rows mark a Stage/Task child in Available/Enabled/
         // Active/Suspended as <impossible> alongside a Completed parent. A child that just told
         // us (via WillRepeat on its own terminal PlanItemTransitionedEvent) that a replacement
         // instance is coming is exactly such a child - it just does not durably exist yet
-        // (StageBehaviorStore.PendingRepetitionSourceInstanceIds tracks it in the interim via
+        // (StageBehaviorStore.AnyOutstandingRepetitionVerdicts tracks it in the interim via
         // MarkRepetitionPending above). Neither OR-branch below may fire while any such verdict
         // is still outstanding, for ANY child - not only the one that triggered this particular
         // call - since two repeating children can race independently.
-        private async Task EvaluateStageCompletionCriteria(PlanItemSnapshot[] childSnapshots)
+        //
+        // Table 8.12's MANUAL Completion branch (Branch 2) does NOT live in this method - see
+        // ManualCompletionCriteriaSatisfied below, which carries the identical guard
+        // independently, since an externally-invoked Trigger(Complete) can race an outstanding
+        // verdict exactly the same way the automatic paths here can.
+        private async Task TryCompleteStage(PlanItemSnapshot[] childSnapshots)
         {
-            if (StageStore.AnyRepetitionVerdictsPending) return;
+            if (StageStore.AnyOutstandingRepetitionVerdicts) return;
 
             if (PlanItemDefinition.AutoComplete)
             {
@@ -655,14 +709,26 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             }
         }
 
-        // #198 - write side of the pending-verdict set (see StageBehaviorStore.
-        // PendingRepetitionSourceInstanceIds' remarks). Idempotent against redelivery of the same
-        // terminal PlanItemTransitionedEvent (Orleans streams are at-least-once, same rationale
-        // as every other guard in this class): a second WillRepeat=true delivery for a
-        // SourceInstanceId already marked pending is a silent no-op, not a second entry.
+        // #198 - write side of the outstanding-verdict set (see StageBehaviorStore's own remarks
+        // on the commutative pending/settled pair). Pre-check here is an OPTIMIZATION only - to
+        // avoid raising a no-op event on the hot, ordinary path - NOT the source of correctness:
+        // StageBehaviorStore.Apply(RepetitionPending) enforces the real "already settled? then
+        // no-op" guard even if this pre-check is bypassed (e.g. during journal replay, which
+        // invokes Apply directly). Covers two distinct reasons this can be a no-op:
+        //   - HasOutstandingRepetitionVerdict: an ordinary redelivery of this SAME terminal
+        //     PlanItemTransitionedEvent (Orleans streams are at-least-once) while still pending.
+        //   - IsRepetitionVerdictSettled: (review round 2) either a REORDERED arrival - the
+        //     corresponding PlanItemRepetitionCriteriaMetEvent already resolved this id before
+        //     this mark ever got here, since the two travel on separate, unordered streams - or a
+        //     STALE redelivery of this same transitioned event arriving after its own resolution
+        //     already happened. Marking pending in either case would strand it permanently.
         private async Task MarkRepetitionPending(string sourceInstanceId)
         {
-            if (StageStore.HasPendingRepetitionVerdict(sourceInstanceId)) return;
+            if (StageStore.HasOutstandingRepetitionVerdict(sourceInstanceId) ||
+                StageStore.IsRepetitionVerdictSettled(sourceInstanceId))
+            {
+                return;
+            }
 
             Host.LogWithContext(logger => logger.LogInformation(
                 "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | child instance {SourceInstanceId} will repeat - deferring Table 8.12 completion until its repetition request resolves (#198)",
@@ -676,17 +742,23 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             await Host.ConfirmEvents();
         }
 
-        // #198 - resolution side of the pending-verdict set. Called from every DEFINITIVE
-        // outcome of a PlanItemRepetitionCriteriaMetEvent for sourceInstanceId - a fresh instance
-        // actually spawned, the #67 ceiling refused it, or this container refused it outright
-        // because it is terminal or Failed (HandleChildRepeated's #178 state switch) -
-        // deliberately NOT called from the Suspended/buffered branch, where the request is real
-        // and still unresolved (see RepetitionResolved's own remarks). Idempotent: resolving an
-        // id that was never marked (or already resolved) is a no-op, so callers do not need their
-        // own "was this actually pending" guard.
+        // #198 - resolution side. Called from every DEFINITIVE outcome of a
+        // PlanItemRepetitionCriteriaMetEvent for sourceInstanceId - a fresh instance actually
+        // spawned, the #67 ceiling refused it, or this container refused it outright because it
+        // is terminal or Failed (HandleChildRepeated's #178 state switch) - deliberately NOT
+        // called from the Suspended/buffered branch, where the request is real and still
+        // unresolved (see RepetitionResolved's own remarks).
+        //
+        // Review round 2 - UNCONDITIONAL, not gated on HasOutstandingRepetitionVerdict: this is
+        // exactly the "repetition-met event arrives before the transition event" ordering the
+        // original design got wrong. Settling must happen whether or not a pending mark exists
+        // YET, so that a mark arriving LATER (StageBehaviorStore.Apply(RepetitionPending)) finds
+        // the tombstone and correctly no-ops instead of stranding. The only pre-check is against
+        // a redelivery of THIS SAME resolving event once already settled, to avoid a harmless but
+        // noisy duplicate audit event.
         private async Task ResolveRepetitionPending(string sourceInstanceId)
         {
-            if (!StageStore.HasPendingRepetitionVerdict(sourceInstanceId)) return;
+            if (StageStore.IsRepetitionVerdictSettled(sourceInstanceId)) return;
 
             Host.RaiseEvent(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
             await Host.ConfirmEvents();
@@ -710,9 +782,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // Named Try*, not Evaluate* (unlike EvaluateManualActivationRule/EvaluateRequiredRule/
         // EvaluateRepetitionRule, this file's existing Evaluate* family - all side-effect-free
         // Task<bool> predicates): this method both evaluates the predicate AND fires the
-        // transition when it holds, mirroring the file's own evaluate-and-act precedent,
-        // BaseBehavior.TryRepeatOnCompleteOrTerminate. Calling it "Evaluate*" would read as a pure
-        // query and risk a future caller assuming it is safe to call speculatively.
+        // transition when it holds - matching TryCompleteStage above (which wraps it, and
+        // shares the same Try* naming for the identical reason) and
+        // StageBehavior.SpawnRepetitionOrRefuseCeiling's own evaluate-and-act shape. Calling this
+        // one "Evaluate*" would read as a pure query and risk a future caller assuming it is safe
+        // to call speculatively.
         private async Task TryAutoComplete(PlanItemSnapshot[] childSnapshots)
         {
             // ...There are no Active children
@@ -754,8 +828,19 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // under the old combined condition) and can overstate (a repetition spawning a NEW
         // required child after the latch would leave it stale-true). The latched event remains as
         // a UI hint; enforcement reads current state.
+        //
+        // #198 (should-fix, review round 2) - this Branch 2 gate does NOT live inside
+        // TryCompleteStage, so it needs the SAME StageStore.AnyOutstandingRepetitionVerdicts guard
+        // independently: an external Trigger(Complete) can arrive in the exact same window as
+        // Branch 1/AutoComplete - between a terminal child's WillRepeat=true verdict and its
+        // repetition request actually resolving - and produce the identical Table 8.9
+        // <impossible> cell if left unguarded. CasePlanModelBehavior OVERRIDES this method with
+        // its own CASE-lifecycle completion criteria (does not call base) - see its own remarks
+        // for the matching guard on that path.
         protected virtual async Task<bool> ManualCompletionCriteriaSatisfied()
         {
+            if (StageStore.AnyOutstandingRepetitionVerdicts) return false;
+
             var childSnapshots = await GetChildSnapshots();
 
             var requiredChildrenTerminal = childSnapshots
@@ -1166,8 +1251,8 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // container (Host) rather than the repeating child is deliberate: the child that
             // published PlanItemRepetitionCriteriaMetEvent is either already terminal
             // (Completed/Terminated, for the no-entry-criteria path - BaseBehavior.
-            // TryRepeatOnCompleteOrTerminate) or still legitimately running (the entry-criterion
-            // OnPart path - HandleSentrySatisfied), and PlanItemStateMachine.
+            // HandleTransitioned/EvaluateRepetitionOnTerminalTransition) or still legitimately
+            // running (the entry-criterion OnPart path - HandleSentrySatisfied), and PlanItemStateMachine.
             // ConfigureForStageOrTask permits no outgoing transition at all from Completed/
             // Terminated for an ordinary Stage/Task - neither is ever a legal Fault target. This
             // Stage/CasePlanModel is the one actually issuing the runaway CreateChild calls and
@@ -1290,13 +1375,16 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // this same guard already closes for the common (fully-succeeded, then redelivered)
             // case.
             // #198 - snapshot BEFORE raising RepetitionResolved below, so the retry at the tail of
-            // this method only fires when resolving sourceInstanceId actually clears a deferred
-            // verdict this method itself (or HandleChildTransitioned) previously recorded - never
-            // for the ordinary case (no WillRepeat ever observed for this child, the entry-
-            // criterion repetition path, or any caller that never went through
-            // MarkRepetitionPending at all), where nothing was deferred and a speculative retry
-            // would just be unnecessary extra work.
-            var wasPending = StageStore.HasPendingRepetitionVerdict(sourceInstanceId);
+            // this method only fires when resolving sourceInstanceId actually clears a mark this
+            // method itself (or HandleChildTransitioned) previously recorded as OUTSTANDING -
+            // never for the ordinary case (no WillRepeat ever observed for this child yet, the
+            // entry-criterion repetition path, or any caller that never went through
+            // MarkRepetitionPending at all - including the common REORDERED case where this
+            // resolution runs BEFORE the matching WillRepeat=true mark ever arrives), where
+            // nothing is currently deferred and a speculative retry would just be unnecessary
+            // extra work (and, in several pre-existing unit tests that call this method directly
+            // against a bare mock Host, an avoidable NRE - see review round 1).
+            var wasOutstanding = StageStore.HasOutstandingRepetitionVerdict(sourceInstanceId);
 
             await CreateChild(child, nextRepetition);
 
@@ -1323,20 +1411,20 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // matching that same batching convention.
             await Host.ConfirmEvents();
 
-            // #198 - only when resolving sourceInstanceId actually cleared a deferred verdict
-            // (wasPending, captured above): a Table 8.12 completion check MarkRepetitionPending
+            // #198 - only when resolving sourceInstanceId actually cleared an outstanding mark
+            // (wasOutstanding, captured above): a Table 8.12 completion check MarkRepetitionPending
             // deferred (HandleChildTransitioned) may now be able to proceed - it was never
             // re-triggered on its own, since the just-created child's own (non-terminal)
             // transition events do not pass HandleChildTransitioned's own
             // `@event.Destination.IsTerminal()` gate. This was the resolution path (not the
             // ceiling), so no Fault was fired and Host.State.PlanItemState is trustworthy here
             // (unlike the ceiling branch above - see its remarks on why a post-Fault read is NOT
-            // safe). EvaluateStageCompletionCriteria's own pending-set guard makes this safe even
+            // safe). TryCompleteStage's own outstanding-verdict guard makes this safe even
             // if other verdicts remain outstanding, and the child just created here is itself
             // freshly non-terminal, so this cannot complete prematurely over IT either.
-            if (wasPending && Host.State.PlanItemState == PlanItemState.Active)
+            if (wasOutstanding && Host.State.PlanItemState == PlanItemState.Active)
             {
-                await EvaluateStageCompletionCriteria(await GetChildSnapshots());
+                await TryCompleteStage(await GetChildSnapshots());
             }
 
             return false;

@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores;
 using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 using Orleans.Streams;
 
@@ -162,8 +163,17 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // terminal. (Judging direct children covers the tree: an Active instance nested deeper
         // inside a non-Active top-level child cannot exist, because a Stage containing an Active
         // instance is itself Active - Table 8.7.)
+        //
+        // #198 (should-fix, review round 2) - this override does NOT call base, so
+        // StageBehavior.ManualCompletionCriteriaSatisfied's own AnyOutstandingRepetitionVerdicts
+        // guard does not apply here automatically; it needs the identical check independently -
+        // an external Trigger(Complete) on the CasePlanModel itself can race a direct child's
+        // outstanding repetition verdict exactly the same way an ordinary Stage's manual
+        // completion can (see the base method's own remarks for the full rationale).
         protected override async Task<bool> ManualCompletionCriteriaSatisfied()
         {
+            if (StageStore.AnyOutstandingRepetitionVerdicts) return false;
+
             var childSnapshots = await GetChildSnapshots();
 
             return childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
