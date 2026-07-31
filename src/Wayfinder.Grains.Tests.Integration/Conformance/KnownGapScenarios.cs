@@ -133,30 +133,20 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
         // PlanItemRepetitionCriteriaMetEvent when TRUE. Verified green on develop@cbd66d7 - at
         // the time, no longer a known gap.
         //
-        // RE-QUARANTINED (#198, discovered investigating #178's own KnownGap conflict): this
-        // scenario's OWN assertion never checked the CasePlanModel's state, only
-        // instances == 2 - so it stayed green on develop across a race it never observed.
-        // SourceTask's completion does TWO things concurrently, on two separate, unordered
-        // streams: (1) BaseBehavior.TryRepeatOnCompleteOrTerminate raises Repeated and publishes
-        // PlanItemRepetitionCriteriaMetEvent (the repetition request), and (2)
-        // StageBehavior.HandleChildTransitioned evaluates Table 8.12's completion criteria over
-        // the CURRENT child snapshots. On develop these are not ordered against each other, so
-        // roughly 40% of runs saw the CasePlanModel's completion check run BEFORE the repetition
-        // request was delivered/applied - completing the case over what was, a moment later, an
-        // Active child: Table 8.9's own <impossible> cell, silently produced and never asserted
-        // against by this test. The #178 fix (StageBehavior.HandleChildRepeated now consulting
-        // Host.State.PlanItemState) correctly REFUSES the late spawn once that race is lost,
-        // which converts the previously-invisible violation into a visible ~25% flake here: this
-        // assertion now depends on winning a race the engine does not order, roughly matching the
-        // original ~40%/~60% split observed on develop. The underlying defect belongs at the
-        // Table 8.12 completion-evaluation seam (the two streams need to be ordered, or
-        // completion needs to await in-flight repetition requests) - it is NOT this scenario's
-        // job, and NOT #178's, to fix; #178 only made the pre-existing hazard observable. Do not
-        // unskip until #198 lands; a passing unskipped run afterward should still be treated with
-        // suspicion until re-verified across enough iterations to rule out having simply won the
-        // race - see docs/03-cmmn-execution-semantics.md's §8 implementation note, extended for
-        // this same finding.
-        [Fact(Skip = "#198 - StageBehavior.HandleChildTransitioned's Table 8.12 completion check races BaseBehavior.TryRepeatOnCompleteOrTerminate's repetition publish (separate, unordered streams); on develop this silently completed the CasePlanModel over an Active child (Table 8.9 <impossible>) ~40% of runs, and #178's correct refusal of the resulting late spawn converts that into a ~25% assertion flake here. See #198.")]
+        // PINNED (#198): the race described above - StageBehavior.HandleChildTransitioned's
+        // Table 8.12 completion check running before the sibling repetition request was
+        // delivered - is now closed at its source: BaseBehavior.HandleTransitioned decides the
+        // no-entry-criteria RepetitionRule re-evaluation BEFORE publishing
+        // PlanItemTransitionedEvent and embeds the verdict as WillRepeat, so the parent's
+        // completion check (StageBehavior.EvaluateStageCompletionCriteria) defers - via
+        // StageBehaviorStore.PendingRepetitionSourceInstanceIds - on the SAME event that reports
+        // the child as terminal, rather than racing a second, unordered stream to find out.
+        //
+        // The assertion below now also checks the CasePlanModel's own state while the second
+        // instance is live - the exact thing the original scenario's instances==2-only assertion
+        // never checked, which is why it stayed green across the ~40% of develop runs that lost
+        // the race silently (Table 8.9's <impossible> cell, produced but unobserved).
+        [Fact]
         [ConformanceCitation("8.6.4 / repeat-on-complete for no-entry-criteria items (D7)")]
         [ConformanceCitation("Table 8.8 / complete - RepetitionRule re-evaluation clause")]
         public async Task TaskRepetition__Given_RepetitionRuleAndNoEntryCriteria__Then_CompletionSpawnsNewInstance()
@@ -177,6 +167,13 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             secondInstanceSpawned.Should().BeTrue(
                 "8.6.4: a no-entry-criteria item with a TRUE RepetitionRule must get a new instance when one completes (D7) - the owning Stage's child bookkeeping must show a second instance");
+
+            // #198 - Table 8.9's complete rows: a Completed parent may never coexist with a
+            // Stage/Task child in Available/Enabled/Active/Suspended. The freshly-spawned second
+            // instance is exactly such a child, so the CasePlanModel must still be Active here,
+            // not Completed - the assertion the original scenario was missing.
+            (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
+                "Table 8.9: the parent must not complete over a live repeated child (<impossible> cell) - it must still be Active while the second instance exists");
         }
 
         // Table 8.5 (Suspended): "A Case instance MUST propagate this state to its outermost

@@ -4,8 +4,9 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
     // ~~~~~
     // 8.6.4 places no upper bound on RepetitionRule re-evaluation: a no-entry-criteria Stage or
     // Task instance with a constant-TRUE RepetitionRule is, per the letter of the spec, entitled
-    // to spawn a new instance forever (BaseBehavior.TryRepeatOnCompleteOrTerminate re-evaluates
-    // and re-publishes on every Complete/Terminate transition; StageBehavior/
+    // to spawn a new instance forever (BaseBehavior.HandleTransitioned/
+    // EvaluateRepetitionOnTerminalTransition re-evaluates and re-publishes on every Complete/
+    // Terminate transition; StageBehavior/
     // CasePlanModelBehavior.HandleChildRepeated spawns unconditionally in response). That is
     // exactly the documented #19 foot-gun: a non-blocking Task (isBlocking=false) with
     // ManualActivationRule=false, RepetitionRule=TRUE, and no entry criteria auto-cascades

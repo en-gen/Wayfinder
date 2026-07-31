@@ -22,7 +22,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
         // collide). A given source instance can request exactly ONE repetition in its lifetime:
         // either via the entry-criterion OnPart path (HandleSentrySatisfied), which unsubscribes
         // from EntryCriteria immediately after publishing, or via the no-entry-criteria Complete/
-        // Terminate path (BaseBehavior.TryRepeatOnCompleteOrTerminate), reachable only once
+        // Terminate path (BaseBehavior.HandleTransitioned/EvaluateRepetitionOnTerminalTransition), reachable only once
         // because CMMN terminal states have no further outgoing transition. So a second delivery
         // carrying the identical SourceInstanceId is necessarily the SAME logical request
         // redelivered - never a distinct, legitimate new repetition (which would arrive from a
@@ -116,6 +116,46 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
             if (@event.SourceInstanceId != null)
             {
                 _repetitionSourceInstanceIds.Add(@event.SourceInstanceId);
+            }
+        }
+
+        // #198 - source instance ids of direct children whose PlanItemTransitionedEvent arrived
+        // with Destination.IsTerminal() and WillRepeat=true (BaseBehavior.HandleTransitioned),
+        // but whose actual repetition request has not yet been definitively resolved by
+        // HandleChildRepeated - spawned, refused by the #67 ceiling, refused because this
+        // container is terminal/Failed, or (while genuinely Suspended) still buffered awaiting
+        // drain. StageBehavior.EvaluateStageCompletionCriteria (Table 8.12) must not complete
+        // this container while this set is non-empty: Table 8.9's complete rows mark a Stage/Task
+        // child in Available/Enabled/Active/Suspended as <impossible> alongside a Completed
+        // parent, and an entry here IS exactly that child, merely not yet durably created. See
+        // docs/03-cmmn-execution-semantics.md section 8's implementation note and RepetitionPending/
+        // RepetitionResolved's own remarks.
+        //
+        // A HashSet, not a growing log like _repetitionSourceInstanceIds above: entries here are
+        // transient (added on a terminal WillRepeat=true transition, removed the moment the
+        // corresponding request resolves), not a permanent redelivery guard, so pruning on
+        // resolution is correct here in a way it would NOT be for that field.
+        [Id(3)]
+        private readonly ICollection<string> _pendingRepetitionVerdictSourceInstanceIds = new HashSet<string>();
+
+        public bool HasPendingRepetitionVerdict(string sourceInstanceId) =>
+            sourceInstanceId != null && _pendingRepetitionVerdictSourceInstanceIds.Contains(sourceInstanceId);
+
+        public bool AnyRepetitionVerdictsPending => _pendingRepetitionVerdictSourceInstanceIds.Count > 0;
+
+        public void Apply(RepetitionPending @event)
+        {
+            if (@event.SourceInstanceId != null)
+            {
+                _pendingRepetitionVerdictSourceInstanceIds.Add(@event.SourceInstanceId);
+            }
+        }
+
+        public void Apply(RepetitionResolved @event)
+        {
+            if (@event.SourceInstanceId != null)
+            {
+                _pendingRepetitionVerdictSourceInstanceIds.Remove(@event.SourceInstanceId);
             }
         }
     }

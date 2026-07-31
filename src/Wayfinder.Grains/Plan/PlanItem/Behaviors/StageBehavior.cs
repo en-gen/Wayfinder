@@ -589,38 +589,107 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // and deliberately does not require non-required children to also be done.
             if (@event.Destination.IsTerminal())
             {
-                if (PlanItemDefinition.AutoComplete)
+                // #198 - this child's own PlanItemTransitionedEvent already carries its
+                // repetition verdict (BaseBehavior.HandleTransitioned/
+                // EvaluateRepetitionOnTerminalTransition), decided BEFORE this event was
+                // published. Record it before ever evaluating Table 8.12 below, so the
+                // AutoComplete/Branch 1 dispatch that follows already sees the pending set
+                // non-empty and defers - see EvaluateStageCompletionCriteria and
+                // ResolveRepetitionPending's remarks for how/when this resolves.
+                if (@event.WillRepeat)
                 {
-                    await TryAutoComplete(childSnapshots);
+                    await MarkRepetitionPending(@event.SourceInstanceId);
                 }
-                // Branch 1: ...There are no Active children AND all children (not just required
-                // ones) are in {Disabled, Completed, Terminated, Failed} AND there are no
-                // DiscretionaryItems left that a Case worker could still plan. "No
-                // DiscretionaryItems" is a standalone structural condition - it must not depend on
-                // Host.State.UserCompletable (a latched UI hint related to Branch 2, a different
-                // OR-branch entirely); conflating the two here was the original bug: a stage whose
-                // PlanningTable's items were all already planned could only complete if the
-                // UserCompletable latch happened to be set, and (because .All() on an empty
-                // sequence is true) a PlanningTable with zero DiscretionaryItems demanded the same
-                // latch for no reason. NOTE the null-check IS still doing double duty as "no
-                // DiscretionaryItems": an absent PlanningTable and a present-but-fully-planned one
-                // are both correctly "none pending" - .All() covers the empty table too.
-                else
-                {
-                    var noDiscretionaryItemsPending =
-                        PlanItemDefinition.PlanningTable == null ||
-                        PlanItemDefinition.PlanningTable.DiscretionaryItems
-                            .All(di => childSnapshots.Any(snap => snap.Definition.Id == di.Id));
 
-                    if (childSnapshots.All(x => x.PlanItemState.IsTerminal()) &&
-                        noDiscretionaryItemsPending &&
-                        StateMachine.CanFire(PlanItemTransition.Complete))
-                    {
-                        Host.RaiseEvent(new FullyCompleteCriteriaMet());
-                        await StateMachine.FireAsync(PlanItemTransition.Complete);
-                    }
+                await EvaluateStageCompletionCriteria(childSnapshots);
+            }
+        }
+
+        // Table 8.12 - Stage instance termination criteria: the two AutoComplete-gated
+        // OR-branches, factored out of HandleChildTransitioned so this and the #198 resolution
+        // retry below (ResolveRepetitionPending, StageBehavior.SpawnRepetitionOrRefuseCeiling)
+        // share exactly one definition rather than two that could drift.
+        //
+        // #198 guard: Table 8.9's complete rows mark a Stage/Task child in Available/Enabled/
+        // Active/Suspended as <impossible> alongside a Completed parent. A child that just told
+        // us (via WillRepeat on its own terminal PlanItemTransitionedEvent) that a replacement
+        // instance is coming is exactly such a child - it just does not durably exist yet
+        // (StageBehaviorStore.PendingRepetitionSourceInstanceIds tracks it in the interim via
+        // MarkRepetitionPending above). Neither OR-branch below may fire while any such verdict
+        // is still outstanding, for ANY child - not only the one that triggered this particular
+        // call - since two repeating children can race independently.
+        private async Task EvaluateStageCompletionCriteria(PlanItemSnapshot[] childSnapshots)
+        {
+            if (StageStore.AnyRepetitionVerdictsPending) return;
+
+            if (PlanItemDefinition.AutoComplete)
+            {
+                await TryAutoComplete(childSnapshots);
+            }
+            // Branch 1: ...There are no Active children AND all children (not just required
+            // ones) are in {Disabled, Completed, Terminated, Failed} AND there are no
+            // DiscretionaryItems left that a Case worker could still plan. "No
+            // DiscretionaryItems" is a standalone structural condition - it must not depend on
+            // Host.State.UserCompletable (a latched UI hint related to Branch 2, a different
+            // OR-branch entirely); conflating the two here was the original bug: a stage whose
+            // PlanningTable's items were all already planned could only complete if the
+            // UserCompletable latch happened to be set, and (because .All() on an empty
+            // sequence is true) a PlanningTable with zero DiscretionaryItems demanded the same
+            // latch for no reason. NOTE the null-check IS still doing double duty as "no
+            // DiscretionaryItems": an absent PlanningTable and a present-but-fully-planned one
+            // are both correctly "none pending" - .All() covers the empty table too.
+            else
+            {
+                var noDiscretionaryItemsPending =
+                    PlanItemDefinition.PlanningTable == null ||
+                    PlanItemDefinition.PlanningTable.DiscretionaryItems
+                        .All(di => childSnapshots.Any(snap => snap.Definition.Id == di.Id));
+
+                if (childSnapshots.All(x => x.PlanItemState.IsTerminal()) &&
+                    noDiscretionaryItemsPending &&
+                    StateMachine.CanFire(PlanItemTransition.Complete))
+                {
+                    Host.RaiseEvent(new FullyCompleteCriteriaMet());
+                    await StateMachine.FireAsync(PlanItemTransition.Complete);
                 }
             }
+        }
+
+        // #198 - write side of the pending-verdict set (see StageBehaviorStore.
+        // PendingRepetitionSourceInstanceIds' remarks). Idempotent against redelivery of the same
+        // terminal PlanItemTransitionedEvent (Orleans streams are at-least-once, same rationale
+        // as every other guard in this class): a second WillRepeat=true delivery for a
+        // SourceInstanceId already marked pending is a silent no-op, not a second entry.
+        private async Task MarkRepetitionPending(string sourceInstanceId)
+        {
+            if (StageStore.HasPendingRepetitionVerdict(sourceInstanceId)) return;
+
+            Host.LogWithContext(logger => logger.LogInformation(
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | child instance {SourceInstanceId} will repeat - deferring Table 8.12 completion until its repetition request resolves (#198)",
+                Host.Definition.GetType().Name,
+                PlanItemDefinition.GetType().Name,
+                Host.Scope,
+                Host.InstanceId,
+                sourceInstanceId));
+
+            Host.RaiseEvent(new RepetitionPending { SourceInstanceId = sourceInstanceId });
+            await Host.ConfirmEvents();
+        }
+
+        // #198 - resolution side of the pending-verdict set. Called from every DEFINITIVE
+        // outcome of a PlanItemRepetitionCriteriaMetEvent for sourceInstanceId - a fresh instance
+        // actually spawned, the #67 ceiling refused it, or this container refused it outright
+        // because it is terminal or Failed (HandleChildRepeated's #178 state switch) -
+        // deliberately NOT called from the Suspended/buffered branch, where the request is real
+        // and still unresolved (see RepetitionResolved's own remarks). Idempotent: resolving an
+        // id that was never marked (or already resolved) is a no-op, so callers do not need their
+        // own "was this actually pending" guard.
+        private async Task ResolveRepetitionPending(string sourceInstanceId)
+        {
+            if (!StageStore.HasPendingRepetitionVerdict(sourceInstanceId)) return;
+
+            Host.RaiseEvent(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
+            await Host.ConfirmEvents();
         }
 
         // Table 8.12 - Stage instance termination criteria, autoComplete = TRUE column:
@@ -829,6 +898,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         Host.InstanceId,
                         child.Id,
                         Host.State.PlanItemState));
+                    // #198 - this container is already terminal, so no completion check needs to
+                    // (or safely can) re-run, but the pending-verdict entry itself must still be
+                    // cleared: a durable, never-resolved entry would be silently confusing
+                    // dead-state, and if this Host is EVER inspected again (e.g. a snapshot read)
+                    // it should not still claim a repetition is "in flight" for a container that
+                    // can never spawn one again.
+                    await ResolveRepetitionPending(@event.PlanItemInstanceId);
                     return;
 
                 case PlanItemState.Failed:
@@ -865,6 +941,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         SourceInstanceId = @event.PlanItemInstanceId,
                         AttemptedRepetition = @event.CurrentRepetition + 1
                     });
+                    // #198 - raised in the SAME confirmed batch as RepetitionRefusedWhileFailed
+                    // above: this container has Failed, so (same rationale as the terminal branch
+                    // above) no completion retry can safely run, but the pending-verdict entry
+                    // must not be left dangling.
+                    Host.RaiseEvent(new RepetitionResolved { SourceInstanceId = @event.PlanItemInstanceId });
                     await Host.ConfirmEvents();
                     return;
 
@@ -882,6 +963,10 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         Host.InstanceId,
                         child.Id,
                         Host.State.PlanItemState));
+                    // #198 - defensive, matching the branch's own "should not be reachable in
+                    // practice" note: clear any pending-verdict entry anyway rather than leaving
+                    // one dangling if this branch is ever somehow reached.
+                    await ResolveRepetitionPending(@event.PlanItemInstanceId);
                     return;
             }
 
@@ -1117,6 +1202,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     Ceiling = _repetitionCeiling
                 });
 
+                // #198 - this source instance's repetition verdict is now definitively resolved
+                // (refused): whichever confirm below ends up committing RepetitionCeilingExceeded
+                // (see the WHO-commits remarks just below) commits this in the same batch. No
+                // completion retry follows this branch - this Host is Failed or about to be (see
+                // the reentrancy remarks below), and no legitimate completion can fire into that.
+                Host.RaiseEvent(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
+
                 if (StateMachine.CanFire(PlanItemTransition.Fault))
                 {
                     // WHO actually commits the RepetitionCeilingExceeded event raised just above
@@ -1197,6 +1289,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // invisible, permanent one, and duplication here is a strict subset of the #161 defect
             // this same guard already closes for the common (fully-succeeded, then redelivered)
             // case.
+            // #198 - snapshot BEFORE raising RepetitionResolved below, so the retry at the tail of
+            // this method only fires when resolving sourceInstanceId actually clears a deferred
+            // verdict this method itself (or HandleChildTransitioned) previously recorded - never
+            // for the ordinary case (no WillRepeat ever observed for this child, the entry-
+            // criterion repetition path, or any caller that never went through
+            // MarkRepetitionPending at all), where nothing was deferred and a speculative retry
+            // would just be unnecessary extra work.
+            var wasPending = StageStore.HasPendingRepetitionVerdict(sourceInstanceId);
+
             await CreateChild(child, nextRepetition);
 
             // #160 - SourceInstanceId records this repetition request's idempotency key (see the
@@ -1208,14 +1309,35 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 SourceInstanceId = sourceInstanceId
             });
 
-            // #160 - CreateChild raises ChildCreated (and the ChildRepeated above) on THIS
-            // Stage/CasePlanModel's own TentativeState; nothing else in this handler's call chain
-            // confirms them, so without this they would sit unconfirmed indefinitely and be lost
-            // entirely if this activation deactivates before some later, unrelated event on this
-            // same host happens to confirm them (Bug #61 class - see HandleEnterActiveFromStart's
-            // remarks for the same discipline applied to the equivalent first-creation path).
-            // Confirmed once after CreateChild completes, matching that same batching convention.
+            // #198 - this source instance's repetition verdict is now definitively resolved
+            // (spawned): raised in the same confirmed batch as ChildRepeated/ChildCreated below.
+            Host.RaiseEvent(new RepetitionResolved { SourceInstanceId = sourceInstanceId });
+
+            // #160 - CreateChild raises ChildCreated (and the ChildRepeated/RepetitionResolved
+            // above) on THIS Stage/CasePlanModel's own TentativeState; nothing else in this
+            // handler's call chain confirms them, so without this they would sit unconfirmed
+            // indefinitely and be lost entirely if this activation deactivates before some later,
+            // unrelated event on this same host happens to confirm them (Bug #61 class - see
+            // HandleEnterActiveFromStart's remarks for the same discipline applied to the
+            // equivalent first-creation path). Confirmed once after CreateChild completes,
+            // matching that same batching convention.
             await Host.ConfirmEvents();
+
+            // #198 - only when resolving sourceInstanceId actually cleared a deferred verdict
+            // (wasPending, captured above): a Table 8.12 completion check MarkRepetitionPending
+            // deferred (HandleChildTransitioned) may now be able to proceed - it was never
+            // re-triggered on its own, since the just-created child's own (non-terminal)
+            // transition events do not pass HandleChildTransitioned's own
+            // `@event.Destination.IsTerminal()` gate. This was the resolution path (not the
+            // ceiling), so no Fault was fired and Host.State.PlanItemState is trustworthy here
+            // (unlike the ceiling branch above - see its remarks on why a post-Fault read is NOT
+            // safe). EvaluateStageCompletionCriteria's own pending-set guard makes this safe even
+            // if other verdicts remain outstanding, and the child just created here is itself
+            // freshly non-terminal, so this cannot complete prematurely over IT either.
+            if (wasPending && Host.State.PlanItemState == PlanItemState.Active)
+            {
+                await EvaluateStageCompletionCriteria(await GetChildSnapshots());
+            }
 
             return false;
         }

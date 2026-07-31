@@ -25,7 +25,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel.RepetitionGuard
     //
     // Every completion cascades fully unattended: Create -> Available -> (ManualActivationRule
     // FALSE, 8.6.2) Start -> Active -> (non-blocking, Table 5.39) auto-Complete ->
-    // TryRepeatOnCompleteOrTerminate re-evaluates RepetitionRule (TRUE, no entry criteria, 8.6.4)
+    // BaseBehavior.HandleTransitioned re-evaluates RepetitionRule (TRUE, no entry criteria, 8.6.4)
     // -> publishes PlanItemRepetitionCriteriaMetEvent -> the CasePlanModel's HandleChildRepeated
     // spawns the next repetition - with NO human or external event ever entering the loop. Left
     // unbounded this is exactly the #19 infinite-spawn scenario; RepetitionGuardClusterFixture

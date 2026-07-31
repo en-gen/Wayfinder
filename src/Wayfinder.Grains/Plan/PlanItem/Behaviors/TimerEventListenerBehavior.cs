@@ -67,7 +67,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // on Available) - i.e. AFTER HandleTransitioned has already raised-and-confirmed the
         // Transitioned event for this Create transition (Stateless invokes the transition
         // callback before the destination state's entry actions - see
-        // BaseBehavior.TryRepeatOnCompleteOrTerminate's remarks). EvaluateTimerExpression below
+        // BaseBehavior.HandleTransitioned's remarks). EvaluateTimerExpression below
         // raises TimerExpressionEvaluated with no confirm of its own. Unlike StageBehavior/
         // TaskBehavior's sibling HandleEnterAvailableFromCreate (whose no-entry-criteria branch
         // falls through to EnableOrStart's nested FireAsync(Enable/Start), and that transition's

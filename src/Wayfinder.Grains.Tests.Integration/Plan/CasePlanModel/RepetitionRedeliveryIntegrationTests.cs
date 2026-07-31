@@ -61,23 +61,16 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
 
         // #198 (found running the #178 verification suite at scale - not part of the original
         // #161 reproduction) - this test's own arrange phase (the genuine repeat landing at line
-        // ~112, BEFORE the redelivery-guard logic under test is ever exercised) has the EXACT
+        // ~112, BEFORE the redelivery-guard logic under test is ever exercised) had the EXACT
         // #198 race shape: a single no-entry-criteria repeating child under a CasePlanModel whose
-        // AutoComplete defaults to false (never set here), no PlanningTable. Completing rep 0
-        // both (1) re-evaluates its RepetitionRule and publishes
-        // PlanItemRepetitionCriteriaMetEvent (BaseBehavior.TryRepeatOnCompleteOrTerminate) and
-        // (2) triggers the parent's Table 8.12 completion check
-        // (StageBehavior.HandleChildTransitioned) - on two separate, unordered streams. With
-        // this Stage's only child now terminal, autoComplete=FALSE's Branch 1 is satisfiable, so
-        // the CasePlanModel can legitimately complete before rep 1's repetition request is
-        // delivered - and once #178 correctly refuses a late spawn into an already-Completed
-        // container, PollUntilChildCount below times out at count 1, never reaching the
-        // redelivery simulation this test actually exists to prove. Quarantined rather than
-        // fixed, exactly like KnownGapScenarios.TaskRepetition__… and
-        // RepetitionOnCompletionIntegrationTests.TaskComplete__…FirstEvalDiscardedAndRepetitionSpawnedOnComplete
-        // (same underlying defect, third occurrence): #198 belongs at the Table 8.12
-        // completion-evaluation seam, not here and not in #178.
-        [Fact(Skip = "#198 - this test's own arrange phase (a genuine repeat must land before the redelivery-guard logic under test even runs) has the exact #198 race shape: a single no-entry-criteria repeating child under a CasePlanModel whose AutoComplete defaults to false, no PlanningTable. The CasePlanModel can legitimately complete before the repetition request is delivered, and #178's correct refusal of the resulting late spawn then times out PollUntilChildCount before this test ever reaches its own redelivery simulation. Same root cause as KnownGapScenarios.TaskRepetition__… and RepetitionOnCompletionIntegrationTests.TaskComplete__…FirstEvalDiscardedAndRepetitionSpawnedOnComplete. See #198.")]
+        // AutoComplete defaults to false (never set here), no PlanningTable. Fixed by #198:
+        // BaseBehavior.HandleTransitioned now decides rep 0's RepetitionRule re-evaluation BEFORE
+        // publishing its own PlanItemTransitionedEvent and embeds the verdict on it (WillRepeat),
+        // so StageBehavior.EvaluateStageCompletionCriteria defers the parent's Table 8.12
+        // completion check until rep 1 actually exists - the CasePlanModel can no longer complete
+        // in the gap before the repetition request is delivered, so PollUntilChildCount below
+        // reliably reaches count 2 and this test reaches its own redelivery simulation.
+        [Fact]
         public async Task HandleChildRepeated__Given_SameRepetitionCriteriaMetEventDeliveredTwice__Then_ExactlyOneChildIsCreated()
         {
             var caseInstanceId = Guid.NewGuid();
@@ -130,6 +123,14 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             var childrenAfterFirstDelivery = await PollUntilChildCount(caseGrain, expectedCount: 2, TimeSpan.FromSeconds(10));
             childrenAfterFirstDelivery.Should().HaveCount(2, "rep0 and rep1 must both be recorded after the genuine repeat");
             childrenAfterFirstDelivery.Values.Should().Contain(1, "the first, genuine delivery must spawn repetition 1");
+
+            // #198 - Table 8.9's complete rows: a Completed parent may never coexist with a
+            // Stage/Task child in Available/Enabled/Active/Suspended. rep1 is exactly such a
+            // (freshly spawned, non-terminal) child, so the CasePlanModel must still be Active
+            // here - the container-state check the original #198 quarantine flagged this test's
+            // own arrange phase as missing.
+            (await caseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
+                "Table 8.9: the parent must not have completed over the live repetition instance (<impossible> cell)");
 
             // Simulate an at-least-once stream REDELIVERY of the exact same logical repetition
             // request: identical SourceScope/SourceDefinitionId/PlanItemInstanceId/
