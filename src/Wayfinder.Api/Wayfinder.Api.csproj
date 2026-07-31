@@ -33,7 +33,7 @@
          10.0.0 release (verified via nuspec: targetFramework net10.0, MIT licensed), so versioning
          is composed by hand instead: AddApiVersioning + AddRouteComponents (see
          DependencyInjection/ServiceCollectionExtensions.cs). -->
-    <PackageReference Include="Asp.Versioning.Mvc" Version="10.0.0" />
+    <PackageReference Include="Asp.Versioning.Mvc" Version="10.0.1" />
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.0.0" />
     <!-- ADO #32 - net10's built-in Microsoft-owned OpenAPI document generator (Microsoft.
          AspNetCore.OpenApi, not Swashbuckle) - MIT licensed, versioned in lockstep with the
