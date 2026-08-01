@@ -71,10 +71,10 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                     (StreamSequenceToken) null
                 });
 
-            // the loud, observable domain event - carries the repeating definition id, the
-            // attempted (refused) repetition index, and the ceiling that refused it
+            // the loud, observable domain event - carries the repeating child's own PlanItem id,
+            // the attempted (refused) repetition index, and the ceiling that refused it
             mockHost.Verify(x => x.RaiseEvent(It.Is<RepetitionCeilingExceeded>(e =>
-                e.RepeatingPlanItemDefinitionId == planItemDefinitionId &&
+                e.RepeatingPlanItemId == planItemDefinitionId &&
                 e.AttemptedRepetition == ceiling &&
                 e.Ceiling == ceiling)), Times.Once);
 

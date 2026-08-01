@@ -16,8 +16,14 @@ namespace Wayfinder.Grains.Plan.PlanItem.Events
     [GenerateSerializer]
     public class RepetitionRefusedWhileFailed : BaseUpdate
     {
+        // The repeating child PlanItem's OWN Id (the <planItem> element's id), NOT its
+        // DefinitionRef/PlanItemDefinition.Id - see StageBehavior.HandleChildRepeated, which
+        // populates this from child.Id. Property name kept aligned with that semantics (renamed
+        // from the misleading RepeatingPlanItemDefinitionId, mirroring the #132 fix on
+        // RepetitionCeilingExceeded.RepeatingPlanItemId); [Id(0)] is unchanged for wire/replay
+        // compatibility.
         [Id(0)]
-        public string RepeatingPlanItemDefinitionId { get; set; }
+        public string RepeatingPlanItemId { get; set; }
         [Id(1)]
         public string SourceInstanceId { get; set; }
         [Id(2)]

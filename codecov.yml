@@ -27,7 +27,7 @@ comment:
 
 # Test projects and test-only helpers do not count toward the number on the badge.
 ignore:
-  - "src/Flow.Grains.Tests/**"
-  - "src/Flow.Grains.Tests.Integration/**"
-  - "src/Flow.Grains.Tests.Utils/**"
-  - "src/Flow.Api.Tests/**"
+  - "src/Wayfinder.Grains.Tests/**"
+  - "src/Wayfinder.Grains.Tests.Integration/**"
+  - "src/Wayfinder.Grains.Tests.Utils/**"
+  - "src/Wayfinder.Api.Tests/**"

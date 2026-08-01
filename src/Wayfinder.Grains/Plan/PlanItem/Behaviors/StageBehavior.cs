@@ -1231,7 +1231,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
                     Host.RaiseEvent(new RepetitionRefusedWhileFailed
                     {
-                        RepeatingPlanItemDefinitionId = child.Id,
+                        RepeatingPlanItemId = child.Id,
                         SourceInstanceId = @event.PlanItemInstanceId,
                         AttemptedRepetition = @event.CurrentRepetition + 1
                     });
@@ -1610,7 +1610,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
                 Host.RaiseEvent(new RepetitionCeilingExceeded
                 {
-                    RepeatingPlanItemDefinitionId = child.Id,
+                    RepeatingPlanItemId = child.Id,
                     AttemptedRepetition = nextRepetition,
                     Ceiling = _repetitionCeiling
                 });

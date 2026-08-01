@@ -134,11 +134,16 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
         public async Task HandleChildRepeated__Given_HostStateFailed__Then_RefuseSpawnAndRaiseObservableEvent()
         {
             var address = ShortGuid.NewGuid();
-            var planItemDefinitionId = ShortGuid.NewGuid();
+            // The child PlanItem's own Id (not a PlanItemDefinition/DefinitionRef id) - it feeds
+            // both the fixture's PlanItem.Id and the event's SourceDefinitionId below, mirroring
+            // production (Host.DefinitionId => Definition.Id is that same own-id, per
+            // PlanItemGrain's IBehaviorHost.DefinitionId remarks), so RepetitionRefusedWhileFailed
+            // is expected to carry this same value back out as RepeatingPlanItemId.
+            var planItemId = ShortGuid.NewGuid();
             var sourceInstanceId = ShortGuid.NewGuid();
             const int currentRepetition = 4;
 
-            var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
+            var pi = new Interfaces.Model.PlanItem { Id = planItemId };
             var stage = new Stage { PlanItems = { pi } };
 
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Failed);
@@ -154,14 +159,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
 
             await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
-                address, sourceInstanceId, planItemDefinitionId, currentRepetition));
+                address, sourceInstanceId, planItemId, currentRepetition));
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<RepetitionBuffered>()), Times.Never);
 
             mockHost.Verify(x => x.RaiseEvent(It.Is<RepetitionRefusedWhileFailed>(e =>
-                e.RepeatingPlanItemDefinitionId == planItemDefinitionId &&
+                e.RepeatingPlanItemId == planItemId &&
                 e.SourceInstanceId == sourceInstanceId &&
                 e.AttemptedRepetition == currentRepetition + 1)), Times.Once);
 
@@ -395,7 +400,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.Is<RepetitionCeilingExceeded>(e =>
-                e.RepeatingPlanItemDefinitionId == planItemDefinitionId &&
+                e.RepeatingPlanItemId == planItemDefinitionId &&
                 e.AttemptedRepetition == ceiling &&
                 e.Ceiling == ceiling)), Times.Once);
 
