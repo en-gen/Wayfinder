@@ -275,13 +275,36 @@ held completion diagnosable from logs alone is asserted through the real DI-reso
 (#194's `FakeLoggerProvider`) and at the unit layer in
 `HandleChildTransitioned__Given_CompletionHeldForARepetition__…`.
 
-**Current state (branch `fix/198-live-repetition-predicate`).** 31 sample `.cmmn` files
+**#181 fix (branch `fix/181-subscribe-before-trigger`, 2026-08-01).** `StageBehavior.CreateChild`
+subscribed to a new child's streams *after* triggering it, so a non-blocking child's creation-turn
+publishes — including its repetition-0 `PlanItemRepetitionCriteriaMetEvent` — could reach a stream
+this parent had not subscribed to yet and be dropped with no redelivery, after which (since #198)
+the container held its own completion forever. Fixed by hoisting the subscribe above
+`DefineRepetition`/`Trigger(Create)`. Full write-up in the commit message and
+[#181](https://github.com/en-gen/Wayfinder/issues/181); it is also the root cause of #153.
+
+Honesty note on what this suite pins, per the rule above. Four conformance scenarios traverse the
+exposed shape (`Lifecycle_NonBlockingTaskAutoCompletes.cmmn` ×2,
+`Lifecycle_StageAllDiscretionaryAutoCompletes.cmmn`, `Discretionary_ItemExcluded.cmmn`), and they
+exercised it before this fix too — without ever depending on the dropped message, so their failure
+rate against this defect was zero, not merely low. (The ~1–2% figure quoted elsewhere is the
+cold-first-cascade wedge rate for the defect itself, not a detection rate for these four.) They
+still are not a guard: **no integration scenario in this suite
+detects this regression**, and none is claimed to. The deterministic guard is at the unit layer,
+`StageBehaviorTests_CreateChild_SubscribeOrdering.cs`, mutation-verified — reverting the hoist
+turns three of its four tests red (the fourth is partial-failure-retry coverage, orthogonal to the
+reorder by construction). What the integration suite contributes here is a *negative* result
+reported as such: repeated full runs post-fix with zero occurrences of the #153 signature.
+
+**Current state (branch `fix/181-subscribe-before-trigger`).** 31 sample `.cmmn` files
 under `Conformance/Samples/`; 41 scenarios (`CaseFileScenarios` 3, `InstantiationScenarios` 2,
 `KnownGapScenarios` 9, `LifecycleScenarios` 16, `SentryScenarios` 11) — **41 executed green, 0
 quarantined, 0 failing**. `KnownGapScenarios.cs` keeps its name and the quarantine machinery
 described in the honesty rule above; that file's own header remarks still narrate the ORIGINAL
 failure investigations (including FINDING-1) for historical context, and the scenario inside it
-that #198 had re-quarantined (`TaskRepetition__…`, above) is executing again. This COVERAGE.md
+that #198 had re-quarantined (`TaskRepetition__…`, above) is executing again. #181 added no sample
+and no scenario — its guard is at the unit layer — so these counts carry over from
+`fix/198-live-repetition-predicate` unchanged, re-verified on this branch. This COVERAGE.md
 file is the current-status source of truth; where its per-row Status column disagrees with prose
 elsewhere, the Status column wins.
 ## Engine findings discovered by this suite (details in the #21 report)
