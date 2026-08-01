@@ -64,6 +64,11 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var mockHost = new Mock<IBehaviorHost>();
             mockHost.Setup(x => x.Address)
                 .Returns(address);
+            // #178/#198 - this handler consults Host.State (the container-liveness switch, and the
+            // settle record the completion gate reads), so the fixture has to supply one; a real
+            // IBehaviorHost always does.
+            mockHost.Setup(x => x.State)
+                .Returns(testStore);
 
             var mockMachine = new MockPlanItemStateMachine(testStore);
 
@@ -108,6 +113,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
 
             var mockGrainFactory = new Mock<IGrainFactory>();
             mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))

@@ -77,7 +77,9 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 // see CasePlanModelBehavior's own Reactivate registration for the CASE-level
                 // counterpart of this same call (its Reactivate is overloaded across MULTIPLE
                 // source states by Table 8.6, so it needs a source-state guard rather than simply
-                // omitting the hook).
+                // omitting the hook). #198 - because those entries are never replayed here, they
+                // are settled where they are stranded (SettleStrandedPendingRepetitions), so this
+                // decision cannot leave a reactivated container unable to complete.
                 .OnEntryFromAsync(PlanItemTransition.Resume, DrainPendingRepetitions)
                 .OnEntryFromAsync(PlanItemTransition.ParentResume, DrainPendingRepetitions);
         }
@@ -296,7 +298,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // definitions of "complete".
             if (PlanItemDefinition.AutoComplete && !PlanItemDefinition.PlanItems.Any())
             {
-                await TryAutoComplete(await GetChildSnapshots());
+                await TryAutoComplete(await GetChildInstances());
             }
         }
 
@@ -577,7 +579,59 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 }
             }
 
-            var childSnapshots = await GetChildSnapshots();
+            // Table 8.12's automatic criteria (and the UserCompletable latch that shadows its
+            // manual branch) can only change their answer when a child reaches one of Table 8.12's
+            // OWN states - {Disabled, Completed, Terminated, Failed}, exactly PlanItemState.
+            // IsTerminal()'s set - so a non-terminal destination has nothing to evaluate. Every
+            // other route into TryCompleteStage is a repetition request being resolved
+            // (TryCompleteStageAfterRepetitionResolved), which changes the gate's answer without
+            // any child transitioning at all.
+            if (@event.Destination.IsTerminal())
+            {
+                // #198 - fetched once as (instance id, snapshot) pairs: the blocking predicate
+                // needs the child's INSTANCE id (its key into this Stage's own settled-request
+                // record), which a bare PlanItemSnapshot does not carry. See GetChildInstances.
+                await TryCompleteStage(await GetChildInstances());
+            }
+        }
+
+        // Table 8.12 - Stage instance termination criteria
+        // ~~~~~
+        // autoComplete = TRUE
+        // There are no Active children, AND all required (requiredRule evaluates to TRUE) children are
+        // in {Disabled, Completed, Terminated, Failed}.
+        //
+        // autoComplete = FALSE
+        // (There are no Active children AND all children are in {Disabled, Completed, Terminated, Failed}
+        // AND there are no DiscretionaryItems) OR (Manual Completion AND all required (requiredRule evaluates
+        // to TRUE) children are in { Disabled, Completed, Terminated, Failed}).
+        //
+        // These are two INDEPENDENT OR-branches, not one combined condition: Branch 1 (below)
+        // is the automatic path; Branch 2 ("Manual Completion") is NOT evaluated here at all - it
+        // is an explicitly-invoked action (an external Trigger(Complete) call), gated by Trigger's
+        // override below, and deliberately does not require non-required children to also be done.
+        //
+        // THE one place the automatic criteria are evaluated (#198 F1). It exists because the
+        // criteria now have two genuinely different triggers, and a second, divergent notion of
+        // "complete" at the seam between them is precisely how #198 happened in the first place:
+        //   - a child reaching a Table 8.12 state (HandleChildTransitioned above), and
+        //   - a repetition request being resolved (TryCompleteStageAfterRepetitionResolved below),
+        //     which needs no child transition at all and, in the shape that made this necessary,
+        //     never produces one: a spawned successor whose ManualActivationRule is TRUE lands
+        //     Enabled and simply sits there.
+        // TryAutoComplete stays factored out below because #180 calls it from a THIRD place
+        // (HandleEnterActiveFromStart's zero-PlanItems case) that must not evaluate the
+        // autoComplete=FALSE arm or the UserCompletable latch.
+        private async Task TryCompleteStage((string InstanceId, PlanItemSnapshot Snapshot)[] children)
+        {
+            var childSnapshots = children.Select(c => c.Snapshot).ToArray();
+
+            // Read twice below - by the UserCompletable latch and by Branch 1 - so evaluated once
+            // here. (TryAutoComplete evaluates its own; the predicate is pure and does no I/O, see
+            // RepetitionRequestsAwaitingResolution, so that costs nothing and keeps that method
+            // callable on its own from HandleEnterActiveFromStart.) Only the Warning is deferred,
+            // to the point where a completion was genuinely held.
+            var blocking = RepetitionRequestsAwaitingResolution(children);
 
             // Table 8.12 - UserCompletable (#68, D4 residual): the UI-facing observability twin
             // of ManualCompletionCriteriaSatisfied's autoComplete=FALSE arm below, not of the
@@ -596,64 +650,115 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // exactly that). Gating on !PlanItemDefinition.AutoComplete and dropping the
             // no-Active-children conjunct keeps this flag true only where the spec's Manual
             // Completion branch actually is.
+            //
+            // #198 F3 - and gated on the repetition gate too, silently (no Warning: this is not a
+            // completion attempt, so logging a "holding completion" line here would be false).
+            // Trigger below refuses a manual Complete while a repetition is owed, so latching this
+            // flag without consulting the same predicate advertises to the UI a Complete that would
+            // throw. The latch stays MONOTONIC either way - nothing ever clears it - so this only
+            // delays it; the delay ends the moment the request resolves, because
+            // TryCompleteStageAfterRepetitionResolved routes back through this same method. In the
+            // residual lost-message window (see Trigger's remarks) it never latches at all, which
+            // is exactly right: a Complete really is unavailable there.
             if (!PlanItemDefinition.AutoComplete &&
                 !Host.State.UserCompletable &&
                 StateMachine.CanFire(PlanItemTransition.Complete) &&
-                childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal()))
+                childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal()) &&
+                !blocking.Any())
             {
                 Host.RaiseEvent(new UserCompletableCriteriaMet());
             }
 
-            // Table 8.12 - Stage instance termination criteria
-            // ~~~~~
-            // autoComplete = TRUE
-            // There are no Active children, AND all required (requiredRule evaluates to TRUE) children are
-            // in {Disabled, Completed, Terminated, Failed}.
-            //
-            // autoComplete = FALSE
-            // (There are no Active children AND all children are in {Disabled, Completed, Terminated, Failed}
-            // AND there are no DiscretionaryItems) OR (Manual Completion AND all required (requiredRule evaluates
-            // to TRUE) children are in { Disabled, Completed, Terminated, Failed}).
-            //
-            // These are two INDEPENDENT OR-branches, not one combined condition: Branch 1 (below)
-            // is the automatic path this method evaluates on every child transition; Branch 2
-            // ("Manual Completion") is NOT evaluated here at all - it is an explicitly-invoked
-            // action (an external Trigger(Complete) call), gated by Trigger's override below,
-            // and deliberately does not require non-required children to also be done.
-            if (@event.Destination.IsTerminal())
+            if (PlanItemDefinition.AutoComplete)
             {
-                if (PlanItemDefinition.AutoComplete)
-                {
-                    await TryAutoComplete(childSnapshots);
-                }
-                // Branch 1: ...There are no Active children AND all children (not just required
-                // ones) are in {Disabled, Completed, Terminated, Failed} AND there are no
-                // DiscretionaryItems left that a Case worker could still plan. "No
-                // DiscretionaryItems" is a standalone structural condition - it must not depend on
-                // Host.State.UserCompletable (a latched UI hint related to Branch 2, a different
-                // OR-branch entirely); conflating the two here was the original bug: a stage whose
-                // PlanningTable's items were all already planned could only complete if the
-                // UserCompletable latch happened to be set, and (because .All() on an empty
-                // sequence is true) a PlanningTable with zero DiscretionaryItems demanded the same
-                // latch for no reason. NOTE the null-check IS still doing double duty as "no
-                // DiscretionaryItems": an absent PlanningTable and a present-but-fully-planned one
-                // are both correctly "none pending" - .All() covers the empty table too.
-                else
-                {
-                    var noDiscretionaryItemsPending =
-                        PlanItemDefinition.PlanningTable == null ||
-                        PlanItemDefinition.PlanningTable.DiscretionaryItems
-                            .All(di => childSnapshots.Any(snap => snap.Definition.Id == di.Id));
-
-                    if (childSnapshots.All(x => x.PlanItemState.IsTerminal()) &&
-                        noDiscretionaryItemsPending &&
-                        StateMachine.CanFire(PlanItemTransition.Complete))
-                    {
-                        Host.RaiseEvent(new FullyCompleteCriteriaMet());
-                        await StateMachine.FireAsync(PlanItemTransition.Complete);
-                    }
-                }
+                await TryAutoComplete(children);
+                return;
             }
+
+            // Branch 1: ...There are no Active children AND all children (not just required
+            // ones) are in {Disabled, Completed, Terminated, Failed} AND there are no
+            // DiscretionaryItems left that a Case worker could still plan. "No
+            // DiscretionaryItems" is a standalone structural condition - it must not depend on
+            // Host.State.UserCompletable (a latched UI hint related to Branch 2, a different
+            // OR-branch entirely); conflating the two here was the original bug: a stage whose
+            // PlanningTable's items were all already planned could only complete if the
+            // UserCompletable latch happened to be set, and (because .All() on an empty
+            // sequence is true) a PlanningTable with zero DiscretionaryItems demanded the same
+            // latch for no reason. NOTE the null-check IS still doing double duty as "no
+            // DiscretionaryItems": an absent PlanningTable and a present-but-fully-planned one
+            // are both correctly "none pending" - .All() covers the empty table too.
+            var noDiscretionaryItemsPending =
+                PlanItemDefinition.PlanningTable == null ||
+                PlanItemDefinition.PlanningTable.DiscretionaryItems
+                    .All(di => childSnapshots.Any(snap => snap.Definition.Id == di.Id));
+
+            if (childSnapshots.All(x => x.PlanItemState.IsTerminal()) &&
+                noDiscretionaryItemsPending &&
+                StateMachine.CanFire(PlanItemTransition.Complete))
+            {
+                // #198 - the repetition gate is checked LAST deliberately: it logs at Warning
+                // whenever it holds up a completion, and reaching it only once every other Table
+                // 8.12 term is already satisfied keeps that log to genuine "this Stage would have
+                // completed right now" events rather than one line per child transition of a Stage
+                // that was never close to completing.
+                if (blocking.Any())
+                {
+                    LogCompletionHeldForRepetition(blocking, "automatic (Table 8.12 autoComplete=FALSE, Branch 1)");
+                    return;
+                }
+
+                Host.RaiseEvent(new FullyCompleteCriteriaMet());
+                await StateMachine.FireAsync(PlanItemTransition.Complete);
+            }
+        }
+
+        // #198 F1 - the release half of the gate. RepetitionRequestsAwaitingResolution holds Table
+        // 8.12 completion while a request is outstanding; something has to re-open that decision
+        // once the request is resolved, and HandleChildTransitioned cannot: it only runs on a child
+        // transition, and resolving a request produces none that Table 8.12 reacts to. A successor
+        // spawned with a TRUE ManualActivationRule (8.6.2/Table 5.51's absence default) lands
+        // Enabled - neither Active nor terminal - so the container would satisfy Table 8.12 in full
+        // and sit Active forever, its one chance to notice already spent on the check the gate
+        // refused. Called from every path that resolves a request: HandleChildRepeated (all
+        // branches except #178's Suspended buffer, where the request is genuinely still pending)
+        // and the tail of DrainPendingRepetitions.
+        //
+        // Routes through TryCompleteStage rather than restating anything: there is exactly one
+        // definition of Table 8.12's automatic criteria and this is not a second one.
+        //
+        // REENTRANCY - both call sites are accounted for, and they are NOT the same:
+        //  - from HandleChildRepeated this runs in a stream-delivery turn, so the FireAsync(Complete)
+        //    inside TryCompleteStage runs to completion and BaseBehavior.HandleTransitioned's own
+        //    ConfirmEvents commits everything raised on the way.
+        //  - from DrainPendingRepetitions this runs inside an OnEntryFromAsync action of the
+        //    Resume/ParentResume/Reactivate transition still being dispatched, so that FireAsync is
+        //    REENTRANT: Stateless (FiringMode.Queued) only ENQUEUES it and drains the queue once the
+        //    outermost FireAsync unwinds - see DrainPendingRepetitions' own ceilingBreached remarks
+        //    for the same fact. That is fine and needs no ordering fix here (the queued Complete
+        //    still runs, still within this activation, and its HandleTransitioned still confirms),
+        //    but it is why the guard below reads Host.State.PlanItemState BEFORE the fire and never
+        //    after it: on that path Host.State does not advance within the turn.
+        private async Task TryCompleteStageAfterRepetitionResolved()
+        {
+            // Only an Active container can complete (Table 8.8: complete is Active->Completed).
+            // This is also what makes it safe to call this unconditionally from HandleChildRepeated:
+            // the terminal-container, Failed-container and unexpected-state branches all settle the
+            // request and then land here, and all of them are correctly no-ops.
+            if (Host.State.PlanItemState != PlanItemState.Active) return;
+
+            var children = await GetChildInstances();
+
+            // A container with no child instances at all cannot have produced the request that got
+            // us here, so this is an unreachable-in-production shape rather than a completion to
+            // evaluate. Guarded explicitly so Table 8.12's VACUOUS reading for a childless Stage
+            // stays where #180 deliberately put it - HandleEnterActiveFromStart, autoComplete=TRUE
+            // only - instead of leaking an autoComplete=FALSE vacuous auto-completion in through
+            // this back door (see Conformance/LifecycleScenarios.cs's
+            // StageCompletion__Given_NotAutoCompleteStageWithZeroPlanItems__… for the reading that
+            // would break).
+            if (!children.Any()) return;
+
+            await TryCompleteStage(children);
         }
 
         // Table 8.12 - Stage instance termination criteria, autoComplete = TRUE column:
@@ -661,15 +766,14 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // children are in {Disabled, Completed, Terminated, Failed}." Factored out of
         // HandleChildTransitioned (#180) so it has exactly one definition, called from two
         // places that must never be allowed to drift onto different notions of "complete":
-        //   - HandleChildTransitioned itself, reactively, on every terminal child transition
-        //     (the pre-existing path, only reachable once at least one child exists to
-        //     transition);
+        //   - TryCompleteStage above, i.e. every reactive evaluation - a terminal child
+        //     transition, or a repetition request being resolved (#198 F1);
         //   - HandleEnterActiveFromStart, once, for the zero-PlanItems case that would
         //     otherwise never produce a child transition to react to at all (see that method's
         //     remarks for why it is safe to call this from there).
-        // Takes the already-fetched snapshots rather than re-fetching: HandleChildTransitioned
-        // already has a live set for its own UserCompletable check just above; HandleEnterActive
-        // FromStart fetches its own (necessarily empty, in the only shape it calls this for).
+        // Takes the already-fetched snapshots rather than re-fetching: TryCompleteStage already
+        // has a live set for its own UserCompletable check; HandleEnterActiveFromStart fetches its
+        // own (necessarily empty, in the only shape it calls this for).
         //
         // Named Try*, not Evaluate* (unlike EvaluateManualActivationRule/EvaluateRequiredRule/
         // EvaluateRepetitionRule, this file's existing Evaluate* family - all side-effect-free
@@ -677,18 +781,127 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // transition when it holds, mirroring the file's own evaluate-and-act precedent,
         // BaseBehavior.TryRepeatOnCompleteOrTerminate. Calling it "Evaluate*" would read as a pure
         // query and risk a future caller assuming it is safe to call speculatively.
-        private async Task TryAutoComplete(PlanItemSnapshot[] childSnapshots)
+        private async Task TryAutoComplete((string InstanceId, PlanItemSnapshot Snapshot)[] children)
         {
             // ...There are no Active children
-            if (childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
+            if (children.All(x => x.Snapshot.PlanItemState != PlanItemState.Active) &&
                 // ... all required children are in {Disabled, Completed, Terminated, Failed}
-                childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal()) &&
+                children.Where(x => x.Snapshot.Required).All(x => x.Snapshot.PlanItemState.IsTerminal()) &&
                 StateMachine.CanFire(PlanItemTransition.Complete))
             {
+                // #198 - checked last deliberately; see the Branch-1 call site's remarks for why
+                // (the hold is logged at Warning, and only a completion actually held up is worth
+                // a line).
+                var blocking = RepetitionRequestsAwaitingResolution(children);
+                if (blocking.Any())
+                {
+                    LogCompletionHeldForRepetition(blocking, "automatic (Table 8.12 autoComplete=TRUE)");
+                    return;
+                }
+
                 Host.RaiseEvent(new AutoCompleteCriteriaMet());
                 await StateMachine.FireAsync(PlanItemTransition.Complete);
             }
         }
+
+        // #198 - the single definition of "a child has declared a repetition this container has
+        // not yet dealt with", evaluated on EVERY Table 8.12 completion path (TryAutoComplete
+        // above, TryCompleteStage's autoComplete=FALSE Branch 1 and its UserCompletable latch, and
+        // Trigger's manual branch below - which covers CasePlanModelBehavior too, since that class
+        // overrides only ManualCompletionCriteriaSatisfied and inherits this Trigger unchanged).
+        // Returns the blocking child INSTANCE ids, empty when nothing blocks.
+        //
+        // Pure and side-effect-free (no I/O, no logging, no events) - the Warning that makes a held
+        // completion diagnosable is LogCompletionHeldForRepetition below, raised by the callers
+        // that are genuinely refusing a completion, so the latch check can consult the same
+        // predicate without claiming a completion was held.
+        //
+        // 8.6.4 + Table 8.9: a child that has durably raised Repeated has determined a repetition -
+        // a successor instance that MUST exist. Completing this Stage over it drops that instance
+        // outright, and, once the request finally arrives, #178 correctly refuses to spawn into a
+        // now-terminal container - i.e. the repetition is lost silently, and (before #178) the
+        // spawn produced Table 8.9's <impossible> Completed-parent/Available-child cell. Blocking
+        // completion until the request is resolved is the only reading of Table 8.12 that keeps
+        // 8.6.4 and Table 8.9 simultaneously true.
+        //
+        // Three conjuncts:
+        //  1. IsTerminal() - so this predicate only ever adds a constraint for a child Table 8.12
+        //     would otherwise consider DONE; a still-live child is already handled by Table 8.12's
+        //     own terms and needs nothing from here. Note both repetition paths can land in this
+        //     conjunct's scope, which is why it is stated as a property of the CHILD rather than of
+        //     the path: the no-entry-criteria path (BaseBehavior.TryRepeatOnCompleteOrTerminate)
+        //     always raises Repeated on a child entering Completed/Terminated, and the
+        //     entry-criterion path raises it on a child that is still live for a Stage/Task
+        //     (StageBehavior/TaskBehavior.HandleSentrySatisfied, from Available/Active) but on an
+        //     already-Completed one for a Milestone (MilestoneBehavior.HandleSentrySatisfied's
+        //     IsTerminal() branch - a milestone repeats only AFTER it has occurred). A Milestone
+        //     therefore does block its container here, deliberately: 8.6.4 grants Milestones
+        //     repetition too, and a determined-but-unspawned milestone repetition is lost exactly
+        //     the same way.
+        //  2. Snapshot.Repeated - read from the child's OWN live, confirmed state via a direct
+        //     grain call (GetChildInstances), never from a stream. This is what makes the fix
+        //     race-free: PlanItemGrain is not [Reentrant], so a child's Complete/Terminate turn -
+        //     which raises and CONFIRMS Repeated in BaseBehavior.TryRepeatOnCompleteOrTerminate's
+        //     entry action before the turn ends - cannot be interleaved by this container's
+        //     GetSnapshot call. A child observable as terminal is therefore always already
+        //     observable as Repeated if it is going to repeat at all. Measured on this branch
+        //     before the fix was written: across 10 runs of the #198 shape, 42 parent-side reads,
+        //     a terminal child never once read back Repeated=false.
+        //  3. !IsRepetitionSettled - this container's own durable, monotonic record of having
+        //     spawned (ChildRepeated, #161) or definitively refused (RepetitionRequestSettled) the
+        //     request. Parent-local, so it cannot race the signal in (2).
+        //
+        // WHY (3) IS A JOURNALED RECORD RATHER THAN SOMETHING DERIVED from state already on hand.
+        // It is tempting to read it off StageStore.Children instead ("has a later repetition of the
+        // same PlanItem been created?"), and most of the refusing branches would indeed survive
+        // that: the Completed/Terminated/Closed refusal is unreachable by this predicate at all
+        // (those three states have no outgoing transition back to a Table 8.12 evaluation, so
+        // nothing would ever ask), and the #67 ceiling refusal is expressible as a
+        // `Snapshot.Repetition + 1 < ceiling` conjunct. Two things are NOT derivable, and they are
+        // the whole reason this set exists:
+        //  a. A FAILED container that is later Reactivated. The Failed branch of HandleChildRepeated
+        //     refuses without spawning, and neither this class (no Reactivate hook at all) nor
+        //     CasePlanModelBehavior (its hook is guarded to transition.Source == Suspended) replays
+        //     the request afterwards - both deliberately, see their constructors. So the container
+        //     comes back Active with a terminal, Repeated child and nothing anywhere in derivable
+        //     state saying "that one was already answered": it would block Complete forever.
+        //  b. Configuration is not durable, and this predicate must be. Deriving the ceiling case
+        //     would make a completion decision depend on the CURRENT value of
+        //     RepetitionGuardOptions.MaxRepetitionsPerPlanItem, so raising that limit between
+        //     deployments would resurrect a block on a request this container already refused under
+        //     the old limit - a case that completed fine yesterday stops completing after a config
+        //     change. A journaled record cannot do that: it says what this container DID, not what
+        //     its configuration currently implies.
+        // (The unrecognized-child branches settle too, but on their own they are a weak argument -
+        // they are defensive paths that should not be reachable in production.)
+        //
+        // Deliberately NOT gated on Required: losing a determined repetition is a defect whether
+        // or not the repeating item's requiredRule is TRUE. Table 8.12's Required term scopes which
+        // children must be FINISHED; it says nothing about a child that is finished but has already
+        // spawned an obligation the container has yet to honour.
+        private string[] RepetitionRequestsAwaitingResolution((string InstanceId, PlanItemSnapshot Snapshot)[] children) =>
+            children
+                .Where(x => x.Snapshot.PlanItemState.IsTerminal() &&
+                            x.Snapshot.Repeated &&
+                            !StageStore.IsRepetitionSettled(x.InstanceId))
+                .Select(x => x.InstanceId)
+                .ToArray();
+
+        // #198 - the diagnosability half of the escape hatch (see Trigger's remarks): a Stage that
+        // stops completing must be explainable from logs alone, naming exactly which child
+        // instances are responsible. Call ONLY from a path that is actually refusing a completion,
+        // and only once every other Table 8.12 term is already satisfied - otherwise this degrades
+        // into one line per child transition of a Stage that was never close to completing, and
+        // stops being a signal at all.
+        private void LogCompletionHeldForRepetition(string[] blocking, string completionPath) =>
+            Host.LogWithContext(logger => logger.LogWarning(
+                "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | holding {CompletionPath} completion - child instance(s) {BlockingInstanceIds} declared a repetition (8.6.4) this container has neither spawned nor refused; completing now would drop it (#198)",
+                Host.Definition.GetType().Name,
+                PlanItemDefinition.GetType().Name,
+                Host.Scope,
+                Host.InstanceId,
+                completionPath,
+                string.Join(", ", blocking)));
 
         // Table 8.12 - Stage instance termination criteria, evaluated LIVE at the moment of an
         // externally-invoked (manual) Complete - a Case worker completing a Stage by hand is
@@ -718,10 +931,17 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // under the old combined condition) and can overstate (a repetition spawning a NEW
         // required child after the latch would leave it stale-true). The latched event remains as
         // a UI hint; enforcement reads current state.
-        protected virtual async Task<bool> ManualCompletionCriteriaSatisfied()
+        //
+        // #198 - takes the caller's already-fetched snapshots and is synchronous now: Trigger
+        // below needs the SAME live read for its own repetition gate, and re-fetching every
+        // child's snapshot twice per manual Complete (once here, once there) would be pure waste
+        // and would let the two gates judge two different populations. Repetition blocking is NOT
+        // folded into this method: this one is Table 8.12's own criteria (overridden wholesale by
+        // CasePlanModelBehavior for the Case lifecycle's different completion rule, Table 8.5/8.6),
+        // whereas the repetition gate applies identically to both and must not be duplicated into
+        // - or accidentally dropped by - an override.
+        protected virtual bool ManualCompletionCriteriaSatisfied(PlanItemSnapshot[] childSnapshots)
         {
-            var childSnapshots = await GetChildSnapshots();
-
             var requiredChildrenTerminal = childSnapshots
                 .Where(x => x.Required)
                 .All(x => x.PlanItemState.IsTerminal());
@@ -736,32 +956,115 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // the existing silent unhandled-trigger no-op (BaseBehavior.HandleUnhandledTrigger), same
         // as every other invalid transition. When the machine is willing but Table 8.12 is not,
         // fail loudly: this is a rule violation at the public surface, not an idempotent replay.
+        //
+        // #198 - this method is also where the manual half of the repetition gate lives, for both
+        // an ordinary Stage and the CasePlanModel (which overrides only
+        // ManualCompletionCriteriaSatisfied and inherits this unchanged). ORDER MATTERS, and is
+        // deliberate: Table 8.12's own criteria are checked FIRST, so the message a caller gets for
+        // an ordinary "a required child is still Active" refusal is unchanged, and the repetition
+        // message is only ever produced when the repetition really is the sole remaining blocker.
+        //
+        // Escape hatch / why this cannot wedge a case with no operator recourse:
+        //  - ONLY Complete is gated. Terminate, Exit, Suspend, Close and (for the Case)
+        //    CaseGrain.Trigger's other transitions are untouched, so a Stage held here can always
+        //    still be terminated or the whole Case closed by a Case worker.
+        //  - The refusal names the specific blocking child instance ids, so it is actionable
+        //    rather than a generic "criteria not met" - and LogCompletionHeldForRepetition emits
+        //    the same detail at Warning, so it is diagnosable from logs alone.
+        //  - The block clears itself the moment the repetition request is resolved, and EVERY
+        //    branch of HandleChildRepeated/SpawnRepetitionOrRefuseCeiling resolves it: spawned
+        //    (ChildRepeated), ceiling-refused, refused into a terminal/Failed container, or
+        //    unrecognized child. The single branch that does NOT settle - #178's Suspended buffer -
+        //    is one where the request is genuinely still pending and blocking IS the correct
+        //    answer; it settles when DrainPendingRepetitions later spawns or ceiling-refuses it -
+        //    with ONE exception: DrainPendingRepetitions' own catch branch (a transient failure
+        //    while draining) deliberately leaves that entry buffered and UNSETTLED rather than
+        //    dropping or refusing it. Nothing re-drains it automatically; that child stays terminal
+        //    + Repeated + unsettled, holding Complete indefinitely, until another Suspend/Resume
+        //    cycle gives DrainPendingRepetitions a further attempt (or an operator falls back to
+        //    Terminate). See that catch branch's own remarks.
+        //  - Clearing it does not merely stop refusing a MANUAL Complete: resolution re-runs the
+        //    automatic criteria too (TryCompleteStageAfterRepetitionResolved), so a Stage that
+        //    would have auto-completed does so without needing a human at all.
+        //  - RESIDUAL WINDOW, stated honestly rather than hand-waved: a repetition request
+        //    published but never delivered to this container leaves the child blocking here. Two
+        //    sub-cases, and they do NOT have the same answer under the provider this engine is
+        //    actually configured with (Program.cs: AddMemoryStreams("Default") over an in-memory
+        //    PubSubStore, while grain journals are durable Azure Blob):
+        //      * Handler-level failure inside a live cluster - the pulling agent retries and
+        //        redelivers, which is precisely why the #161 redelivery guard exists at all. This
+        //        self-heals; the block clears when the retry lands.
+        //      * Loss of the queued message itself (silo restart, memory queue gone) - NOT
+        //        self-healing here. Memory streams are not durable, so no redelivery is coming,
+        //        and the child stays blocking. A durable stream provider would close this; that is
+        //        a deployment/transport decision, not something this class can assert on its own.
+        //    The failure mode is still strictly better than the defect it replaces: before this
+        //    fix, the same lost message meant the repetition silently never happened AND the Stage
+        //    completed anyway (silent data loss). Now it is a loud, named, logged refusal on a
+        //    Stage that is still Terminate-able. No engine-side "force complete" override exists
+        //    today - see docs/03-cmmn-execution-semantics.md for that open question.
         public override async Task Trigger(PlanItemTransition transition)
         {
             if (transition == PlanItemTransition.Complete &&
-                StateMachine.CanFire(PlanItemTransition.Complete) &&
-                !await ManualCompletionCriteriaSatisfied())
+                StateMachine.CanFire(PlanItemTransition.Complete))
             {
-                throw new InvalidOperationException(
-                    $"stage {Host.Scope}.{Host.InstanceId} does not satisfy Table 8.12's completion criteria: " +
-                    (PlanItemDefinition.AutoComplete
-                        ? "autoComplete=true requires no Active children and all required children terminal"
-                        : "manual completion requires all required children to be in {Disabled, Completed, Terminated, Failed}"));
+                var children = await GetChildInstances();
+
+                if (!ManualCompletionCriteriaSatisfied(children.Select(x => x.Snapshot).ToArray()))
+                {
+                    throw new InvalidOperationException(
+                        $"stage {Host.Scope}.{Host.InstanceId} does not satisfy Table 8.12's completion criteria: " +
+                        (PlanItemDefinition.AutoComplete
+                            ? "autoComplete=true requires no Active children and all required children terminal"
+                            : "manual completion requires all required children to be in {Disabled, Completed, Terminated, Failed}"));
+                }
+
+                var blocking = RepetitionRequestsAwaitingResolution(children);
+                if (blocking.Any())
+                {
+                    LogCompletionHeldForRepetition(blocking, "manual (Table 8.12 Manual Completion)");
+
+                    throw new InvalidOperationException(
+                        $"stage {Host.Scope}.{Host.InstanceId} cannot complete yet: child instance(s) " +
+                        $"{string.Join(", ", blocking)} declared a repetition (8.6.4) that this stage has " +
+                        "neither spawned nor refused. Completing now would drop that instance (#198). This " +
+                        "clears itself as soon as the repetition request is processed; Terminate/Exit are " +
+                        "not gated by it.");
+                }
             }
 
             await base.Trigger(transition);
         }
 
-        // Live snapshots of every child instance this stage has created (including repetitions) -
-        // the same set HandleChildTransitioned's automatic criteria evaluate, reused by the
-        // manual-completion gate so both Table 8.12 paths judge the same population.
-        protected async Task<PlanItemSnapshot[]> GetChildSnapshots() =>
-            await Task.WhenAll(StageStore.Children
+        // Live snapshots of every child instance this stage has created (including repetitions),
+        // paired with the instance id they were fetched by - the same set HandleChildTransitioned's
+        // automatic criteria evaluate, reused by the manual-completion gate so both Table 8.12
+        // paths judge the same population.
+        //
+        // #198 - returns pairs rather than bare snapshots because the instance id is this Stage's
+        // key into its OWN settled-repetition-request record (StageBehaviorStore.
+        // IsRepetitionSettled) and PlanItemSnapshot carries no instance id. Chosen over adding an
+        // InstanceId field to PlanItemSnapshot: the id is already in hand here (it is the very key
+        // being iterated), so pairing is free, whereas widening the snapshot would change a
+        // serialized public contract that flows out through IPlanItemGrain/ICaseGrain to the API
+        // and every test double that constructs one, to serve a need that exists only inside this
+        // class.
+        private async Task<(string InstanceId, PlanItemSnapshot Snapshot)[]> GetChildInstances()
+        {
+            var instanceIds = StageStore.Children
                 .SelectMany(kvp => kvp.Value.Keys)
+                .ToArray();
+
+            var snapshots = await Task.WhenAll(instanceIds
                 .Select(piInstanceId => Host.GrainFactory.GetGrain<IPlanItemInternalGrain>(
                         Host.CaseInstanceId,
                         $"{Host.Address}.{piInstanceId}")
                     .GetSnapshot()));
+
+            return instanceIds
+                .Zip(snapshots, (instanceId, snapshot) => (InstanceId: instanceId, Snapshot: snapshot))
+                .ToArray();
+        }
 
         // #178 - StageBehavior.HandleChildRepeated never used to consult Host.State.PlanItemState
         // at all before this fix: it acted on ANY PlanItemRepetitionCriteriaMetEvent scoped to
@@ -777,6 +1080,27 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // ignore events that are not direct children of this stage
             if (@event.SourceScope != Host.Address) return;
 
+            // #198 F1 - resolving a request changes the answer to Table 8.12's completion criteria
+            // without any child transitioning, so the check HandleChildTransitioned would have run
+            // has to be re-run here. Deliberately covers EVERY resolving branch below, including
+            // the #161 redelivery early-return: a handler that died between confirming
+            // CreateChild/ChildRepeated and re-evaluating completion is exactly the case the
+            // stream agent's retry-then-redeliver exists to recover, and returning early on the
+            // redelivery without re-evaluating would strand that recovery.
+            if (await ResolveRepetitionRequest(@event))
+            {
+                await TryCompleteStageAfterRepetitionResolved();
+            }
+        }
+
+        // The body of HandleChildRepeated: decide what this container does with one repetition
+        // request. Returns TRUE when the request is no longer pending on this container (spawned,
+        // or definitively refused, or already answered by an earlier delivery) and FALSE for the
+        // single branch that leaves it genuinely outstanding - #178's Suspended buffer, where
+        // holding Table 8.12 completion is still the correct answer and re-evaluating it would be
+        // wrong.
+        private async Task<bool> ResolveRepetitionRequest(PlanItemRepetitionCriteriaMetEvent @event)
+        {
             var child = PlanItemDefinition.PlanItems
                 .SingleOrDefault(pi => pi.Id == @event.SourceDefinitionId);
 
@@ -789,7 +1113,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     Host.Scope,
                     Host.InstanceId,
                     @event.SourceDefinitionId));
-                return;
+
+                // #198 - a request this container cannot even identify will never be acted on, so
+                // it must not hold up Table 8.12 completion forever. Settled, not silently dropped.
+                await SettleRepetitionRequest(@event.PlanItemInstanceId, "unknown child definition");
+                return true;
             }
 
             // #161 - Orleans streams are at-least-once; a redelivered
@@ -817,7 +1145,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     Host.Scope,
                     Host.InstanceId,
                     @event.PlanItemInstanceId));
-                return;
+                return true;
             }
 
             // #178 - branch on what THIS Host's own state actually is before ever reaching the
@@ -841,7 +1169,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     // once this Stage returns to Active (DrainPendingRepetitions, hooked to
                     // Resume/ParentResume in the constructor above).
                     await BufferPendingRepetition(child, @event);
-                    return;
+                    return false;
 
                 case PlanItemState.Completed:
                 case PlanItemState.Terminated:
@@ -849,11 +1177,14 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     // docs/03-cmmn-execution-semantics.md section 3 / Table 8.9: a terminating
                     // Stage drives every non-terminal child to Terminated via exit BEFORE it,
                     // itself, ever reaches a terminal state - so nothing live can remain inside a
-                    // terminal container to legitimately request a repetition. Refuse; no new
-                    // domain event beyond this log line - unlike Suspended (which preserves real,
+                    // terminal container to legitimately request a repetition. Refuse; no AUDIT
+                    // event beyond this log line - unlike Suspended (which preserves real,
                     // earned-but-undelivered work) or Failed (a human-recoverable state where a
                     // silent refusal could be mistaken for "nothing happened"), there is no
                     // legitimate "earned-before" story to flag for a genuinely terminal container.
+                    // (#198 added ONE journaled event here, RepetitionRequestSettled below - but
+                    // that is bookkeeping the completion gate reads, not an audit record of the
+                    // refusal, which is still just this log line.)
                     Host.LogWithContext(logger => logger.LogWarning(
                         "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | refusing repetition of {ChildElementDefinitionId} - this container is {ContainerState} and cannot spawn new children (#178)",
                         Host.Definition.GetType().Name,
@@ -862,7 +1193,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         Host.InstanceId,
                         child.Id,
                         Host.State.PlanItemState));
-                    return;
+
+                    // #198 - refused, and no successor is ever coming (this container is terminal,
+                    // and Table 8.9 has already driven every live child out of it). Record that so
+                    // the blocking predicate stops holding the request against a completion that
+                    // has, in these three states, already happened - and cannot be re-attempted.
+                    await SettleRepetitionRequest(@event.PlanItemInstanceId, $"container is {Host.State.PlanItemState}");
+                    return true;
 
                 case PlanItemState.Failed:
                     // Semi-terminal and re-activatable (Reactivate -> Active), so not
@@ -898,8 +1235,21 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         SourceInstanceId = @event.PlanItemInstanceId,
                         AttemptedRepetition = @event.CurrentRepetition + 1
                     });
+
+                    // #198 - stop holding Table 8.12 completion for this request (see
+                    // RepetitionRequestsAwaitingResolution; this exact branch - a Failed container
+                    // that is later Reactivated - is reason (a) there for why the record is
+                    // journaled rather than derived). Raised alongside RepetitionRefusedWhileFailed
+                    // rather than instead of it: that event is the human-facing audit record of WHY,
+                    // this one is the machine-readable "stop blocking completion on it".
+                    Host.RaiseEvent(new RepetitionRequestSettled
+                    {
+                        SourceInstanceId = @event.PlanItemInstanceId,
+                        Reason = "container has Failed"
+                    });
+
                     await Host.ConfirmEvents();
-                    return;
+                    return true;
 
                 default:
                     // Available/Enabled/Disabled/Uninitialized: this Host has no children at all
@@ -915,13 +1265,41 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         Host.InstanceId,
                         child.Id,
                         Host.State.PlanItemState));
-                    return;
+
+                    // #198 - same reasoning as the unknown-child branch above: refused with no
+                    // successor coming, so it must not block completion indefinitely.
+                    await SettleRepetitionRequest(@event.PlanItemInstanceId, $"unexpected container state {Host.State.PlanItemState}");
+                    return true;
             }
 
-            // Return value (ceiling breached or not) is irrelevant here - this is a single-shot
-            // event handler, not a loop that needs to decide whether to keep going. Only
-            // DrainPendingRepetitions below consumes it.
+            // SpawnRepetitionOrRefuseCeiling's own return value (ceiling breached or not) is
+            // irrelevant here - this is a single-shot event handler, not a loop that needs to decide
+            // whether to keep going; only DrainPendingRepetitions below consumes it. EITHER outcome
+            // resolves the request (spawned, or ceiling-refused and settled), hence the unconditional
+            // true.
             await SpawnRepetitionOrRefuseCeiling(child, @event.PlanItemInstanceId, @event.CurrentRepetition + 1);
+            return true;
+        }
+
+        // #198 - shared write side of the "this container has definitively dealt with that
+        // repetition request" record, for the branches that refuse with nothing further to come.
+        // The SPAWNED path does not go through here: ChildRepeated (#161) already carries the same
+        // SourceInstanceId and StageBehaviorStore.Apply(ChildRepeated) settles from it, so adding a
+        // second event there would journal the same fact twice.
+        //
+        // Confirms immediately, Bug #61 discipline: every call site returns straight afterwards, so
+        // there is no later confirm for this raise to ride on and an unconfirmed settle would be
+        // lost on deactivation - re-blocking a completion whose request was already refused, which
+        // is exactly the wedge this record exists to prevent.
+        private Task SettleRepetitionRequest(string sourceInstanceId, string reason)
+        {
+            Host.RaiseEvent(new RepetitionRequestSettled
+            {
+                SourceInstanceId = sourceInstanceId,
+                Reason = reason
+            });
+
+            return Host.ConfirmEvents();
         }
 
         // #178 - write side of the Suspended buffer (see HandleChildRepeated's Suspended branch).
@@ -983,6 +1361,8 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // re-reading Host.State (see its remarks for why a re-read would not even catch it).
         protected async Task DrainPendingRepetitions()
         {
+            var faultedMidDrain = false;
+
             // Snapshot: PendingRepetitions is mutated (entries removed) as this loop progresses -
             // iterate a stable copy, not the live collection.
             foreach (var pending in StageStore.PendingRepetitions.ToList())
@@ -1034,6 +1414,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                             Host.Scope,
                             Host.InstanceId,
                             pending.PlanItemDefinitionId));
+
+                        // #198 - dropped means definitively refused: nothing will ever spawn for
+                        // it, so it must not keep blocking Table 8.12 completion. Confirmed below
+                        // together with this entry's RepetitionBufferDrained.
+                        Host.RaiseEvent(new RepetitionRequestSettled
+                        {
+                            SourceInstanceId = pending.SourceInstanceId,
+                            Reason = "buffered request references an unknown child definition"
+                        });
                     }
                     else
                     {
@@ -1067,7 +1456,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     // relying on it would let a SECOND buffered entry spawn (or hit its own,
                     // redundant ceiling refusal) into what is effectively already a faulted
                     // container within the very same drain pass.
-                    if (ceilingBreached) break;
+                    if (ceilingBreached)
+                    {
+                        faultedMidDrain = true;
+                        break;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1085,6 +1478,14 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     // failure (e.g. a timeout) spawning one buffered request must not permanently
                     // strand every other request queued behind it, nor silently swallow the fact
                     // that this one needs another attempt later.
+                    //
+                    // Note this branch is the exception to Trigger's doc comment claim that every
+                    // buffered request eventually settles: this entry stays buffered and UNSETTLED,
+                    // and nothing re-invokes DrainPendingRepetitions for it on its own - only a
+                    // future Suspend/Resume cycle gives it another attempt. With #198's gate in
+                    // place, the owning child stays terminal + Repeated + unsettled and holds
+                    // Complete indefinitely in the meantime; recourse is Terminate or a manual
+                    // Suspend/Resume.
                     Host.LogWithContext(logger => logger.LogError(ex,
                         "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | draining buffered repetition request from source instance {SourceInstanceId} threw - leaving it buffered for a future drain attempt",
                         Host.Definition.GetType().Name,
@@ -1094,6 +1495,70 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                         pending.SourceInstanceId));
                 }
             }
+
+            if (faultedMidDrain)
+            {
+                await SettleStrandedPendingRepetitions();
+                return;
+            }
+
+            // #198 F1 - the drain has just resolved (spawned, or ceiling-refused) every entry it
+            // touched, and resolving a request re-opens Table 8.12 exactly as it does on the live
+            // path. Skipped entirely on the ceiling-breach path above: there the container is
+            // semantically already Faulted, and Host.State.PlanItemState is not yet a reliable
+            // witness of that (see the ceilingBreached remarks in the loop), so evaluating
+            // completion here could journal an AutoComplete/FullyComplete criteria event and
+            // enqueue a Complete behind the Fault the same pass already fired.
+            await TryCompleteStageAfterRepetitionResolved();
+        }
+
+        // #198 F2 - the #67 ceiling Faulting this Host mid-drain strands every entry queued behind
+        // the one that breached it (the `break` above, deliberately - see its remarks). Those
+        // entries are never replayed: neither this class (no Reactivate hook at all) nor
+        // CasePlanModelBehavior (its hook is guarded to transition.Source == Suspended) drains on a
+        // Failed->Reactivate recovery, both by design, because replaying them would immediately
+        // re-fault the container. So after a human reactivates, their requesting children are still
+        // terminal + Repeated + unsettled, and RepetitionRequestsAwaitingResolution would hold
+        // Complete on the recovered container FOREVER - a wedge with no recourse but Terminate,
+        // which is the one outcome this whole design exists to avoid.
+        //
+        // Settle them, so they stop holding completion. Deliberately settle ONLY - the entries stay
+        // buffered, untouched and unattempted, exactly as the `break` left them: this method's job
+        // is to stop the wedge, not to decide that a request queued behind an unrelated ceiling
+        // breach may never be spawned. If a later Suspend/Resume cycle does drain one and it
+        // spawns, ChildRepeated settles it again (the set is monotonic, so that is a no-op) - which
+        // is why RepetitionRequestSettled is documented as "this container is no longer holding
+        // Table 8.12 completion for this request" rather than the stronger "no successor can ever
+        // appear".
+        private async Task SettleStrandedPendingRepetitions()
+        {
+            var stranded = StageStore.PendingRepetitions
+                .Where(pending => !StageStore.IsRepetitionSettled(pending.SourceInstanceId))
+                .ToList();
+
+            if (!stranded.Any()) return;
+
+            foreach (var pending in stranded)
+            {
+                Host.LogWithContext(logger => logger.LogWarning(
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | buffered repetition request from source instance {SourceInstanceId} was stranded by a #67 ceiling breach earlier in this drain - it stays buffered but is settled, so it cannot hold Table 8.12 completion once this container is reactivated (#198)",
+                    Host.Definition.GetType().Name,
+                    PlanItemDefinition.GetType().Name,
+                    Host.Scope,
+                    Host.InstanceId,
+                    pending.SourceInstanceId));
+
+                Host.RaiseEvent(new RepetitionRequestSettled
+                {
+                    SourceInstanceId = pending.SourceInstanceId,
+                    Reason = "stranded by a #67 ceiling breach earlier in the same drain"
+                });
+            }
+
+            // Bug #61 discipline, as everywhere else in this class: this batch has no later confirm
+            // to ride on (the caller returns immediately), and an unconfirmed settle would be lost
+            // on deactivation - re-opening the very wedge it exists to close.
+            await Host.ConfirmEvents();
         }
 
         // Shared tail of the live (HandleChildRepeated, Active) and replayed (DrainPendingRepetitions,
@@ -1148,6 +1613,21 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                     RepeatingPlanItemDefinitionId = child.Id,
                     AttemptedRepetition = nextRepetition,
                     Ceiling = _repetitionCeiling
+                });
+
+                // #198 - stop holding Table 8.12 completion for this request (see
+                // RepetitionRequestsAwaitingResolution). Note this branch still does NOT record the
+                // #161 redelivery guard - the two records mean different things, per the scope note
+                // just above.
+                //
+                // Raised, not raised-and-confirmed via SettleRepetitionRequest: this branch does
+                // not return immediately, and whichever of the two paths below runs confirms
+                // everything queued here along with RepetitionCeilingExceeded (see the long note
+                // in the CanFire branch on WHO commits on which call path).
+                Host.RaiseEvent(new RepetitionRequestSettled
+                {
+                    SourceInstanceId = sourceInstanceId,
+                    Reason = $"#67 repetition ceiling {_repetitionCeiling} reached"
                 });
 
                 if (StateMachine.CanFire(PlanItemTransition.Fault))

@@ -7,7 +7,11 @@
   administrator, or by Case worker (human) when the source of the failure has been resolved", and
   "terminate: [Active -> Terminated] Transition by Case worker (human) decision". TaskA
   auto-starts (explicit FALSE ManualActivationRule) so each scenario picks up at Active.
-  autoComplete=false keeps the Case Active around TaskA's excursions.
+  autoComplete=false does NOT keep the Case Active around TaskA's excursions: Table 8.12
+  Branch 1 (autoComplete=FALSE) only requires TaskA - the sole required child - to be
+  terminal, so a lone Failed TaskA alone completes the Case immediately (confirmed 40/40
+  on unmodified develop). It is Reactivate that returns TaskA, and with it the Case, to
+  Active for the next excursion.
 -->
 <definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
              targetNamespace="http://wayfinder/conformance/lifecycle-task-fault-reactivate"

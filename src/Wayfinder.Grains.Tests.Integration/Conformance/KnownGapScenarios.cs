@@ -133,30 +133,28 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
         // PlanItemRepetitionCriteriaMetEvent when TRUE. Verified green on develop@cbd66d7 - at
         // the time, no longer a known gap.
         //
-        // RE-QUARANTINED (#198, discovered investigating #178's own KnownGap conflict): this
-        // scenario's OWN assertion never checked the CasePlanModel's state, only
+        // RE-QUARANTINED (#198, discovered investigating #178's own KnownGap conflict), then
+        // UN-QUARANTINED once #198 landed. History, because it explains why this scenario is
+        // worded the way it is: its OWN assertion never checked the CasePlanModel's state, only
         // instances == 2 - so it stayed green on develop across a race it never observed.
         // SourceTask's completion does TWO things concurrently, on two separate, unordered
         // streams: (1) BaseBehavior.TryRepeatOnCompleteOrTerminate raises Repeated and publishes
         // PlanItemRepetitionCriteriaMetEvent (the repetition request), and (2)
         // StageBehavior.HandleChildTransitioned evaluates Table 8.12's completion criteria over
-        // the CURRENT child snapshots. On develop these are not ordered against each other, so
-        // roughly 40% of runs saw the CasePlanModel's completion check run BEFORE the repetition
-        // request was delivered/applied - completing the case over what was, a moment later, an
-        // Active child: Table 8.9's own <impossible> cell, silently produced and never asserted
-        // against by this test. The #178 fix (StageBehavior.HandleChildRepeated now consulting
-        // Host.State.PlanItemState) correctly REFUSES the late spawn once that race is lost,
-        // which converts the previously-invisible violation into a visible ~25% flake here: this
-        // assertion now depends on winning a race the engine does not order, roughly matching the
-        // original ~40%/~60% split observed on develop. The underlying defect belongs at the
-        // Table 8.12 completion-evaluation seam (the two streams need to be ordered, or
-        // completion needs to await in-flight repetition requests) - it is NOT this scenario's
-        // job, and NOT #178's, to fix; #178 only made the pre-existing hazard observable. Do not
-        // unskip until #198 lands; a passing unskipped run afterward should still be treated with
-        // suspicion until re-verified across enough iterations to rule out having simply won the
-        // race - see docs/03-cmmn-execution-semantics.md's §8 implementation note, extended for
-        // this same finding.
-        [Fact(Skip = "#198 - StageBehavior.HandleChildTransitioned's Table 8.12 completion check races BaseBehavior.TryRepeatOnCompleteOrTerminate's repetition publish (separate, unordered streams); on develop this silently completed the CasePlanModel over an Active child (Table 8.9 <impossible>) ~40% of runs, and #178's correct refusal of the resulting late spawn converts that into a ~25% assertion flake here. See #198.")]
+        // the CURRENT child snapshots. Those were not ordered against each other, so roughly half
+        // of runs saw the CasePlanModel's completion check run BEFORE the repetition request was
+        // delivered - completing the case over what should have been a live child: Table 8.9's own
+        // <impossible> cell, silently produced and never asserted against by this test. #178's
+        // refusal of the resulting late spawn converted that invisible violation into a visible
+        // flake here.
+        //
+        // #198's fix does NOT order the two streams - it judges from the repeating child's own
+        // live state instead (StageBehavior.RepetitionRequestsAwaitingResolution): a terminal
+        // child whose snapshot says Repeated holds up its container's Table 8.12 completion until
+        // the container has durably spawned or refused the successor. That makes this scenario
+        // deterministic rather than lucky - the CasePlanModel simply cannot complete in the gap
+        // any more. See docs/03-cmmn-execution-semantics.md's §8 implementation note.
+        [Fact]
         [ConformanceCitation("8.6.4 / repeat-on-complete for no-entry-criteria items (D7)")]
         [ConformanceCitation("Table 8.8 / complete - RepetitionRule re-evaluation clause")]
         public async Task TaskRepetition__Given_RepetitionRuleAndNoEntryCriteria__Then_CompletionSpawnsNewInstance()

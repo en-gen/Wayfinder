@@ -202,6 +202,18 @@ namespace Wayfinder.Grains.Plan.PlanItem
             }
         }
 
+        // #198 - same delegation shape as Apply(ChildRepeated)/Apply(RepetitionBuffered) above:
+        // the settled-repetition-request record lives on the nested StageBehaviorStore, not here.
+        public void Apply(RepetitionRequestSettled @event)
+        {
+            Updated = @event.Updated;
+
+            if (BehaviorExtension is StageBehaviorStore stageStore)
+            {
+                stageStore.Apply(@event);
+            }
+        }
+
         public void Apply(TimerStartTriggerOccurred @event)
         {
             Updated = @event.Updated;

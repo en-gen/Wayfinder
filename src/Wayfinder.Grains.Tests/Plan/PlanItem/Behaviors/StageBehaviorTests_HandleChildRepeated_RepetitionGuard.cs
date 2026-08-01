@@ -118,6 +118,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
 
             var mockGrainFactory = new Mock<IGrainFactory>();
             mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
@@ -192,6 +193,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
 
             var mockGrainFactory = new Mock<IGrainFactory>();
             mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
@@ -263,6 +265,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
 
             var mockGrainFactory = new Mock<IGrainFactory>();
             mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
@@ -346,6 +349,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
             mockPlanItemGrain.SetupSequence(x => x.Trigger(PlanItemTransition.Create))
                 .ThrowsAsync(new InvalidOperationException("transient failure"))
                 .ReturnsAsync((PlanItemSnapshot)null);

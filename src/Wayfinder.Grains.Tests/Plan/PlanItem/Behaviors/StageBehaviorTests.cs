@@ -6,6 +6,7 @@ using Wayfinder.Grains.Executables;
 using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
 using Wayfinder.Grains.Plan;
 using Wayfinder.Grains.Plan.PlanItem;
 using Wayfinder.Grains.Plan.PlanItem.Behaviors;
@@ -23,6 +24,22 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 {
     public partial class StageBehaviorTests
     {
+        // #198 F1 - resolving a repetition request now re-evaluates Table 8.12 over EVERY child
+        // instance of the container (StageBehavior.TryCompleteStageAfterRepetitionResolved), so a
+        // scenario that actually spawns a child needs that child's grain to answer GetSnapshot;
+        // Moq's loose default (a Task<PlanItemSnapshot> completing with null) is not a state any
+        // real PlanItemGrain can be in. Available is what a freshly created repetition genuinely is
+        // at that moment - CreateChild's Trigger(Create) lands it there before this returns - and,
+        // being neither Active nor terminal, it leaves the container exactly where each of these
+        // scenarios asserts it should be.
+        private static void StubFreshlySpawnedChildSnapshot(Mock<IPlanItemInternalGrain> mockChildGrain) =>
+            mockChildGrain.Setup(x => x.GetSnapshot())
+                .ReturnsAsync(new PlanItemSnapshot
+                {
+                    Definition = new Interfaces.Model.PlanItem(),
+                    PlanItemState = PlanItemState.Available
+                });
+
         [Fact]
         public void Ctor__Given_HostDefMachine__Then_ConfigureMachine()
         {

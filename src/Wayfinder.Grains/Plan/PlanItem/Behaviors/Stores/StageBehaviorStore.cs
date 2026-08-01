@@ -49,6 +49,50 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
         public bool IsRepetitionRedelivery(string sourceInstanceId) =>
             sourceInstanceId != null && _repetitionSourceInstanceIds.Contains(sourceInstanceId);
 
+        // #198 - "this container is no longer holding Table 8.12 completion for that child's
+        // repetition request", the third conjunct of StageBehavior.
+        // RepetitionRequestsAwaitingResolution's blocking predicate - see that method for the full
+        // design argument, including why this has to be a journaled record rather than something
+        // derived from Children plus the configured ceiling.
+        //
+        // Keyed on the same requesting-child instance id as _repetitionSourceInstanceIds above, and
+        // monotonic for the same reason (a source instance requests exactly one repetition in its
+        // lifetime), but a SEPARATE set - not an alias of the #161 redelivery guard - on purpose:
+        // that guard means specifically "a child HAS ALREADY BEEN SPAWNED for this request" and
+        // StageBehavior.HandleChildRepeated returns early on it, so folding the refusal branches
+        // into it would silently convert their documented redelivery behaviour (re-log the refusal;
+        // re-raise RepetitionCeilingExceeded and re-attempt Fault - see
+        // SpawnRepetitionOrRefuseCeiling's own #161 scope note) into a no-op.
+        //
+        // Populated from TWO parent-LOCAL sources, never from anything that travels on a stream:
+        // Apply(ChildRepeated) (spawned - the successor exists) and Apply(RepetitionRequestSettled)
+        // (refused, or stranded by a mid-drain ceiling fault). That asymmetry is the whole design of
+        // the #198 fix: the BLOCKING signal is the child's own live, durable state (fetched by
+        // direct grain call in StageBehavior.GetChildInstances, so it can never be lost or
+        // reordered), while the CLEARING signal is produced by this container itself, locally, and
+        // so can never race against it.
+        //
+        // Same unbounded growth as _repetitionSourceInstanceIds/Children, accepted for the same
+        // reason: pruning an entry would let its child start blocking completion again forever.
+        [Id(3)]
+        private readonly ICollection<string> _settledRepetitionSourceInstanceIds = new HashSet<string>();
+
+        public bool IsRepetitionSettled(string sourceInstanceId) =>
+            sourceInstanceId != null && _settledRepetitionSourceInstanceIds.Contains(sourceInstanceId);
+
+        // #198 - see IsRepetitionSettled above. Journaled by every refusing branch of
+        // StageBehavior.HandleChildRepeated / SpawnRepetitionOrRefuseCeiling / the
+        // DrainPendingRepetitions unknown-child drop, and by SettleStrandedPendingRepetitions; NOT
+        // by the Suspended-buffered branch, whose request is still genuinely pending and MUST keep
+        // blocking completion until the drain resolves it.
+        public void Apply(RepetitionRequestSettled @event)
+        {
+            if (@event.SourceInstanceId != null)
+            {
+                _settledRepetitionSourceInstanceIds.Add(@event.SourceInstanceId);
+            }
+        }
+
         // #178 - repetition requests observed while this Host was genuinely Suspended, queued for
         // replay once it returns to Active (StageBehavior.DrainPendingRepetitions). A List (not a
         // Dictionary) so drain order is FIFO by arrival, matching the order the corresponding
@@ -116,6 +160,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors.Stores
             if (@event.SourceInstanceId != null)
             {
                 _repetitionSourceInstanceIds.Add(@event.SourceInstanceId);
+
+                // #198 - a spawned successor settles the request too, and needs no event of its
+                // own: this is the ONE branch that already journals a durable, confirmed record
+                // (this event) at exactly the right moment. Recorded into the separate settled set
+                // rather than having IsRepetitionSettled read the #161 set as well, so the two
+                // meanings stay distinguishable in code and only THIS method ever writes both.
+                _settledRepetitionSourceInstanceIds.Add(@event.SourceInstanceId);
             }
         }
     }

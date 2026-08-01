@@ -54,20 +54,23 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         }
 
         // #198 (found running the #178 verification suite at scale - not part of the original D7
-        // scenario) - this test's own case shape is EXACTLY the #198 race's shape: a single
-        // no-entry-criteria repeating child under a CasePlanModel that defaults AutoComplete to
-        // FALSE (never set here). Completing rep 0 both (1) re-evaluates its RepetitionRule and
-        // publishes PlanItemRepetitionCriteriaMetEvent (BaseBehavior.TryRepeatOnCompleteOrTerminate)
-        // and (2) triggers the parent's Table 8.12 completion check
-        // (StageBehavior.HandleChildTransitioned) - on two separate, unordered streams. With this
-        // Stage's only child now terminal and no PlanningTable, autoComplete=FALSE's Branch 1 is
-        // satisfied, so the CasePlanModel can legitimately complete before rep 1's repetition
-        // request is delivered - and once #178 correctly refuses a late spawn into an
-        // already-Completed container, the rep1Grain poll below times out. Quarantined rather
-        // than fixed, exactly like KnownGapScenarios.TaskRepetition__… in the Conformance suite
-        // (same underlying defect, different sample): #198 belongs at the Table 8.12
-        // completion-evaluation seam, not here and not in #178.
-        [Fact(Skip = "#198 - this case's CasePlanModel (AutoComplete defaults to false, one no-entry-criteria repeating child) races StageBehavior.HandleChildTransitioned's Table 8.12 completion check against the child's own repetition publish on two separate, unordered streams - the CasePlanModel can legitimately complete before the repetition request is delivered, and #178's correct refusal of the resulting late spawn then times out the rep1Grain poll below. Same root cause as KnownGapScenarios.TaskRepetition__… in the Conformance suite. See #198.")]
+        // scenario), quarantined then restored once #198 landed - this test's own case shape is
+        // EXACTLY the #198 race's shape: a single no-entry-criteria repeating child under a
+        // CasePlanModel that defaults AutoComplete to FALSE (never set here). Completing rep 0
+        // both (1) re-evaluates its RepetitionRule and publishes PlanItemRepetitionCriteriaMetEvent
+        // (BaseBehavior.TryRepeatOnCompleteOrTerminate) and (2) triggers the parent's Table 8.12
+        // completion check (StageBehavior.HandleChildTransitioned) - on two separate, unordered
+        // streams. With this Stage's only child now terminal and no PlanningTable,
+        // autoComplete=FALSE's Branch 1 used to be satisfiable before rep 1's repetition request
+        // was delivered, and #178's (correct) refusal of the resulting late spawn then timed out
+        // the rep1Grain poll below.
+        //
+        // #198's fix makes this deterministic: rep 0 is terminal AND its own live snapshot says
+        // Repeated, and the CasePlanModel has neither spawned nor refused that request yet, so
+        // Table 8.12 completion is held until it does (StageBehavior.
+        // RepetitionRequestsAwaitingResolution). The rep-1 poll below therefore no longer races
+        // anything.
+        [Fact]
         public async Task TaskComplete__Given_NoEntryCriteriaRepeatableTask__Then_FirstEvalDiscardedAndRepetitionSpawnedOnComplete()
         {
             var caseInstanceId = Guid.NewGuid();

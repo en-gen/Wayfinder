@@ -1,15 +1,12 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
-using Wayfinder.Grains.Interfaces.Plan.PlanItem;
-using Wayfinder.Grains.Plan.PlanItem;
 using Wayfinder.Grains.Plan.PlanItem.Behaviors;
-using Wayfinder.Grains.Plan.PlanItem.Events;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
 using Moq;
-using Orleans;
 using Xunit;
 
 namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
@@ -142,8 +139,9 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
         public async Task Trigger__Given_CompleteNotFireable__Then_FallsThroughToSilentNoOp()
         {
             // From Enabled the machine cannot fire Complete at all - the gate must not turn that
-            // pre-existing silent unhandled-trigger no-op into a throw (and must not fetch any
-            // child snapshots: no grain factory is set up here, so a fetch would itself throw)
+            // pre-existing silent unhandled-trigger no-op into a throw. (Trigger's CanFire check
+            // also short-circuits before it fetches any child snapshot; that ordering is not
+            // asserted here, only the observable outcome.)
             var (subject, mockMachine, _) = CreateTriggerSubject(
                 autoComplete: false,
                 childStates: new[]
@@ -158,61 +156,23 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 "an unfireable Complete stays the existing silent no-op regardless of Table 8.12");
         }
 
+        // A thin projection of the canonical subject builder in
+        // StageBehaviorTests_RepetitionCompletionGate.cs (same partial class): these scenarios
+        // predate the #198 gate and care only about Table 8.12's own criteria, so every child here
+        // is simply one that never declared a repetition.
         private (StageBehavior subject, MockPlanItemStateMachine machine, Mock<IBehaviorHost> host) CreateTriggerSubject(
             bool autoComplete,
             (bool required, PlanItemState state)[] childStates,
             PlanItemState initialState = PlanItemState.Active)
         {
-            var caseInstanceId = Guid.NewGuid();
-            var address = ShortGuid.NewGuid();
+            var (subject, machine, host, _, _) = CreateStageSubject(
+                autoComplete,
+                childStates
+                    .Select(x => (x.required, x.state, repeated: false, settled: (SettlementKind?)null))
+                    .ToArray(),
+                initialState);
 
-            var pi = new Interfaces.Model.PlanItem();
-            var stage = new Stage { AutoComplete = autoComplete };
-
-            var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: initialState);
-
-            var mockGrainFactory = new Mock<IGrainFactory>();
-
-            foreach (var (required, state) in childStates)
-            {
-                var childDefinitionId = ShortGuid.NewGuid();
-                var childInstanceId = ShortGuid.NewGuid();
-
-                testStore.Apply(new ChildCreated
-                {
-                    PlanItemId = childDefinitionId,
-                    PlanItemInstanceId = childInstanceId,
-                    Repetition = 0
-                });
-
-                var snapshot = new PlanItemSnapshot
-                {
-                    Definition = new Interfaces.Model.PlanItem { Id = childDefinitionId },
-                    Required = required,
-                    PlanItemState = state
-                };
-
-                var mockChildGrain = new Mock<IPlanItemInternalGrain>();
-                mockChildGrain.Setup(x => x.GetSnapshot())
-                    .Returns(Task.FromResult(snapshot));
-
-                mockGrainFactory
-                    .Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{address}.{childInstanceId}", null))
-                    .Returns(mockChildGrain.Object);
-            }
-
-            var mockHost = new Mock<IBehaviorHost>();
-            mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
-            mockHost.Setup(x => x.Address).Returns(address);
-            mockHost.Setup(x => x.Definition).Returns(pi);
-            mockHost.Setup(x => x.State).Returns(testStore);
-            mockHost.Setup(x => x.GrainFactory).Returns(mockGrainFactory.Object);
-
-            var mockMachine = new MockPlanItemStateMachine(testStore);
-
-            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
-
-            return (subject, mockMachine, mockHost);
+            return (subject, machine, host);
         }
     }
 }
