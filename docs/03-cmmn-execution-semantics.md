@@ -73,6 +73,8 @@ Table 8.9's `complete` rows mark the combination of a Completed Stage with a chi
 
 The intent: a Stage should complete once the user has no further planning or work available to them.
 
+The spec states that intent as a **SHOULD**, not a MUST (§8.6.1, in the sentence immediately following Table 8.12). Satisfying the criteria therefore *permits* a Stage to complete; it does not compel it. That distinction is load-bearing wherever the engine legitimately holds a completion back — see §8's #198 note. The only hard prohibition in this area is RequiredRule's (§8.6.3): a parent **MUST NOT** transition to Complete while a required child sits outside {Completed, Terminated, Failed, Disabled}.
+
 > Note the TRUE column carries **no** DiscretionaryItems term. A Stage whose only children are discretionary therefore satisfies it vacuously. See [#180](https://github.com/en-gen/Wayfinder/issues/180).
 
 ## 6. Sentries (§8.5)
@@ -104,6 +106,10 @@ Note the spec's defaults differ per rule — ManualActivationRule's absent-defau
 - **Without entry criteria:** the RepetitionRule is re-evaluated on transition into Complete or Terminate; if true, a new instance is created.
 - On first instantiation the RepetitionRule is evaluated and its result **discarded** — the first instance is not a repetition.
 
+**Creation is part of the transition, not a consequence of it.** Table 8.8's `complete` and `terminate` rows both require the RepetitionRule to be re-evaluated *within that transition*, and state that a new instance is created when it evaluates true. In the spec's model there is consequently **no interval** in which a successor has been determined but does not yet exist — which is why the engine has to manufacture one (§8's implementation note) and then defend against it. Read that way, #198's gate is not an invented rule reconciling two tables; it restores an atomicity the spec simply assumes.
+
+One qualification cuts the other way and is worth recording: §8.6.4 phrases the no-entry-criteria case as instances *trying* to create a successor. That is the only textual basis for an engine legitimately refusing a repetition at all, as ours does at the runaway ceiling.
+
 The spec's Example 1 (§8.6.4) is worth reading directly: it walks a repeatable Task B feeding a non-repeatable Task A, and shows three B instances yielding a single A. It is the clearest statement that repetition multiplies instances without multiplying dependents.
 
 > **Implementation note.** The spec describes the trigger and the resulting instance as a single step. In a distributed engine they are separated by a message hop, which is where several of our defects live — a spawned instance can miss the very satisfaction that created it. See [#177](https://github.com/en-gen/Wayfinder/issues/177), [#181](https://github.com/en-gen/Wayfinder/issues/181).
@@ -118,7 +124,24 @@ The spec's Example 1 (§8.6.4) is worth reading directly: it walks a repeatable 
 >
 > Residual window, stated rather than hand-waved: a repetition request published but never *delivered* leaves the child blocking completion. A handler-level failure inside a live cluster self-heals — the pulling agent retries and redelivers, which is why the #161 redelivery guard exists. Loss of the queued message itself does not, under the provider this engine is configured with today: `Wayfinder.Silo` uses in-memory streams over an in-memory PubSub store while grain journals are durable, so a silo restart can lose an undelivered repetition request that the child's own journal still records. A durable stream provider would close that gap; nothing in the completion check can.
 >
-> The failure mode is nonetheless strictly better than the defect it replaces. Before, the same lost message meant the repetition silently never happened *and* the Stage completed anyway — invisible data loss. Now it is a loud, logged refusal that names the blocking child instances, and only `complete` is gated (`terminate`/`exit` are not), so a Case worker can still resolve the case. **Open question, deliberately not answered here:** whether an operator-facing override ("this repetition is never coming; complete anyway") should exist, and if so at what privilege level. Nothing of the sort is implemented.
+> The failure mode is nonetheless strictly better than the defect it replaces. Before, the same lost message meant the repetition silently never happened *and* the Stage completed anyway — invisible data loss. Now it is a loud, logged refusal that names the blocking child instances, and only `complete` is gated (`terminate`/`exit` are not), so a Case worker can still resolve the case.
+>
+> **On an operator override, the spec does weigh in, and the answer is no.** CMMN names an administrator for exactly two things: `re-activate` (Table 8.6, and Table 8.8's Failed → Active row) and `close` (Table 8.6). It defines no operation letting any actor bypass completion criteria. The sanctioned escape from an instance that will not complete is `terminate` — explicitly a Case worker decision, available from Active — whereas `close` is reachable only from a state that is already terminal, so it is not an escape from a stuck Active instance at all. Leaving `terminate`/`exit` ungated is therefore the conformant escape hatch, and it is already what this engine does. A force-complete would invent a transition CMMN does not have *and* reproduce §4's impossible cell. Not implemented, and now deliberately so rather than merely undecided.
+
+## 9. Where the spec pulls both ways: a repetition created and immediately terminated
+
+Sections 4, 5 and 8 are each individually clear, and a model can be authored that puts them in direct conflict. Four conditions together:
+
+1. the container has `autoComplete="true"`;
+2. the repeating child is **not** required;
+3. the successor lands non-Active — `Enabled` via a true ManualActivationRule (§7's absence default), or `Available` on an unsatisfied entry criterion;
+4. all required siblings are already terminal.
+
+Then: the child completes and determines a successor; #198's gate holds the container until that successor exists; the successor spawns `Enabled`; the gate releases; Table 8.12's TRUE column is satisfied, because `Enabled` is not `Active` and every required child is terminal; the container completes; and §4's cascade drives the successor to `Terminated`. **The repetition is born and dies without ever running.**
+
+Each rule is applied correctly, and the spec supports both halves — Table 8.12 *permits* the completion, Table 8.7 and Table 8.9 *require* the cascade once it happens — while §8.6.4's purpose is nonetheless defeated. CMMN offers no way to express "repeat, and the Stage is not done until the repetition has been dealt with" other than by changing one of the four conditions. The engine therefore has no principled basis for preferring either reading, and picking one at runtime would be inventing semantics the spec declines to state.
+
+The consequence is bounded: the terminated instance is journaled, so this is auditable rather than silent loss. It is an authoring-intent mismatch, which is why the remedy proposed is a deploy-time model-validation **warning** naming the three available fixes (set `autoComplete="false"`, make the child required, or accept it) rather than any change to execution. See [#225](https://github.com/en-gen/Wayfinder/issues/225).
 
 ---
 
@@ -130,9 +153,10 @@ Rules above that Wayfinder is known to violate today, each with a reproducing te
 |---|---|---|
 | Cross-stage OnParts (§1) | [#176](https://github.com/en-gen/Wayfinder/issues/176) | Confirmed, unfixed — fix needs a scope-matching design |
 | Repetition instance activation (§8) | [#177](https://github.com/en-gen/Wayfinder/issues/177) | Confirmed, unfixed |
-| Terminated stages spawning children (§3) | [#178](https://github.com/en-gen/Wayfinder/issues/178) | Confirmed, unfixed |
-| Completion over live children (§4) | [#179](https://github.com/en-gen/Wayfinder/issues/179) | Confirmed, unfixed |
+| Terminated stages spawning children (§3) | [#178](https://github.com/en-gen/Wayfinder/issues/178) | **Fixed** — terminal containers refuse a late repetition spawn; Suspended ones buffer it and replay on resume, since suspension preserves rather than discards (§2) |
+| Completion over live children (§4) | [#179](https://github.com/en-gen/Wayfinder/issues/179) | **Fixed** — a completing Stage now drives non-terminal Stage and Task children to Terminated. Milestones and EventListeners deliberately survive: Table 8.9's `complete` rows keep them Available/Suspended |
 | Timer repetition ignoring the rule (§8) | [#182](https://github.com/en-gen/Wayfinder/issues/182) | Confirmed, unfixed |
 | Stage completion racing an in-flight repetition (§5) | [#198](https://github.com/en-gen/Wayfinder/issues/198) | **Fixed** — the completion check now blocks on the repeating child's live state rather than trying to order the two streams (see §8's implementation note) |
+| Repetition created then immediately terminated (§9) | [#225](https://github.com/en-gen/Wayfinder/issues/225) | Not a violation — the spec permits both readings. Proposed remedy is a deploy-time authoring warning, not an execution change |
 
 When you fix one, update this table — it is meant to stay honest about where the engine and the spec disagree.
