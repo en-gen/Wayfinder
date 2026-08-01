@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Wayfinder.Grains\Wayfinder.Grains.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Benchmark inputs are embedded here rather than referenced from a test project: a
+         ProjectReference to Wayfinder.Grains.Tests would couple performance work to test
+         refactoring and drag xunit + the Orleans test host into a measurement process. These
+         are copies, and divergence from the test fixtures is acceptable - benchmark inputs
+         need to be representative, not canonical. -->
+    <EmbeddedResource Include="Interchange\Samples\*.cmmn" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+
+    <!-- NU1107 tie-break, not a feature choice. BenchmarkDotNet 0.15.8 pulls
+         Microsoft.CodeAnalysis.CSharp 4.14.0, which pins Microsoft.CodeAnalysis.Common to
+         *exactly* 4.14.0, while Microsoft.Orleans.EventSourcing 10.2.1 (via Wayfinder.Grains)
+         requires Common >= 5.0.0. Those two constraints cannot both be satisfied by transitive
+         resolution, so both Roslyn packages are pinned directly at a matching 5.0.0 - keeping
+         CSharp and Common on the same version rather than letting only Common float up and
+         leaving CSharp 4.14.0 bound to an assembly it was not built against. Remove these once
+         BenchmarkDotNet ships against Roslyn 5.x. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+  </ItemGroup>
+
+</Project>
