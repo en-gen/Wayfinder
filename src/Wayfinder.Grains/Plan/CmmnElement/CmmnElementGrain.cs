@@ -124,6 +124,17 @@ namespace Wayfinder.Grains.Plan.CmmnElement
         private IAsyncStream<TEvent> GetCaseEventStream<TEvent>(string eventSourceRef) =>
             this.GetStreamProvider("Default").GetCaseEventStream<TEvent>(_caseInstanceId, eventSourceRef);
 
+        // The Create/Resume contract, stated here rather than at each call site because callers
+        // depend on it: StreamFlags.Create is guarded by !handles.Any(), so re-running the same
+        // Create subscribe is IDEMPOTENT - a second repetition, or a stream agent's retry of the
+        // handler that called it, cannot produce a duplicate subscription. StreamFlags.Resume is
+        // the reverse: it only re-attaches a handler to handles that already exist, which is how a
+        // reactivating grain re-arms subscriptions a previous activation created without creating
+        // anything new. Both flags may be set; whichever branch the existing handles select wins.
+        //
+        // That idempotence is what lets a caller arm a subscription BEFORE the thing it watches
+        // exists, which #181 requires (StageBehavior.CreateChild subscribes to a child's streams
+        // before the child grain is defined or triggered).
         protected async Task SubscribeTo<TEvent>(
             string eventSourceId,
             Func<TEvent, StreamSequenceToken, Task> eventHandler,

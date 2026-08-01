@@ -84,6 +84,12 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 .OnEntryFromAsync(PlanItemTransition.ParentResume, DrainPendingRepetitions);
         }
 
+        // Reactivation counterpart of the child subscriptions CreateChild arms (#181): the same two
+        // streams, keyed on the same child DEFINITION ids, blanket-resumed for every declared child
+        // whether or not an instance of it exists yet. Resume-only by design - it re-attaches
+        // handlers to handles a previous activation created and creates nothing (see the
+        // Create/Resume contract on CmmnElementGrain.SubscribeTo), so a child never instantiated is
+        // simply a no-op here.
         public override Task Activate() =>
             Task.WhenAll(
                 base.Activate(),
@@ -1750,6 +1756,61 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                 Host.CaseInstanceId,
                 $"{Host.Address}.{childInstanceId}");
 
+            // #181 (root cause of #153) - SUBSCRIBE BEFORE TRIGGERING. This block used to sit
+            // AFTER DefineRepetition/Trigger(Create) below, and that ordering is a production
+            // liveness defect, not a style point:
+            //
+            //   A non-blocking child (IsBlocking = false) auto-cascades all the way to a terminal
+            //   state INSIDE its own Trigger(Create) turn. On the way it publishes its
+            //   PlanItemTransitionedEvent(s) and - if it carries a RepetitionRule - its
+            //   repetition-0 PlanItemRepetitionCriteriaMetEvent (BaseBehavior.
+            //   TryRepeatOnCompleteOrTerminate). If this Stage has not subscribed yet, the
+            //   pulling agent resolves those messages to ZERO consumers and drops them
+            //   permanently - Orleans does not redeliver a message that had no subscriber at
+            //   delivery time, and a subscription created afterwards starts at the current cache
+            //   position. The repetition request is gone with no warning, error or retry, and
+            //   since #198 the container then holds its own completion INDEFINITELY waiting for a
+            //   successor that will never be requested again. Measured as a permanent stall (zero
+            //   progress past 30s), not slowness.
+            //
+            // The subscription is keyed on child.Id - the child's DEFINITION id, shared by every
+            // repetition of it - so arming it before the child instance exists is inert: it
+            // subscribes to a stream only real child instances ever publish to, and re-arming it
+            // cannot duplicate it (see the Create/Resume contract documented on
+            // CmmnElementGrain.SubscribeTo; StageBehavior.Activate is the Resume-side counterpart).
+            //
+            // THIS FIX DEPENDS ON NON-REENTRANCY, so state it rather than leave it implicit. Being
+            // subscribed this early opens a window that must stay closed: between a delivery from
+            // the child's creation turn and Host.RaiseEvent(ChildCreated) below, StageStore.Children
+            // does not yet contain this child, so a handler running in that gap would evaluate
+            // Table 8.12 over a partial child population and could complete this Stage over a live
+            // child - #198's impossible cell, silently. It cannot happen because PlanItemGrain and
+            // CaseGrain are NOT [Reentrant]: the delivery turn queues behind this one and cannot
+            // interleave with it. If either is ever annotated [Reentrant], this reasoning fails and
+            // #198 reopens with no test to catch it.
+            //
+            // Partial-failure note (unchanged by this reorder, stated so it stays visible): if
+            // DefineRepetition or Trigger throws below, ChildCreated is never raised, this
+            // handler's ConfirmEvents never runs, and the stream agent's retry re-runs CreateChild
+            // with a fresh child instance id - the pre-existing "can at worst DUPLICATE" hazard
+            // documented on SpawnRepetitionOrRefuseCeiling's #160/#161 ordering remarks. Moving
+            // the subscribe earlier does not widen it: the subscribe is idempotent, and a
+            // subscription with no child behind it is inert.
+            //
+            // Do NOT re-order these lines back, and do NOT try to buy the window back with stream
+            // tuning instead - #154 added and reverted a 15ms GetQueueMsgsTimerPeriod for exactly
+            // this symptom; shrinking the pulling agent's poll period shrinks the window the
+            // subscribe has to win and makes this materially worse. Ordering is the fix.
+            await Task.WhenAll(
+                Host.SubscribeTo<PlanItemTransitionedEvent>(
+                    child.Id,
+                    HandleChildTransitioned,
+                    StreamFlags.Create),
+                Host.SubscribeTo<PlanItemRepetitionCriteriaMetEvent>(
+                    child.Id,
+                    HandleChildRepeated,
+                    StreamFlags.Create));
+
             // Host.DefinitionId: this Stage's own definition id, i.e. the new child's PARENT
             // definition id - threaded through so the child's BaseBehavior.Activate can key its
             // parent-transition subscription on the same stream this Stage's transitions publish
@@ -1760,16 +1821,6 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // (#65).
             await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId, Host.DefinitionScope);
             await childGrain.Trigger(PlanItemTransition.Create);
-
-            await Task.WhenAll(
-                Host.SubscribeTo<PlanItemTransitionedEvent>(
-                    child.Id,
-                    HandleChildTransitioned,
-                    StreamFlags.Create),
-                Host.SubscribeTo<PlanItemRepetitionCriteriaMetEvent>(
-                    child.Id,
-                    HandleChildRepeated,
-                    StreamFlags.Create));
 
             Host.RaiseEvent(new ChildCreated
             {
