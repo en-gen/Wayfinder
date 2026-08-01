@@ -93,12 +93,14 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             await CompleteTask(setup.RequiredTaskGrain);
 
             // ADO #174 - positive sync point instead of a fixed sleep: StageBehavior.
-            // HandleChildTransitioned unconditionally raises+confirms UserCompletableCriteriaMet
-            // (latching PlanItemSnapshot.UserCompletable) once the required children are terminal,
-            // strictly BEFORE it evaluates Table 8.12's Branch 1 auto-complete criteria, in the same
-            // method invocation - so once UserCompletable reads true, the automatic branch's
-            // decision for THIS child-transitioned event has already been made, however long
-            // delivery of that event to the stage grain took.
+            // TryCompleteStage raises+confirms UserCompletableCriteriaMet (latching
+            // PlanItemSnapshot.UserCompletable) once the required children are terminal, strictly
+            // BEFORE it evaluates Table 8.12's Branch 1 auto-complete criteria, in the same method
+            // invocation - so once UserCompletable reads true, the automatic branch's decision for
+            // THIS child-transitioned event has already been made, however long delivery of that
+            // event to the stage grain took. (#198 added one further conjunct to the latch - no
+            // child may be owed an unresolved repetition - which no model in this file has, so the
+            // sync point is unaffected.)
             var userCompletableLatched = await PollUntil(
                 async () => (await setup.StageGrain.GetSnapshot()).UserCompletable,
                 TimeSpan.FromSeconds(10));

@@ -42,15 +42,22 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
         // #178 - Table 8.9: a terminating Stage cascades exit to every non-terminal child before it
         // reaches a terminal state itself, so nothing live can remain to legitimately request a
         // repetition. All three genuinely terminal states must refuse identically: no spawn, no
-        // buffered entry, no new domain event beyond the log line.
+        // buffered entry, no ceiling/Failed audit event.
+        //
+        // #198 - the refusal DOES journal one thing now: RepetitionRequestSettled, the record that
+        // this container has definitively dealt with the request. Without it, a child that reached
+        // a terminal state with Repeated set would keep blocking this container's Table 8.12
+        // completion forever (see StageBehavior.RepetitionRequestsAwaitingResolution and
+        // StageBehaviorTests_RepetitionCompletionGate.cs).
         [Theory]
         [InlineData(PlanItemState.Completed)]
         [InlineData(PlanItemState.Terminated)]
         [InlineData(PlanItemState.Closed)]
-        public async Task HandleChildRepeated__Given_HostStateTerminal__Then_RefuseSpawnAndRaiseNoEvent(PlanItemState terminalState)
+        public async Task HandleChildRepeated__Given_HostStateTerminal__Then_RefuseSpawnAndSettleTheRequest(PlanItemState terminalState)
         {
             var address = ShortGuid.NewGuid();
             var planItemDefinitionId = ShortGuid.NewGuid();
+            var sourceInstanceId = ShortGuid.NewGuid();
 
             var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
             var stage = new Stage { PlanItems = { pi } };
@@ -68,7 +75,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
 
             await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
-                address, ShortGuid.NewGuid(), planItemDefinitionId, 0));
+                address, sourceInstanceId, planItemDefinitionId, 0));
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never);
@@ -76,8 +83,47 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<RepetitionCeilingExceeded>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<RepetitionRefusedWhileFailed>()), Times.Never);
 
-            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().BeEmpty();
+            mockHost.Verify(x => x.RaiseEvent(It.Is<RepetitionRequestSettled>(e =>
+                e.SourceInstanceId == sourceInstanceId)), Times.Once);
+            mockHost.Verify(x => x.ConfirmEvents(), Times.Once);
+
+            var stageStore = (StageBehaviorStore)testStore.BehaviorExtension;
+            stageStore.PendingRepetitions.Should().BeEmpty();
+            stageStore.IsRepetitionSettled(sourceInstanceId).Should().BeTrue();
             testStore.PlanItemState.Should().Be(terminalState, "the refused spawn attempt must not itself change this Host's state");
+        }
+
+        // #198 - the unknown-child branch is also a definitive refusal: this container cannot even
+        // identify what to spawn, so nothing ever will be, and the request must stop blocking
+        // completion.
+        [Fact]
+        public async Task HandleChildRepeated__Given_UnknownChildDefinition__Then_SettleTheRequest()
+        {
+            var address = ShortGuid.NewGuid();
+            var sourceInstanceId = ShortGuid.NewGuid();
+
+            var stage = new Stage { PlanItems = { new Interfaces.Model.PlanItem { Id = ShortGuid.NewGuid() } } };
+
+            var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Address).Returns(address);
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object);
+
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                address, sourceInstanceId, "not_a_known_child", 0));
+
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never);
+
+            ((StageBehaviorStore)testStore.BehaviorExtension)
+                .IsRepetitionSettled(sourceInstanceId).Should().BeTrue();
         }
 
         // #178 - Failed is semi-terminal and re-activatable, unlike the genuinely terminal states
@@ -119,7 +165,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 e.SourceInstanceId == sourceInstanceId &&
                 e.AttemptedRepetition == currentRepetition + 1)), Times.Once);
 
-            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().BeEmpty();
+            // #198 - a Failed container refuses definitively (this class's Reactivate registration
+            // deliberately does not replay refused requests), so the request must also be recorded
+            // as settled or it would block Table 8.12 completion forever after a recovery.
+            mockHost.Verify(x => x.RaiseEvent(It.Is<RepetitionRequestSettled>(e =>
+                e.SourceInstanceId == sourceInstanceId)), Times.Once);
+
+            var failedStageStore = (StageBehaviorStore)testStore.BehaviorExtension;
+            failedStageStore.PendingRepetitions.Should().BeEmpty();
+            failedStageStore.IsRepetitionSettled(sourceInstanceId).Should().BeTrue();
             testStore.PlanItemState.Should().Be(PlanItemState.Failed);
         }
 
@@ -164,6 +218,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var stageStore = (StageBehaviorStore)testStore.BehaviorExtension;
             stageStore.PendingRepetitions.Should().HaveCount(1);
             stageStore.HasPendingRepetition(sourceInstanceId).Should().BeTrue();
+
+            // #198 - the ONE branch that must NOT settle: the request is real and still pending,
+            // so it has to keep blocking this container's Table 8.12 completion until
+            // DrainPendingRepetitions spawns or ceiling-refuses it on resume.
+            stageStore.IsRepetitionSettled(sourceInstanceId).Should().BeFalse(
+                "a buffered request is still owed a successor - blocking completion here is correct");
+
             testStore.PlanItemState.Should().Be(PlanItemState.Suspended, "buffering must not itself change this Host's state");
         }
 
@@ -239,6 +300,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
 
             var mockGrainFactory = new Mock<IGrainFactory>();
             mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
@@ -286,8 +348,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
 
-            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().BeEmpty(
+            var drainedStore = (StageBehaviorStore)testStore.BehaviorExtension;
+            drainedStore.PendingRepetitions.Should().BeEmpty(
                 "a drained entry (spawned or refused) must be removed from the buffer");
+
+            // #198 - the buffered-then-drained path completes the settle lifecycle: the request
+            // blocked Table 8.12 completion while it sat in the buffer, and the spawn's
+            // ChildRepeated (#161) is what finally resolves it.
+            drainedStore.IsRepetitionSettled(sourceInstanceId).Should().BeTrue(
+                "spawning the successor resolves the request the buffer was holding");
         }
 
         // #178 hazard 2 - draining the buffer must go through the SAME #67
@@ -333,8 +402,18 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             testStore.PlanItemState.Should().Be(PlanItemState.Failed,
                 "the ceiling must still Fault the container even when reached via a buffered replay");
 
-            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().BeEmpty(
+            var ceilingStore = (StageBehaviorStore)testStore.BehaviorExtension;
+            ceilingStore.PendingRepetitions.Should().BeEmpty(
                 "a ceiling-refused buffered entry is drained (not retried), matching the live ceiling path's own no-retry semantics");
+
+            // #198 - a ceiling refusal is final, so it must settle the request. Otherwise the
+            // repeating child - terminal, Repeated, never spawned - would block this container's
+            // Table 8.12 completion permanently, with no operator recourse but Terminate.
+            ceilingStore.IsRepetitionSettled(sourceInstanceId).Should().BeTrue();
+            // ...but the #161 redelivery guard is deliberately NOT recorded by the ceiling branch
+            // (see SpawnRepetitionOrRefuseCeiling's scope note) - the two records mean different
+            // things, and this pins that they have not been conflated.
+            ceilingStore.IsRepetitionRedelivery(sourceInstanceId).Should().BeFalse();
         }
 
         // #178 self-review hazard - "can a buffered request be replayed into a Stage that has
@@ -384,9 +463,21 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 "only the FIRST buffered entry should ever be attempted once the Host Faults mid-drain");
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
 
-            var remaining = ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions;
+            var strandedStore = (StageBehaviorStore)testStore.BehaviorExtension;
+            var remaining = strandedStore.PendingRepetitions;
             remaining.Should().HaveCount(1, "the drain must stop re-checking state and leave the untried entry buffered");
             remaining.Single().SourceInstanceId.Should().Be(secondSourceInstanceId);
+
+            // #198 F2 - ...but "untried" must not mean "wedging". Nothing replays this entry after a
+            // Failed->Reactivate (neither StageBehavior nor CasePlanModelBehavior drains on that
+            // recovery, both deliberately), so if it stayed UNSETTLED its requesting child would be
+            // terminal + Repeated + unresolved forever and Table 8.12 completion would be
+            // permanently unavailable on the reactivated container. Settled, therefore, without
+            // being attempted or drained - see StageBehavior.SettleStrandedPendingRepetitions.
+            strandedStore.IsRepetitionSettled(secondSourceInstanceId).Should().BeTrue(
+                "an entry stranded behind a ceiling breach must stop holding Table 8.12 completion");
+            strandedStore.IsRepetitionRedelivery(secondSourceInstanceId).Should().BeFalse(
+                "settling it says nothing about a child having been spawned - no child ever was");
         }
 
         // #178 review round 2, BLOCKER - StageBehavior's own constructor only wires
@@ -416,6 +507,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: casePlanModel, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
 
             var mockGrainFactory = new Mock<IGrainFactory>();
             mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
@@ -549,6 +641,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Active);
 
             var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
             // First entry drained (FIFO - the throwing one, buffered first below) throws; the
             // second entry's Trigger(Create) call (this same mock, a fresh grain key per
             // CreateChild call but this SetupSequence applies across ALL calls in order) succeeds.

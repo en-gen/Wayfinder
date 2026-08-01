@@ -60,24 +60,26 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
         }
 
         // #198 (found running the #178 verification suite at scale - not part of the original
-        // #161 reproduction) - this test's own arrange phase (the genuine repeat landing at line
-        // ~112, BEFORE the redelivery-guard logic under test is ever exercised) has the EXACT
-        // #198 race shape: a single no-entry-criteria repeating child under a CasePlanModel whose
-        // AutoComplete defaults to false (never set here), no PlanningTable. Completing rep 0
-        // both (1) re-evaluates its RepetitionRule and publishes
+        // #161 reproduction), quarantined then restored once #198 landed - this test's own arrange
+        // phase (the genuine repeat, which must land BEFORE the redelivery-guard logic under test
+        // is ever exercised) has the EXACT #198 race shape: a single no-entry-criteria repeating
+        // child under a CasePlanModel whose AutoComplete defaults to false, no PlanningTable.
+        // Completing rep 0 both (1) re-evaluates its RepetitionRule and publishes
         // PlanItemRepetitionCriteriaMetEvent (BaseBehavior.TryRepeatOnCompleteOrTerminate) and
         // (2) triggers the parent's Table 8.12 completion check
-        // (StageBehavior.HandleChildTransitioned) - on two separate, unordered streams. With
-        // this Stage's only child now terminal, autoComplete=FALSE's Branch 1 is satisfiable, so
-        // the CasePlanModel can legitimately complete before rep 1's repetition request is
-        // delivered - and once #178 correctly refuses a late spawn into an already-Completed
-        // container, PollUntilChildCount below times out at count 1, never reaching the
-        // redelivery simulation this test actually exists to prove. Quarantined rather than
-        // fixed, exactly like KnownGapScenarios.TaskRepetition__… and
-        // RepetitionOnCompletionIntegrationTests.TaskComplete__…FirstEvalDiscardedAndRepetitionSpawnedOnComplete
-        // (same underlying defect, third occurrence): #198 belongs at the Table 8.12
-        // completion-evaluation seam, not here and not in #178.
-        [Fact(Skip = "#198 - this test's own arrange phase (a genuine repeat must land before the redelivery-guard logic under test even runs) has the exact #198 race shape: a single no-entry-criteria repeating child under a CasePlanModel whose AutoComplete defaults to false, no PlanningTable. The CasePlanModel can legitimately complete before the repetition request is delivered, and #178's correct refusal of the resulting late spawn then times out PollUntilChildCount before this test ever reaches its own redelivery simulation. Same root cause as KnownGapScenarios.TaskRepetition__… and RepetitionOnCompletionIntegrationTests.TaskComplete__…FirstEvalDiscardedAndRepetitionSpawnedOnComplete. See #198.")]
+        // (StageBehavior.HandleChildTransitioned) - on two separate, unordered streams. With this
+        // Stage's only child now terminal, autoComplete=FALSE's Branch 1 used to be satisfiable
+        // before rep 1's request was delivered, and #178's (correct) refusal of the resulting late
+        // spawn then timed out PollUntilChildCount at count 1, never reaching the redelivery
+        // simulation this test actually exists to prove.
+        //
+        // #198's fix holds the CasePlanModel's completion while rep 0 - terminal, and Repeated on
+        // its own live snapshot - is still owed a successor (StageBehavior.
+        // RepetitionRequestsAwaitingResolution), so the arrange phase below is deterministic
+        // again. Note it also exercises the settled record's OTHER half: the redelivery this test
+        // publishes is caught by #161's guard, which is a strictly narrower set than #198's
+        // settled record and deliberately still separate from it.
+        [Fact]
         public async Task HandleChildRepeated__Given_SameRepetitionCriteriaMetEventDeliveredTwice__Then_ExactlyOneChildIsCreated()
         {
             var caseInstanceId = Guid.NewGuid();

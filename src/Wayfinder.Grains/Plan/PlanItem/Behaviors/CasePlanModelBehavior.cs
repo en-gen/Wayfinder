@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Wayfinder.Grains.Interfaces.Model;
+using Wayfinder.Grains.Interfaces.Plan.PlanItem;
 using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 using Orleans.Streams;
 
@@ -162,12 +163,15 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         // terminal. (Judging direct children covers the tree: an Active instance nested deeper
         // inside a non-Active top-level child cannot exist, because a Stage containing an Active
         // instance is itself Active - Table 8.7.)
-        protected override async Task<bool> ManualCompletionCriteriaSatisfied()
-        {
-            var childSnapshots = await GetChildSnapshots();
-
-            return childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
-                   childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal());
-        }
+        //
+        // #198 - takes the caller's snapshots and is synchronous, mirroring the base signature
+        // change (see StageBehavior.ManualCompletionCriteriaSatisfied's remarks). The repetition
+        // gate is NOT restated here on purpose: it lives in StageBehavior.Trigger, which this class
+        // inherits unchanged, so the Case root is covered by exactly the same code an ordinary
+        // Stage is - an override that had to remember to re-apply it would be one refactor away
+        // from silently losing it.
+        protected override bool ManualCompletionCriteriaSatisfied(PlanItemSnapshot[] childSnapshots) =>
+            childSnapshots.All(x => x.PlanItemState != PlanItemState.Active) &&
+            childSnapshots.Where(x => x.Required).All(x => x.PlanItemState.IsTerminal());
     }
 }
