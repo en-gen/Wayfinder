@@ -149,8 +149,15 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
         // Table 8.8 (fault): Active -> Failed, "This state MUST NOT propagate"; (re-activated):
         // Failed -> Active "when the source of the failure has been resolved"; then (terminate):
-        // Active -> Terminated by Case worker decision. The parent Case must still be Active at
-        // the end - the fault MUST NOT have propagated to it.
+        // Active -> Terminated by Case worker decision. The MUST-NOT-propagate clause pins one
+        // thing only: the parent Case must never become Failed as a result of the child's fault.
+        // It does NOT say the parent stays Active - and here it provably does not: this sample's
+        // CasePlanModel is autoComplete="false" with exactly one planItem and no planningTable, so
+        // once the terminate above leaves that lone child Terminated, Table 8.12's autoComplete=
+        // FALSE Branch 1 ("no Active children AND all children terminal AND no DiscretionaryItems
+        // pending") is satisfied and the Case is guaranteed to complete shortly after - this is not
+        // a possible outcome, it is the mandated one (confirmed 40/40 on unmodified develop; see
+        // issue #221). Asserting Active here would just be racing that guaranteed completion.
         [Fact]
         [ConformanceCitation("Table 8.8 / fault, re-activated, terminate")]
         public async Task TaskLifecycle__Given_ActiveTask__Then_FaultReactivateTerminateWalkTable88()
@@ -174,8 +181,12 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             terminated.PlanItemState.Should().Be(PlanItemState.Terminated,
                 "Table 8.8 (terminate): Active -> Terminated by Case worker decision");
 
-            (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
-                "Table 8.8 (fault): 'This state MUST NOT propagate' - the Case must have stayed Active throughout");
+            (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().NotBe(PlanItemState.Failed,
+                "Table 8.8 (fault): 'This state MUST NOT propagate' means the Case must never become " +
+                "Failed as a result of the child's fault - it does NOT mean the Case stays Active. With " +
+                "the lone child now Terminated, Table 8.12's autoComplete=FALSE Branch 1 is satisfied and " +
+                "the Case is guaranteed to complete shortly after, so asserting Active here would just be " +
+                "racing that guaranteed completion, not pinning anything the spec actually mandates");
         }
 
         // Table 8.11 (create): Milestone -> Available; (suspend): Available -> Suspended by Case
