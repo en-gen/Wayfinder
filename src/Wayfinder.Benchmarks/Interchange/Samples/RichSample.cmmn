@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ADO #20 round-trip fidelity sample: exercises every XML-mapped collection in the model layer
+  (see Model/CmmnXmlCollectionShadows.cs COVERAGE remarks) - documentation, extension elements
+  and extension (any-)attributes, a relationship with QName source/target, a textAnnotation
+  artifact, nested case-file-item hierarchy, a HumanTask with a full PlanItemControl plus
+  task-level inputs/outputs, a PlanningTable (discretionary item with entry/exit criteria +
+  applicability rule), process/case/decision tasks with parameter mappings, top-level
+  process/decision declarations with their parameters, a nested stage, stage- and plan-item-level
+  exit criteria, a TimerEventListener with a PlanItemStartTrigger, a UserEventListener,
+  CaseRoles, and a Case input parameter. Used only for import(export(import(x)))
+  structural-equality tests - never deployed/run, so cross-references do not all need to resolve
+  to something the engine would successfully execute (this file deliberately lints Unsupported:
+  the model-only task kinds are the point of the coverage).
+
+  Element order under <definitions> follows CMMN11.xsd's tDefinitions sequence
+  (caseFileItemDefinition*, case*, process*, decision*, extensionElements?, relationship*,
+  artifact*). Deliberately not covered here (bounded MVP scope): cmmndi:CMMNDI (diagram
+  interchange - out of scope), multi-level PlanningTable nesting, and documentation INSIDE a
+  mixed-content expression (whitespace-sensitive by XSD design; covered import-only in
+  CmmnXmlSerializerTests). Non-Jint expression-language fixtures live in CmmnCapabilityLintTests
+  so each lint rule keeps its own minimal, single-defect fixture.
+-->
+<definitions xmlns="http://www.omg.org/spec/CMMN/20151109/MODEL"
+             xmlns:tns="http://wayfinder/samples/rich"
+             xmlns:flow="http://wayfinder/ext"
+             targetNamespace="http://wayfinder/samples/rich"
+             expressionLanguage="expression://lang/jint"
+             id="Definitions_Rich"
+             name="RichSample"
+             exporter="Wayfinder sample author"
+             exporterVersion="1.0"
+             author="Wayfinder test suite"
+             creationDate="2026-01-01T00:00:00Z"
+             flow:origin="test-suite">
+  <caseFileItemDefinition id="CFID_1" name="RichItemDef" definitionType="http://www.omg.org/spec/CMMN/DefinitionType/Unspecified">
+    <property name="amount" type="http://www.omg.org/spec/CMMN/PropertyType/Unspecified"/>
+  </caseFileItemDefinition>
+  <case id="RichCase" name="RichCase">
+    <documentation id="Doc_Case" textFormat="text/plain">The rich round-trip sample case.</documentation>
+    <caseFileModel>
+      <caseFileItem id="RichItem" name="RichItem" definitionRef="tns:CFID_1" multiplicity="ExactlyOne">
+        <children>
+          <caseFileItem id="RichChildItem" name="RichChildItem" definitionRef="tns:CFID_1" sourceRef="RichItem" multiplicity="ZeroOrOne"/>
+        </children>
+      </caseFileItem>
+    </caseFileModel>
+    <casePlanModel id="RichCPM" name="RichCPM" autoComplete="true" flow:tier="gold">
+      <extensionElements><flow:audit xmlns:flow="http://wayfinder/ext" level="verbose"/></extensionElements>
+      <planItem id="PI_Human" name="PI_Human" definitionRef="RichHumanTask">
+        <entryCriterion id="EC_1" sentryRef="RichSentry"/>
+        <exitCriterion id="PIExit_1" sentryRef="RichSentry"/>
+      </planItem>
+      <planItem id="PI_Timer" name="PI_Timer" definitionRef="RichTimer"/>
+      <planItem id="PI_UserEvent" name="PI_UserEvent" definitionRef="RichUserEvent"/>
+      <planItem id="PI_NestedStage" name="PI_NestedStage" definitionRef="RichNestedStage"/>
+      <sentry id="RichSentry" name="RichSentry">
+        <caseFileItemOnPart id="OnPart_1" sourceRef="RichItem">
+          <standardEvent>update</standardEvent>
+        </caseFileItemOnPart>
+        <ifPart id="IfPart_1" contextRef="RichItem">
+          <condition language="expression://lang/jint" body="value.amount &gt;= 0" flow:hint="fast"/>
+        </ifPart>
+      </sentry>
+      <planningTable>
+        <discretionaryItem id="DiscItem_1" name="DiscTask" definitionRef="RichHumanTask" applicabilityRuleRefs="AppRule_1">
+          <entryCriterion id="DIEntry_1" sentryRef="RichSentry"/>
+          <exitCriterion id="DIExit_1" sentryRef="RichSentry"/>
+        </discretionaryItem>
+        <applicabilityRule id="AppRule_1" name="AppRule" contextRef="RichItem">
+          <condition language="expression://lang/jint" body="true"/>
+        </applicabilityRule>
+      </planningTable>
+      <humanTask id="RichHumanTask" name="RichHumanTask" performerRef="RoleA" isBlocking="true">
+        <defaultControl id="Control_1">
+          <repetitionRule id="RR_1" name="RR" contextRef="RichItem">
+            <condition language="expression://lang/jint" body="true"/>
+          </repetitionRule>
+          <requiredRule id="ReqR_1" contextRef="RichItem">
+            <condition language="expression://lang/jint" body="true"/>
+          </requiredRule>
+          <manualActivationRule id="MAR_1" contextRef="RichItem">
+            <condition language="expression://lang/jint" body="false"/>
+          </manualActivationRule>
+        </defaultControl>
+        <input id="HTIn_1" name="formData" bindingRef="RichItem"/>
+        <output id="HTOut_1" name="result" bindingRef="RichItem"/>
+      </humanTask>
+      <processTask id="RichProcessTask" name="RichProcessTask" processRef="tns:Process_1">
+        <parameterMapping id="PM_1" sourceRef="HTIn_1" targetRef="PIn_1">
+          <transformation language="expression://lang/jint" body="value"/>
+        </parameterMapping>
+      </processTask>
+      <caseTask id="RichCaseTask" name="RichCaseTask" caseRef="tns:RichCase">
+        <parameterMapping id="PM_2" sourceRef="CaseIn_1" targetRef="PIn_1"/>
+      </caseTask>
+      <decisionTask id="RichDecisionTask" name="RichDecisionTask" decisionRef="tns:Decision_1">
+        <parameterMapping id="PM_3" sourceRef="DIn_1" targetRef="DOut_1"/>
+      </decisionTask>
+      <stage id="RichNestedStage" name="RichNestedStage">
+        <planItem id="PI_NestedMilestone" name="PI_NestedMilestone" definitionRef="NestedMilestone"/>
+        <milestone id="NestedMilestone" name="NestedMilestone"/>
+        <exitCriterion id="NestedExit_1"/>
+      </stage>
+      <timerEventListener id="RichTimer" name="RichTimer">
+        <timerExpression language="expression://lang/jint" body="'PT1H'"/>
+        <planItemStartTrigger sourceRef="PI_Human">
+          <standardEvent>create</standardEvent>
+        </planItemStartTrigger>
+      </timerEventListener>
+      <userEventListener id="RichUserEvent" name="RichUserEvent" authorizedRoleRefs="RoleA"/>
+      <exitCriterion id="CPMExit_1" sentryRef="RichSentry"/>
+    </casePlanModel>
+    <caseRoles>
+      <role id="RoleA" name="RoleA"/>
+    </caseRoles>
+    <input id="CaseIn_1" name="AmountInput" bindingRef="RichItem">
+      <bindingRefinement language="expression://lang/jint" body="value"/>
+    </input>
+  </case>
+  <process id="Process_1" name="RichProcess" implementationType="http://www.omg.org/spec/CMMN/ProcessType/Unspecified">
+    <input id="PIn_1" name="processIn"/>
+    <output id="POut_1" name="processOut"/>
+  </process>
+  <decision id="Decision_1" name="RichDecision">
+    <input id="DIn_1" name="decisionIn"/>
+    <output id="DOut_1" name="decisionOut"/>
+  </decision>
+  <extensionElements><flow:settings xmlns:flow="http://wayfinder/ext" retention="30d"/></extensionElements>
+  <relationship id="Rel_1" type="traces" direction="Forward">
+    <source>tns:RichCase</source>
+    <target>tns:Process_1</target>
+  </relationship>
+  <textAnnotation id="Note_1" textFormat="text/plain">
+    <text>Annotation kept at the definitions level.</text>
+  </textAnnotation>
+</definitions>
