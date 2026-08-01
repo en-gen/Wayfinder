@@ -1610,7 +1610,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
                 Host.RaiseEvent(new RepetitionCeilingExceeded
                 {
-                    RepeatingPlanItemDefinitionId = child.Id,
+                    RepeatingPlanItemId = child.Id,
                     AttemptedRepetition = nextRepetition,
                     Ceiling = _repetitionCeiling
                 });

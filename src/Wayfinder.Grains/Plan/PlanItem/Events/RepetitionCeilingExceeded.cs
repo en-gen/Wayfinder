@@ -7,7 +7,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Events
     // ADO #67 - Wayfinder ENGINE EXTENSION, NOT CMMN 1.1 spec surface.
     // ~~~~~
     // Raised on the Stage/CasePlanModel instance (Host, in StageBehavior.HandleChildRepeated)
-    // that refused to spawn one more repetition of RepeatingPlanItemDefinitionId because
+    // that refused to spawn one more repetition of RepeatingPlanItemId because
     // AttemptedRepetition would meet or exceed RepetitionGuardOptions.MaxRepetitionsPerPlanItem
     // (Ceiling). Immediately followed by driving that same Stage/CasePlanModel to Fault - see
     // RepetitionGuardOptions' remarks for why the CONTAINER faults rather than the repeating
@@ -20,8 +20,13 @@ namespace Wayfinder.Grains.Plan.PlanItem.Events
     [GenerateSerializer]
     public class RepetitionCeilingExceeded : BaseUpdate
     {
+        // The repeating child PlanItem's OWN Id (the <planItem> element's id), NOT its
+        // DefinitionRef/PlanItemDefinition.Id - see StageBehavior.SpawnRepetitionOrRefuseCeiling,
+        // which populates this from child.Id. Property name kept aligned with that semantics
+        // (renamed from the misleading RepeatingPlanItemDefinitionId, mirroring the #83 fix on
+        // ChildCreated.PlanItemId); [Id(1)] is unchanged for wire/replay compatibility.
         [Id(1)]
-        public string RepeatingPlanItemDefinitionId { get; set; }
+        public string RepeatingPlanItemId { get; set; }
         [Id(2)]
         public int AttemptedRepetition { get; set; }
         [Id(3)]

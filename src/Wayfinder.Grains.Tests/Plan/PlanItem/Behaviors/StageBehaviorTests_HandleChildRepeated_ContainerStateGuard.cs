@@ -395,7 +395,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.Is<RepetitionCeilingExceeded>(e =>
-                e.RepeatingPlanItemDefinitionId == planItemDefinitionId &&
+                e.RepeatingPlanItemId == planItemDefinitionId &&
                 e.AttemptedRepetition == ceiling &&
                 e.Ceiling == ceiling)), Times.Once);
 
