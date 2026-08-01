@@ -6,6 +6,7 @@ using Wayfinder.Grains.Infrastructure.Quartz;
 using Wayfinder.Grains.Interfaces.Model;
 using Wayfinder.Grains.Services.PlanItemBehaviorConfigurator;
 using Wayfinder.Grains.Services.PlanItemStateMachineConfigurator;
+using Wayfinder.Grains.Tests.Utils.Helpers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -25,8 +26,20 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
 {
     public class ClusterFixture : IDisposable, IAsyncLifetime
     {
+        // Issue #194 - a fixture-lifetime capture provider wired in ALONGSIDE Serilog below (see
+        // IntegrationTestLogging.Configure's remarks: don't touch that shared method, every other
+        // fixture keeps its Serilog-only wiring untouched). Static because TestSiloConfigurator is
+        // instantiated by TestClusterBuilder itself (no constructor args this fixture controls),
+        // not because the capture is meant to be process-global - there is exactly one ClusterFixture
+        // instance per test run (xunit collection fixture), so static here is equivalent to instance
+        // in practice. PlanningTableGrainTests (the only consumer today) clears it immediately
+        // before the specific call it wants to assert on, since this collection's tests all share
+        // both the cluster and this capture and run sequentially, never in parallel with each other.
+        private static readonly FakeLoggerProvider LogCapture = new FakeLoggerProvider();
+
         public TestCluster Cluster { get; private set; }
         public IClusterClient ClusterClient { get; private set; }
+        public FakeLoggerProvider Logs => LogCapture;
 
         private bool _disposed = false;
 
@@ -103,7 +116,27 @@ namespace Wayfinder.Grains.Tests.Integration.SiloFixture
                     .UseInMemoryReminderService()
 
                     .ConfigureServices(ConfigureServices)
-                    .ConfigureLogging(IntegrationTestLogging.Configure);
+                    .ConfigureLogging(logging =>
+                    {
+                        IntegrationTestLogging.Configure(logging);
+
+                        // #194 - added alongside, not instead of, the Serilog wiring above.
+                        // AddSerilog registers a provider-scoped filter tied to its own
+                        // LoggingLevelSwitch (Debug when WAYFINDER_TEST_SEQ is set, Information
+                        // otherwise - see IntegrationTestLogging), but that filter only ever
+                        // applies to SerilogLoggerProvider. Every OTHER provider, this one
+                        // included, falls back to Microsoft.Extensions.Logging's own global
+                        // MinLevel, which defaults to Information with nothing here raising it -
+                        // so LogCapture only ever sees Information and above (see
+                        // FakeLoggerProvider's own remarks, and FakeLogger.IsEnabled, which is kept
+                        // truthful to this ceiling rather than claiming to capture everything).
+                        // Deliberately NOT widened with an AddFilter<FakeLoggerProvider>(null,
+                        // LogLevel.Trace) override: measured on this suite, that turns Orleans'
+                        // own chatty Debug/Trace logging into ~12.5k captured entries (~8 MB) for
+                        // the whole run, against ~100 entries (tens of KB) at Information+ - not a
+                        // "small in-memory capture" at that point, and nothing today needs it.
+                        logging.AddProvider(LogCapture);
+                    });
 
                 silo.Services.AddSerializer(s => s.AddJsonSerializer(
                     isSupported: OrleansFallbackJsonSerializer.IsSupportedType,

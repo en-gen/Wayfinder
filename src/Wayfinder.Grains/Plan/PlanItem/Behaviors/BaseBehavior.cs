@@ -324,6 +324,26 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             }
             var result = ruleResult?.ValueOr(defaultResult) ?? defaultResult;
 
+            // #194 - Executable.ExecuteAsBool already LogErrors this failure one layer down (with
+            // the exception object and the expression source), so this is NOT the only place the
+            // error is recorded - on unfixed code it was already double-logged, and this makes it
+            // triple (Executable's log + this log + the journaled RuleEvaluated.Error below). What
+            // that lower-layer log CANNOT tell you is which plan item's rule blew up - Executable
+            // only has the raw expression text, no element context. This line adds
+            // {Element}/{ElementScope}/{ElementInstanceId} so an erroring rule is traceable back to
+            // the specific PlanItem instance, not just "some expression, somewhere, failed."
+            if (ruleResult?.IsError ?? false)
+            {
+                Host.LogWithContext(logger => logger.LogError(
+                    "{Element} [{PlanItemDefinition}] {ElementScope}.{ElementInstanceId} | Evaluation of {RuleType} resulted in error: {RuleError}",
+                    Host.Definition.GetType().Name,
+                    PlanItemDefinition.GetType().Name,
+                    Host.Scope,
+                    Host.InstanceId,
+                    rule.GetType().Name,
+                    ruleResult.Message));
+            }
+
             var @event = Activator.CreateInstance<TEvent>();
             @event.Result = result;
             @event.Error = ruleResult?.Message;

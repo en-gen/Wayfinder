@@ -12,6 +12,7 @@ using Wayfinder.Grains.Plan.PlanItem.Events;
 using Wayfinder.Grains.Plan.PlanItem.StateMachine;
 using Wayfinder.Grains.Tests.Utils.Helpers;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Orleans;
 using Orleans.Streams;
@@ -260,6 +261,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()))
                 .Callback<RequiredRuleEvaluated>(x => capturedEvent = x);
 
+            // #194 - EvaluateRule's error branch calls Host.LogWithContext(Action<ILogger>), not a
+            // logger it owns directly, so the seam to capture it is intercepting that callback and
+            // invoking it against a FakeLogger instead of production's real ILogger - IBehaviorHost
+            // is mocked in this test class, there is no DI container / ILoggerProvider to hook.
+            var fakeLogger = new FakeLogger();
+            mockHost
+                .Setup(x => x.LogWithContext(It.IsAny<Action<ILogger>>()))
+                .Callback<Action<ILogger>>(logAction => logAction(fakeLogger));
+
             var mockExpressionGrain = new Mock<IExpressionGrain>();
             mockExpressionGrain
                 .Setup(x => x.ExecuteAsBool(Rules.ErroringRequiredRule.ContextRef, Rules.ErroringRequiredRule.Condition))
@@ -283,6 +293,12 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             capturedEvent.Should().NotBeNull();
             capturedEvent.Result.Should().BeFalse();
             capturedEvent.Error.Should().Be("expression blew up");
+
+            // #194 - the audit event above proves the error is recorded in the journal; this proves
+            // it is ALSO independently observable via logging, so a future edit that drops
+            // EvaluateRule's LogError branch (while leaving the event alone) still fails a test.
+            fakeLogger.Entries.Should().ContainSingle(e => e.Level == LogLevel.Error)
+                .Which.Message.Should().Contain("expression blew up");
         }
 
         [Theory, AutoData]
@@ -650,6 +666,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()))
                 .Callback<ManualActivationRuleEvaluated>(x => capturedEvent = x);
 
+            // #194 - see the identical setup in EvaluateRequiredRule__...ConditionErrors above for
+            // why intercepting Host.LogWithContext's callback is the right seam here.
+            var fakeLogger = new FakeLogger();
+            mockHost
+                .Setup(x => x.LogWithContext(It.IsAny<Action<ILogger>>()))
+                .Callback<Action<ILogger>>(logAction => logAction(fakeLogger));
+
             var mockExpressionGrain = new Mock<IExpressionGrain>();
             mockExpressionGrain
                 .Setup(x => x.ExecuteAsBool(Rules.ErroringManualActivationRule.ContextRef, Rules.ErroringManualActivationRule.Condition))
@@ -671,6 +694,11 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 "an erroring expression must fall back to ManualActivationRule's spec default of TRUE, " +
                 "not the ExecutableResult<bool> failure-value default of false - a false result here means " +
                 "the human/manual activation gate is silently bypassed (#158)");
+
+            // #194 - proves the error is independently observable via logging, not just recoverable
+            // from the RaiseEvent'd audit event asserted below.
+            fakeLogger.Entries.Should().ContainSingle(e => e.Level == LogLevel.Error)
+                .Which.Message.Should().Contain("expression blew up");
 
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()), Times.Once);
 
