@@ -7,27 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Wayfinder.Benchmarks.Expressions
 {
-    // #224 section 4.1 - the headline benchmark. AddRuleExecutor
-    // (src/Wayfinder.Grains/Infrastructure/Extensions/ServiceCollectionExtensions.cs) registers the
-    // Jint Engine as transient, so ExpressionGrain.BuildExecutable builds a brand-new realm on every
-    // single sentry IfPart / ManualActivationRule / RequiredRule / RepetitionRule / ApplicabilityRule
-    // evaluation. Section 2's hypothesis is that engine construction dominates evaluation by one to
-    // three orders of magnitude - this class is what turns that from a code-trace observation into a
-    // number.
-    //
-    // Isolated first: engine construction alone, nothing else in the mix.
-    [MemoryDiagnoser]
-    public class JintEngineBenchmarks
-    {
-        // The return value matters as much as the body: a method that builds an Engine and discards
-        // it is exactly the shape the JIT is entitled to eliminate as dead code once it can prove
-        // nothing observes the result. Returning the Engine gives BenchmarkDotNet's consumer plumbing
-        // something to hold onto, which is what keeps SandboxedJintEngine.Create() from being
-        // optimized away.
-        [Benchmark]
-        public Engine CreateEngine() => SandboxedJintEngine.Create();
-    }
-
     // Three expression shapes, chosen to separate parser/evaluator floor cost (Trivial) from
     // arithmetic (Arithmetic) from JSON context binding and JsonObjectInstance marshalling
     // (BoundContext) - see design spec section 4.1, item list.
@@ -53,6 +32,30 @@ namespace Wayfinder.Benchmarks.Expressions
     //     independent of Executable construction.
     //   - EvaluateOnWarmEngine reuses both Engine and Executable, built and (for BoundContext) bound
     //     once in [GlobalSetup] - the evaluation-only floor.
+    //
+    // Omitted DI resolutions (#224 review): production's _executable(expression.Body) call runs the
+    // AddRuleExecutor factory registered in ServiceCollectionExtensions.cs, which performs
+    // sp.GetRequiredService<Engine>() (transient - this invokes the factory, i.e. is the same
+    // construction EvaluateAsWired already models) AND sp.GetRequiredService<ILogger<Executable>>()
+    // - a container resolution - on every single evaluation. EvaluateAsWired below calls
+    // SandboxedJintEngine.Create() directly and passes NullLogger<Executable>.Instance as a field
+    // reference, so both container-resolution calls themselves (as opposed to the Engine/Executable
+    // construction they trigger) are absent from every benchmark in this class. This is a
+    // conservative omission: it can only make the transient-Engine effect measured here look
+    // SMALLER than production's, never larger, since the missing DI resolutions are pure additional
+    // cost EvaluateAsWired does not pay.
+    //
+    // Grain-call envelope (#224 review): ExpressionGrain is [StatelessWorker], so every real rule
+    // evaluation is also an Orleans grain call - serialization of the Expression argument in and the
+    // ExecutableResult<T> return value out. That envelope is out of scope for this harness (design
+    // spec §1.1 - BenchmarkDotNet cannot usefully time network/serialization variance) and is
+    // UNMEASURED here, not estimated. A reader taking EvaluateAsWired vs EvaluateWithReusedEngine off
+    // the table and concluding "fix the transient registration, get ~4x on rule evaluation" is
+    // over-reading it: if the grain-call envelope is comparable to or larger than the in-process
+    // delta measured here, the reachable win from fixing the registration is a fraction of that
+    // ratio, not the ratio itself. Treat the ratio as an upper bound on the achievable win. This
+    // matters concretely because design spec §7 says the transient-registration decision waits for
+    // these numbers.
     [MemoryDiagnoser]
     public class ExpressionEvaluationBenchmarks
     {
@@ -104,6 +107,14 @@ namespace Wayfinder.Benchmarks.Expressions
         // Production shape (AddRuleExecutor + ExpressionGrain.BuildExecutable), baseline for the
         // other two. See THE CRITICAL INVARIANT above - Engine and Executable are constructed here,
         // inside the method body, on every invocation. Do not hoist either into [GlobalSetup].
+        //
+        // NullLogger caveat (mirrors StateMachineBenchmarks.cs's logging caveat): Executable logs on
+        // its catch-and-log failure path (`_logger.LogError(e, "unable to evaluate expression: ...")`
+        // - see Executable.cs), and every benchmark in this class passes
+        // NullLogger<Executable>.Instance, matching production only on the success path. None of the
+        // three shapes below throws (see the GlobalSetup self-check), so this never exercises that
+        // path - production logging cost on a FAILING expression is UNMEASURED by this class, not
+        // small, not estimated.
         [Benchmark(Baseline = true)]
         public bool EvaluateAsWired()
         {

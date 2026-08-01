@@ -34,6 +34,23 @@ namespace Wayfinder.Benchmarks.Interchange
         // production model (dozens of stages/tasks, deep nesting, many sentries). These numbers
         // characterize the small end of the range only; they say nothing about how Import/Export
         // scale for a genuinely large .cmmn document.
+        //
+        // A second, larger omission: CmmnXmlSerializer.Serializer is `static readonly`, built via
+        // `new XmlSerializer(typeof(Definitions), overrides)` - the XmlAttributeOverrides-taking
+        // constructor overload, which is the one overload the BCL does NOT cache internally (see
+        // that field's own remarks in CmmnXmlSerializer.cs). It pays runtime codegen on first
+        // touch, and this class's [GlobalSetup] calls Import before any [Benchmark] method runs,
+        // so that one-time cost lands entirely OUTSIDE the measured region. Measured (not
+        // estimated) on this reviewer's machine: the first-ever Import call in a fresh process
+        // took 127.3 ms; an equivalent standalone `new XmlSerializer(typeof(Definitions),
+        // overrides)` with nothing else around it took 34.1 ms of that. The Import Rich row this
+        // benchmark reports is on the order of 127 MICROSECONDS - roughly three orders of
+        // magnitude below what the first Import after any silo start actually costs. Every number
+        // below is a steady-state, per-deploy cost with the serializer already warm; it says
+        // nothing about the one-time first-deploy cost. There is no fix within this benchmark:
+        // Serializer is static readonly and cannot be reset within a process, so
+        // [IterationSetup] cannot isolate this - it would only re-measure the already-warm
+        // instance. A documented caveat is the correct and only fix here.
         [GlobalSetup]
         public void GlobalSetup()
         {
@@ -45,12 +62,36 @@ namespace Wayfinder.Benchmarks.Interchange
             // Nothing here would make a broken parse *fail to run* - it would just silently time
             // the catch-and-wrap path on every iteration and report numbers that look plausible
             // and mean nothing. Verify once, up front, that both directions actually succeed.
+            //
+            // IsError/Value-not-null alone is not enough: CmmnXmlSerializer's own class remarks
+            // document a failure mode where a mis-wired XmlAttributeOverrides shadow redirect
+            // (see BuildOverrides) makes every repeatable child - PlanItemDefinitions among them -
+            // "silently deserialize as empty, with no exception." That produces a non-error,
+            // non-null Definitions with nothing in it: IsError/null checks pass, and the benchmark
+            // would then time the empty-graph path on every iteration and report a fast, plausible,
+            // meaningless number. Assert the parse produced actual content - both sample fixtures
+            // model a case whose CasePlanModel Stage carries at least one plan item - matching the
+            // rigor of StateMachineBenchmarks' CanFire(Create) guard (design spec §5); that
+            // asymmetry between the two files was the finding this guard fixes.
             var importResult = CmmnXmlSerializer.Import(_xml);
             if (importResult.IsError || importResult.Value is null)
             {
                 throw new InvalidOperationException(
                     $"GlobalSetup: Import of {Model} sample failed round-trip self-check: " +
                     $"IsError={importResult.IsError}, Message='{importResult.Message}'");
+            }
+
+            var importedCase = importResult.Value.Cases?.Count > 0 ? importResult.Value.Cases[0] : null;
+            var planItemCount = importedCase?.CasePlanModel?.PlanItemDefinitions?.Count ?? 0;
+            if (planItemCount == 0)
+            {
+                throw new InvalidOperationException(
+                    $"GlobalSetup: Import of {Model} sample produced no plan items under " +
+                    "Cases[0].CasePlanModel.PlanItemDefinitions - this is the silent-empty-" +
+                    "deserialization failure mode CmmnXmlSerializer's class remarks warn about " +
+                    "(a mis-wired XmlAttributeOverrides shadow redirect). IsError/Value-not-null " +
+                    "alone would not have caught this; benchmarking this result would measure an " +
+                    "empty graph, not a real parse.");
             }
 
             _definitions = importResult.Value;
