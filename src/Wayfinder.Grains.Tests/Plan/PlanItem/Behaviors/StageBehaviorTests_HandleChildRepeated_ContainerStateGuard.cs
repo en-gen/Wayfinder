@@ -698,5 +698,103 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             remaining.Should().HaveCount(1, "the throwing entry must remain buffered for a future drain attempt");
             remaining.Single().SourceInstanceId.Should().Be(throwingSourceInstanceId);
         }
+
+        // #216 phase 1 (characterization) - StageBehavior's constructor argues at length (see its
+        // Resume/ParentResume registration remarks) that an ordinary Stage deliberately gets NO
+        // DrainPendingRepetitions hook on Reactivate: for a Stage/Task, Reactivate's only source is
+        // Failed, and an entry left buffered after the #67 ceiling faulted this Host mid-drain is,
+        // by construction, one that would immediately re-fault the container if replayed. A human
+        // reactivating from Failed is recovering from whatever ORIGINALLY faulted the Host, not
+        // asking to re-attempt every stale spawn queued behind it.
+        //
+        // That decision was argued in prose and pinned nowhere - the sibling decision it is
+        // contrasted against (CasePlanModelBehavior's source-state-guarded Reactivate hook) has a
+        // test above, but this one, the deliberate ABSENCE, had none. It is exactly the shape a
+        // consolidation into BaseBehavior would "fix" by accident, by registering the drain hook on
+        // every trigger that reaches Active.
+        //
+        // Reaches the setup the way production does rather than by seeding the store: two buffered
+        // entries, the first breaching the ceiling on drain and faulting the Host, the second left
+        // buffered and unattempted (the `break` in DrainPendingRepetitions - pinned by
+        // Resume__Given_TwoBufferedRepetitions__… above). Its nextRepetition is deliberately well
+        // UNDER the ceiling, so a Reactivate that did drain would genuinely spawn a child rather
+        // than merely hit the same ceiling refusal again.
+        [Fact]
+        public async Task Reactivate__Given_OrdinaryStageWithBufferedRepetitionFromFailed__Then_DoesNotDrain()
+        {
+            const int ceiling = 3;
+
+            var caseInstanceId = Guid.NewGuid();
+            var address = ShortGuid.NewGuid();
+            var planItemDefinitionId = ShortGuid.NewGuid();
+            var breachingSourceInstanceId = ShortGuid.NewGuid();
+            var strandedSourceInstanceId = ShortGuid.NewGuid();
+
+            var pi = new Interfaces.Model.PlanItem { Id = planItemDefinitionId };
+            var stage = new Stage { PlanItems = { pi } };
+
+            var testStore = new TestPlanItemStore(piDef: stage, initialState: PlanItemState.Suspended);
+
+            var mockPlanItemGrain = new Mock<IPlanItemInternalGrain>();
+            StubFreshlySpawnedChildSnapshot(mockPlanItemGrain);
+
+            var mockGrainFactory = new Mock<IGrainFactory>();
+            mockGrainFactory.Setup(x => x.GetGrain<IPlanItemInternalGrain>(caseInstanceId, It.IsAny<string>(), null))
+                .Returns(mockPlanItemGrain.Object);
+
+            var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.GrainFactory).Returns(mockGrainFactory.Object);
+            mockHost.Setup(x => x.Address).Returns(address);
+            mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
+            mockHost.Setup(x => x.DefinitionId).Returns(stage.Id);
+            mockHost.Setup(x => x.State).Returns(testStore);
+            mockHost.Setup(x => x.RaiseEvent(It.IsAny<object>()))
+                .Callback<object>(x => testStore.Apply((dynamic)x));
+
+            var mockMachine = new MockPlanItemStateMachine(testStore);
+
+            var subject = new StageBehavior(mockHost.Object, stage, mockMachine.Object, ceiling);
+
+            // currentRepetition=2 -> nextRepetition=3 == ceiling: refused on drain, faults the Host.
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                address, breachingSourceInstanceId, planItemDefinitionId, 2));
+            // currentRepetition=0 -> nextRepetition=1, comfortably under the ceiling: this one WOULD
+            // spawn if anything ever drained it.
+            await InvokeHandleChildRepeated(subject, new PlanItemRepetitionCriteriaMetEvent(
+                address, strandedSourceInstanceId, planItemDefinitionId, 0));
+
+            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions.Should().HaveCount(2);
+
+            await mockMachine.Object.FireAsync(PlanItemTransition.Resume);
+
+            testStore.PlanItemState.Should().Be(PlanItemState.Failed,
+                "the first buffered entry breaches the #67 ceiling on drain and faults this container");
+            ((StageBehaviorStore)testStore.BehaviorExtension).PendingRepetitions
+                .Should().ContainSingle(entry => entry.SourceInstanceId == strandedSourceInstanceId,
+                    "the drain must have stopped at the ceiling breach, stranding the second entry");
+
+            // Table 8.7/8.8 recovery: a human reactivates the Failed container.
+            await mockMachine.Object.FireAsync(PlanItemTransition.Reactivate);
+
+            testStore.PlanItemState.Should().Be(PlanItemState.Active,
+                "Reactivate itself must still work - this test is about what it does NOT do");
+
+            mockGrainFactory.Verify(
+                x => x.GetGrain<IPlanItemInternalGrain>(It.IsAny<Guid>(), It.IsAny<string>(), null), Times.Never,
+                "an ordinary Stage has no DrainPendingRepetitions hook on Reactivate - reactivating from Failed must not re-attempt the stale spawn that was queued behind the one that faulted it");
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Never);
+            mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildRepeated>()), Times.Never);
+
+            var afterReactivate = (StageBehaviorStore)testStore.BehaviorExtension;
+            afterReactivate.PendingRepetitions
+                .Should().ContainSingle(entry => entry.SourceInstanceId == strandedSourceInstanceId,
+                    "the stranded entry stays buffered and untouched across a Failed -> Reactivate recovery");
+
+            // #198 F2 - it stays buffered, but it must NOT still be holding Table 8.12 completion
+            // on the recovered container: SettleStrandedPendingRepetitions settled it where it was
+            // stranded. Asserted here so "does not drain" can never be satisfied by re-introducing
+            // the wedge that decision was paired with.
+            afterReactivate.IsRepetitionSettled(strandedSourceInstanceId).Should().BeTrue();
+        }
     }
 }
