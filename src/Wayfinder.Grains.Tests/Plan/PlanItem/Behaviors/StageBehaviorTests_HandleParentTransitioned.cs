@@ -198,10 +198,30 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
         }
 
         // #216 phase 1 (characterization) - #179's `complete` cascade had NO unit coverage on
-        // either side; the only thing pinning it was one integration scenario. Table 8.9's
-        // `complete` rows mark a Stage or Task child in {Available, Enabled, Active, Suspended}
-        // as `<impossible>` alongside a Completed parent, so a completing parent must drive the
-        // remainder out via `exit`. See StageBehavior.HandleParentTransitioned's Complete case.
+        // either side; the only thing pinning it was one integration scenario.
+        //
+        // WHAT THE TABLE SAYS. Table 8.9's `complete` rows, Stage/Task column: a child in
+        // {Available, Enabled, Active, Suspended} has Transition = N/A and To state =
+        // `<impossible>`. The table asserts the combination cannot arise. It does NOT prescribe a
+        // transition - N/A means exactly that, and the `exit, terminate` rows a few lines below it
+        // are where the table does name `exit`.
+        //
+        // WHAT THIS REPO INFERS. Table 8.12's autoComplete=TRUE criteria ("no Active children AND
+        // all REQUIRED children terminal") say nothing about non-required children, so a Stage CAN
+        // legitimately reach Completed with a non-required child still Available/Enabled - which is
+        // the `<impossible>` combination. #179 reconciles the two tables by having completion drive
+        // that remainder out via `exit`, reusing the existing downward cascade. That is a design
+        // decision, not a quotation.
+        //
+        // So a future author is free to reconcile them differently - firing `terminate` instead, or
+        // changing Table 8.12 evaluation so the Stage does not complete at all while a non-required
+        // child is still live. Either would turn this test red, and that red would be a DESIGN
+        // DISAGREEMENT to discuss, not a spec violation. What is NOT open to reinterpretation is
+        // the sibling test below (already-terminal children are left alone, which the table states
+        // outright) and the Milestone/EventListener asymmetry in MilestoneBehaviorTests /
+        // EventListenerBehaviorTests - those are the table's own cells.
+        //
+        // See StageBehavior.HandleParentTransitioned's Complete case.
         //
         // The mock host needs a real backing store here (unlike this file's other tests): the
         // Complete arm reads Host.State.PlanItemState.IsTerminal(), which NREs against a bare
@@ -254,7 +274,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit), Times.Once);
 
             mockMachine.Object.State.Should().Be(PlanItemState.Terminated,
-                "Table 8.9's `complete` row marks a non-terminal Stage child of a Completed parent `<impossible>` - completion must drive it out via exit");
+                "Table 8.9 marks a non-terminal Stage child of a Completed parent `<impossible>` (Transition = N/A); #179 reconciles that with Table 8.12 by cascading exit, which is this repo's design decision rather than the table's own prescription - see this test's remarks");
         }
 
         // #216 phase 1 (characterization) - the other half of Table 8.9's `complete` rows:

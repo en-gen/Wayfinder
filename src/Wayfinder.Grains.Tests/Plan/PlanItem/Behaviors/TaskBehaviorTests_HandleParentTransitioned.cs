@@ -199,10 +199,17 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
         // #216 phase 1 (characterization) - the Task half of #179's `complete` cascade, which had
         // no unit coverage at all. Table 8.9's `complete` rows put Task instances in the SAME
-        // `<impossible>` column as Stage instances (Available/Enabled/Active/Suspended), so this is
-        // deliberately the mirror image of
+        // column as Stage instances: {Available, Enabled, Active, Suspended} carry Transition = N/A
+        // and To state = `<impossible>`. So this is deliberately the mirror image of
         // StageBehaviorTests_HandleParentTransitioned's own pair - if the two ever diverge, one of
-        // them is wrong. See TaskBehavior.HandleParentTransitioned's Complete case.
+        // them is wrong.
+        //
+        // Firing `exit` is #179's RECONCILIATION of that `<impossible>` cell with Table 8.12, not
+        // something Table 8.9 prescribes (its N/A means no transition is named; the `exit,
+        // terminate` rows are where the table does name one). See
+        // StageBehaviorTests_HandleParentTransitioned's twin of this test for the full argument and
+        // for what a future author is and is not free to reinterpret. See also
+        // TaskBehavior.HandleParentTransitioned's Complete case.
         //
         // The mock host needs a real backing store here (unlike this file's other tests): the
         // Complete arm reads Host.State.PlanItemState.IsTerminal(), which NREs against a bare
@@ -255,7 +262,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Exit), Times.Once);
 
             mockMachine.Object.State.Should().Be(PlanItemState.Terminated,
-                "Table 8.9's `complete` row marks a non-terminal Task child of a Completed parent `<impossible>` - completion must drive it out via exit");
+                "Table 8.9 marks a non-terminal Task child of a Completed parent `<impossible>` (Transition = N/A); #179 reconciles that with Table 8.12 by cascading exit, which is this repo's design decision rather than the table's own prescription - see this test's remarks");
         }
 
         // #216 phase 1 (characterization) - Table 8.9's "may coexist" set, exactly
