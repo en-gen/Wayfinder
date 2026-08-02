@@ -333,6 +333,136 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CasePlanModel
             stageFMoved.Should().BeFalse("Table 8.9's `complete` row permits Failed to coexist with a Completed parent - it must be left alone, not cascaded to Terminated");
         }
 
+        // #216 phase 1 (characterization) - the OTHER column of Table 8.9's `complete` rows, and the
+        // one this file has been asserting only in prose.
+        //
+        // Stage and Task children in {Available, Enabled, Active, Suspended} are `<impossible>`
+        // alongside a Completed parent and are cascaded out via `exit` (the two scenarios above).
+        // Milestone and EventListener children have their OWN column: Available -> Available and
+        // Suspended -> Suspended are explicitly PERMITTED - they legitimately survive a completed
+        // parent. Table 8.7's description of a completed Stage confirms it, naming only "Stage or
+        // Task instances" as needing to be Completed/Terminated.
+        //
+        // That asymmetry is precisely why MilestoneBehavior/EventListenerBehavior deliberately have
+        // no `complete` arm in HandleParentTransitioned, and it was pinned by nothing: this file
+        // contained a Task child and a Stage child but no Milestone and no EventListener, so
+        // handing either of those types a parent-Complete cascade would have kept the whole suite
+        // green while violating this table. The unit-level twin lives in
+        // MilestoneBehaviorTests/EventListenerBehaviorTests
+        // (HandleParentTransitioned__When_ParentCompleted__Then_NoEventAndNoTransition).
+        //
+        // Case shape:
+        //   StageS (autoComplete=TRUE)
+        //     PlanItemR -> TaskR         (required, no criteria - drives StageS's completion)
+        //     PlanItemM -> MilestoneM    (non-required, NO entry criterion, so nothing can ever
+        //                                 make it Occur - it simply sits Available)
+        //     PlanItemE -> EventListenerE (UserEventListener, non-required, no authorized roles -
+        //                                 sits Available waiting for a user event that never comes)
+        // Neither Milestone nor EventListener is Active or required, so Table 8.12's
+        // autoComplete=TRUE criteria ("no Active children AND all required children terminal") are
+        // satisfied the moment TaskR completes - exactly the situation in which the two tables can
+        // only be reconciled by leaving these two children alone.
+        [Fact]
+        public async Task StageCompletionCascade__Given_AutoCompleteStageWithAvailableMilestoneAndEventListenerChildren__When_ParentCompletes__Then_ChildrenRemainAvailable()
+        {
+            var caseInstanceId = Guid.NewGuid();
+            var caseDefinitionId = $"case-{ShortGuid.NewGuid()}";
+
+            var taskRDefinition = new HumanTask { Id = "TaskR", IsBlocking = true };
+            var milestoneMDefinition = new Milestone { Id = "MilestoneM" };
+            var eventListenerEDefinition = new UserEventListener { Id = "EventListenerE" };
+
+            var stageSDefinition = new Stage
+            {
+                Id = "StageS",
+                AutoComplete = true,
+                PlanItemDefinitions = { taskRDefinition, milestoneMDefinition, eventListenerEDefinition },
+                PlanItems =
+                {
+                    new Interfaces.Model.PlanItem
+                    {
+                        Id = "PlanItemR",
+                        DefinitionRef = taskRDefinition.Id,
+                        ItemControl = new PlanItemControl { RequiredRule = Rules.IsRequiredRule }
+                    },
+                    new Interfaces.Model.PlanItem { Id = "PlanItemM", DefinitionRef = milestoneMDefinition.Id },
+                    new Interfaces.Model.PlanItem { Id = "PlanItemE", DefinitionRef = eventListenerEDefinition.Id }
+                }
+            };
+
+            var @case = new CaseModel
+            {
+                Id = caseDefinitionId,
+                CaseRoles = new CaseRoles(),
+                CasePlanModel = new Stage
+                {
+                    Id = Scope,
+                    PlanItemDefinitions = { stageSDefinition },
+                    PlanItems =
+                    {
+                        new Interfaces.Model.PlanItem { Id = "PlanItemStage", DefinitionRef = stageSDefinition.Id }
+                    }
+                }
+            };
+
+            await _clusterClient
+                .GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+                .Define(@case);
+
+            var caseGrain = _clusterClient.GetGrain<ICaseGrain>(caseInstanceId, Scope);
+            await caseGrain.Create(caseDefinitionId);
+            var caseSnapshot = await caseGrain.Trigger(PlanItemTransition.Create);
+
+            var stageSInstanceId = caseSnapshot.BehaviorExtension.Children["PlanItemStage"].Keys.Single();
+            var stageSGrain = _clusterClient.GetGrain<IPlanItemInternalGrain>(caseInstanceId, $"{Scope}.{stageSInstanceId}");
+
+            var stageSSnapshot = await stageSGrain.Trigger(PlanItemTransition.ManualStart);
+            stageSSnapshot.PlanItemState.Should().Be(PlanItemState.Active);
+
+            var stageSChildren = ((StageBehaviorSnapshot)stageSSnapshot.BehaviorExtension).Children;
+
+            var taskRGrain = ResolveChild(caseInstanceId, stageSInstanceId, stageSChildren, "PlanItemR");
+            var milestoneMGrain = ResolveChild(caseInstanceId, stageSInstanceId, stageSChildren, "PlanItemM");
+            var eventListenerEGrain = ResolveChild(caseInstanceId, stageSInstanceId, stageSChildren, "PlanItemE");
+
+            // Table 8.10/8.11: both land in Available on create and stay there - a Milestone with no
+            // entry criterion has nothing that can satisfy it, and a UserEventListener is waiting on
+            // a user event that this test never raises. If either were anything other than Available
+            // here, the assertions after the parent completes would prove nothing.
+            (await milestoneMGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available);
+            (await eventListenerEGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Available);
+
+            // Complete the only required child. The Milestone and the EventListener are Available
+            // (not Active) and not required, so Table 8.12's autoComplete=TRUE criteria are met.
+            await taskRGrain.Trigger(PlanItemTransition.ManualStart);
+            await taskRGrain.Trigger(PlanItemTransition.Complete);
+
+            var stageSCompleted = await PollUntil(
+                async () => (await stageSGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed,
+                TimeSpan.FromSeconds(10));
+            stageSCompleted.Should().BeTrue(
+                "autoComplete=true requires only that no child is Active and every required child is terminal - an Available Milestone and an Available EventListener must not hold the stage open");
+
+            // Give an (incorrect) cascade a generous window to misfire before asserting it didn't -
+            // same technique as the Disabled/Failed scenario above. A parent-Complete arm added to
+            // MilestoneBehavior/EventListenerBehavior would drive these to Terminated via
+            // ParentTerminate, and this is what would catch it.
+            var milestoneMoved = await PollUntil(
+                async () => (await milestoneMGrain.GetSnapshot()).PlanItemState != PlanItemState.Available,
+                TimeSpan.FromSeconds(3));
+            milestoneMoved.Should().BeFalse(
+                "Table 8.9's `complete` row keeps a Milestone child Available under a Completed parent - MilestoneBehavior must have no parent-Complete cascade");
+
+            var eventListenerMoved = await PollUntil(
+                async () => (await eventListenerEGrain.GetSnapshot()).PlanItemState != PlanItemState.Available,
+                TimeSpan.FromSeconds(3));
+            eventListenerMoved.Should().BeFalse(
+                "Table 8.9's `complete` row keeps an EventListener child Available under a Completed parent - EventListenerBehavior must have no parent-Complete cascade");
+
+            (await stageSGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Completed,
+                "StageS must still be Completed - the surviving children must not have reopened it");
+        }
+
         private IPlanItemInternalGrain ResolveChild(
             Guid caseInstanceId,
             string stageInstanceId,

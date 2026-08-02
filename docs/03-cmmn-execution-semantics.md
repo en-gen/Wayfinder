@@ -6,7 +6,7 @@ This is a **paraphrase with citations**, not a copy. Every rule below is restate
 
 > **The spec is not in this repo, and must not be.** It is OMG-copyrighted and this repository is public. Download it from [omg.org/spec/CMMN](https://www.omg.org/spec/CMMN/) and keep a local copy. Reading it to inform implementation is fine; redistributing it is not.
 >
-> **Navigating a local PDF:** printed page ≈ PDF page − 16 (the front matter runs ~16 pages). Clause 8 begins at printed page 107.
+> **Navigating a local PDF:** printed page ≈ PDF page − 18 (the front matter runs ~18 pages). Clause 8 begins at printed page 107. Verify with a spot-check before trusting it for a long jump: printed p.113 (Figure 8.3) is PDF p.131, and Table 8.9 at printed p.117 is PDF p.135.
 
 ## Where to look
 
