@@ -4,11 +4,19 @@
 environment has no Docker/infra available. §7 designs the reproducible harness that would
 validate this analysis later, aligned with the Testcontainers pattern work item #60 already
 established (`AzuriteClusterFixture`, `DockerAvailability`, `RequiresDockerFact`). Companion to
-[07-product-roadmap.md](07-product-roadmap.md) M2 ("runs somewhere real") and the #35 benchmark
+`07-product-roadmap.md` M2 ("runs somewhere real") and the #35 benchmark
 milestone (10k concurrent cases × 50 plan items). Findings below are grounded in direct
-inspection of `Flow.Silo/Program.cs` / `AzureOptions.cs` plus Microsoft Learn documentation and
+inspection of `Wayfinder.Silo/Program.cs` / `AzureOptions.cs` plus Microsoft Learn documentation and
 Orleans project docs/source; every claim is tagged **[E]** (evidence-backed, source linked) or
 **[R]** (reasoned/engineering judgment, no authoritative source found) — see the ledger in §8.*
+
+> **Superseded direction, 2026-08-01.** This memo's §5.4/§6 recommendation to swap memory streams
+> for Azure Queue Storage is a provider swap. The August 2026 adversarial review considered exactly
+> that fallback (finding R4) and the project explicitly did **not** adopt it — Decision D-2026-08-01
+> chose the intra-case granularity redesign (R2) instead, which removes the need for cross-grain
+> stream durability by construction rather than hardening the transport underneath it. Treat this
+> document as the pre-redesign provider analysis, not as the current plan; see
+> `04-adversarial-review-2026-08.md` §8/§9 for the redesign decision and rationale.
 
 ---
 
@@ -24,7 +32,7 @@ X for Y," it's that two pieces of the *stated* default aren't actually implement
 | Clustering/membership | Azure Table (deployed) / Localhost (dev) | **Keep Azure Table** | Membership writes are silo-count-bound, not backend-bound (§4) — Case.Flow will never get near the ceiling |
 | Grain storage (journaled state) | Azure Blob (Azurite in dev) | **Keep Azure Blob**; ADO.NET/SQL is the only credible future challenger, gated on M2's query needs | Blob-per-grain sidesteps Table's partition ceiling entirely; SQL only pays off if cross-grain queries or transactions become a real requirement |
 | Reminders | Azure Table (deployed) / InMemory (dev) | **Keep Azure Table**; revisit whether *Orleans Reminders at all* (vs. durable Quartz) is the right timer subsystem before touching the provider | 1-minute reminder floor is an Orleans-wide constraint, not a provider one |
-| Streams | **In-memory, fire-and-forget** (not Azure Queue — see §2) | **Azure Queue Storage** as the first durable provider | Matches the account default, fixes a real correctness bug (doc 06), no replay requirement exists to justify Event Hubs |
+| Streams | **In-memory, pulling-agent (at-least-once-while-alive)** — non-durable across restart (not Azure Queue — see §2) | **Azure Queue Storage** as the first durable provider | Matches the account default, fixes a real durability gap, no replay requirement exists to justify Event Hubs |
 
 Nothing here is close enough to justify fragmenting the storage story before there's a measured
 reason. The ADO.NET/SQL path for grain storage is flagged as the one genuinely open question —
@@ -35,24 +43,30 @@ Case.Flow's actual activation-storm shape (doc 06 §3.3).
 
 ## 2. Current State (grounded in code, not the brief)
 
-Direct inspection of `src/Flow.Silo/Program.cs` and `src/Flow.Silo/Infrastructure/Options/AzureOptions.cs`
+Direct inspection of `src/Wayfinder.Silo/Program.cs` and `src/Wayfinder.Silo/Infrastructure/Options/AzureOptions.cs`
 turned up two gaps between the task's framing of "the current default" and what's actually
 wired up. Both are worth a line in the record since they change what this evaluation is really
 comparing:
 
 - **Clustering + reminders**: `UseAzureStorageClustering` + `UseAzureTableReminderService`,
   both riding the same DI-resolved `TableServiceClient` (`ConfigureDeployedOrleans`,
-  `Program.cs:254-258`) — matches the brief.
+  `Program.cs:355-359`) — matches the brief.
 - **Grain storage**: `AddAzureBlobGrainStorageAsDefault` for the journaled/log-consistency slot
-  (`Program.cs:149`, Azurite locally) — matches the brief.
+  (`Program.cs:238`, Azurite locally) — matches the brief.
 - **PubSubStore (stream pub-sub metadata)**: `AddMemoryGrainStorage("PubSubStore", ...)`
-  (`Program.cs:151`) — **in-memory in both environments today**, not Table/Blob. The brief's
+  (`Program.cs:240`) — **in-memory in both environments today**, not Table/Blob. The brief's
   "durable PubSubStore on Table/Blob" describes an intended, not yet implemented, state.
-- **Streams**: `AddMemoryStreams("Default")` (`Program.cs:152`) — **in-memory in both
-  environments today**, not Azure Queue. This is a known correctness gap: with fire-and-forget
-  stream delivery (`FireAndForgetDelivery = true`), a deactivated sentry silently misses
-  transition events and stays unsatisfied forever. The roadmap item that fixes it — replacing
-  fire-and-forget streams for criticality-1 events — hasn't landed.
+- **Streams**: `AddMemoryStreams("Default")` (`Program.cs:241`) — **in-memory in both
+  environments today**, not Azure Queue. `AddMemoryStreams` is **not** fire-and-forget: it is a
+  pulling-agent provider that delivers at-least-once *while the subscriber stays alive* — an
+  agent polls the queue and redelivers on a handler failure, which is exactly why the #161
+  redelivery guard exists. The correctness gap is durability, not delivery semantics: the
+  provider (and the PubSubStore backing its subscriptions) is in-memory, so a deactivated grain
+  that never re-subscribes on reactivation, or a silo restart, can make a sentry silently miss
+  transition events and stay unsatisfied forever. The fix that closes it — a durable stream
+  provider, a durable PubSubStore, and a resubscription strategy for the sites that only re-arm
+  on `Resume` — hasn't landed; see `03-cmmn-execution-semantics.md` §8 and the August 2026
+  adversarial review's C1/D1 findings for the full shape of the gap.
 
 Practically: this memo's Streams section (§5.4) is evaluating **what should replace memory
 streams**, not swapping between two already-durable options. Everything else — clustering,
@@ -147,7 +161,7 @@ so it's the one worth taking seriously.
 
 | Dimension | Azure Blob (current) | ADO.NET / SQL Server | Redis | Cosmos DB |
 |---|---|---|---|---|
-| Throughput ceiling | Each journaled grain gets its **own blob** within the shared container (`CaseStateContainerFactory`, `Program.cs:216-229`), so traffic spreads across the **account-level** ceiling (20,000–40,000 req/s, region-dependent — [Standard storage account scalability, Microsoft Learn](https://learn.microsoft.com/en-us/azure/storage/common/scalability-targets-standard-account) **[E]**), not a punishing per-key ceiling. The commonly-cited ~500 req/s target is *per blob*, so it's a non-issue when each grain owns its blob **[E+R]** | Bound by connection-pool + row/page lock contention, not a documented storage-service ceiling — the real risk is the .NET default max pool size of 100 connections per client instance saturating under an activation storm **[E, general ADO.NET pooling]** **[R, Orleans-specific interaction]** | Highest raw throughput of the four (in-memory) **[R]** | RU-metered per operation; no fixed "ops/sec" ceiling, cost scales linearly with request volume instead (see cost row) |
+| Throughput ceiling | Each journaled grain gets its **own blob** within the shared container (`CaseStateContainerFactory`, `Program.cs:317-329`), so traffic spreads across the **account-level** ceiling (20,000–40,000 req/s, region-dependent — [Standard storage account scalability, Microsoft Learn](https://learn.microsoft.com/en-us/azure/storage/common/scalability-targets-standard-account) **[E]**), not a punishing per-key ceiling. The commonly-cited ~500 req/s target is *per blob*, so it's a non-issue when each grain owns its blob **[E+R]** | Bound by connection-pool + row/page lock contention, not a documented storage-service ceiling — the real risk is the .NET default max pool size of 100 connections per client instance saturating under an activation storm **[E, general ADO.NET pooling]** **[R, Orleans-specific interaction]** | Highest raw throughput of the four (in-memory) **[R]** | RU-metered per operation; no fixed "ops/sec" ceiling, cost scales linearly with request volume instead (see cost row) |
 | Latency p50/p99 | Typical in-region Blob HTTP+auth round trip — no authoritative Case.Flow-specific figure found; would need the harness in §7 **[R]** | Comparable or lower for a warm in-VNet connection, at the cost of connection-pool pressure under concurrency **[R]** | Sub-millisecond in the common case **[R]** | Comparable to Blob; consistency-level dependent (see below) |
 | Scalability ceiling | Effectively the storage-account ceiling above; can be raised further by support request **[E]** | Lock contention and pool exhaustion under the exact "activation storm" pattern `docs/06` §3.3 already flags as a scale risk **[R]** | None from Redis itself; ceiling is the durability trade-off (below) | RU/s provisioned ceiling; can autoscale but costs more at peak (below) |
 | Operational complexity | Already the default; zero new infra | New SQL resource, schema/migration story, connection management | New cache resource, persistence must be explicit | New Cosmos account, container/partition-key design, RU capacity planning |
@@ -183,7 +197,7 @@ before those objections are addressed.
 | Dimension | Azure Table (current) | ADO.NET / SQL Server |
 |---|---|---|
 | Throughput/scale | Low-volume workload (registration/cancellation writes + periodic due-tick scans) — nowhere near either backend's ceiling **[R]** | Same |
-| Operational complexity | Reuses the exact same `TableServiceClient` already backing clustering — genuinely "one less resource," not just a slogan (`Program.cs:277-285`) | New resource unless already adopted for grain storage (§5.2) |
+| Operational complexity | Reuses the exact same `TableServiceClient` already backing clustering — genuinely "one less resource," not just a slogan (`Program.cs:384-386`) | New resource unless already adopted for grain storage (§5.2) |
 | Consistency | Reminder rows are independent per grain; no contention concern observed | Same |
 
 **The real decision here isn't the provider — it's whether Orleans Reminders is even the right
@@ -217,7 +231,7 @@ Restating §2: this is "what replaces memory streams," not a swap between two du
 | Fit for Case.Flow's actual need | CMMN's internal signaling (plan-item transition events → sentry subscriptions) is consume-once, no spec-identified need to replay a stream | Replay/audit is already handled by the event-sourced grain journal (the `Apply`/journal pattern), so Event Hubs' signature strength is redundant here |
 
 **Recommendation: Azure Queue Storage.** It matches the account default, directly fixes the
-fire-and-forget correctness gap `docs/06` already flags, and nothing about CMMN's internal
+non-durable-transport correctness gap flagged in §2, and nothing about CMMN's internal
 signaling needs Event Hubs' replay or throughput headroom. Event Hubs would be justified if
 Case.Flow ever needs genuine external-eventing replay — but that's explicitly work item #56's
 job (the *external* sink), which this spike's brief deliberately keeps separate from the
@@ -312,7 +326,7 @@ not execute, the empirical validation.
 - ADO.NET default connection pool max size (100) as the generic saturation mechanism —
   general .NET/SQL Server ADO.NET documentation (not Orleans-specific)
 - Current Case.Flow provider wiring (clustering, storage, reminders, streams, PubSubStore) —
-  direct read of `src/Flow.Silo/Program.cs` and `src/Flow.Silo/Infrastructure/Options/AzureOptions.cs`
+  direct read of `src/Wayfinder.Silo/Program.cs` and `src/Wayfinder.Silo/Infrastructure/Options/AzureOptions.cs`
   in this repository
 
 **Reasoned, not independently verified [R]**:
