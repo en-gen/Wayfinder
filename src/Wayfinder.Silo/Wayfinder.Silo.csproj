@@ -34,7 +34,7 @@
       Microsoft.Orleans.Hosting.AzureCloudServices and Microsoft.Orleans.OrleansAzureUtils remain
       removed - no code path references those.
     -->
-    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Quartz" Version="3.18.2" />
     <PackageReference Include="Serilog.Exceptions" Version="8.4.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />

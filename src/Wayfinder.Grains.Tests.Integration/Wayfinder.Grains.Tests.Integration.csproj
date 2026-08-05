@@ -49,7 +49,7 @@
     <!-- Real Azure Table clustering suite (work item #30): validates Wayfinder.Silo's
          ConfigureDeployedOrleans clustering choice (UseAzureStorageClustering) actually forms a
          multi-silo cluster against a real Azure Table membership store (Azurite locally/in CI). -->
-    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
     <PackageReference Include="Microsoft.Orleans.Streaming" Version="10.2.1" />
