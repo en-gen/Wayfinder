@@ -45,7 +45,7 @@
          2.X line's patched release (2.7.5+) explicitly - a same-major bump over the transitive
          floor, not a cross-major jump, to stay within Microsoft.AspNetCore.OpenApi 10.0.9's tested
          API surface. -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.7.6" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.9.0" />
     <!-- ADO #33 - JwtBearer authentication against the trusted Zitadel issuer (Authority/Audience
          from configuration - see Infrastructure/Options/ZitadelAuthOptions.cs). Still shipped as a
          NuGet package (not part of the Microsoft.AspNetCore.App shared framework) even on net10;
