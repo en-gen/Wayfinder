@@ -176,7 +176,7 @@ jobs:
       # false failure to an external contributor. fail-on-error:false is a second belt.
       - name: Publish test results
         if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         with:
           name: Test results
           path: '**/*.trx'
