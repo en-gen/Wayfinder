@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/schema.json",
+  "_comment": [
+    "Default run: mutate the CMMN semantics layer, kill with the FAST UNIT SUITE.",
+    "Takes well under a minute and is the one to use in a dev loop.",
+    "For the conformance-corpus acceptance-gate measurement, use:",
+    "  dotnet stryker --config-file stryker-conformance.json",
+    "See .claude/skills/dotnet-test/SKILL.md for how to read the output."
+  ],
+  "stryker-config": {
+    "solution": "src/Wayfinder.sln",
+    "project": "Wayfinder.Grains.csproj",
+    "test-projects": [
+      "src/Wayfinder.Grains.Tests/Wayfinder.Grains.Tests.csproj"
+    ],
+
+    "mutate": [
+      "**/Plan/PlanItem/Behaviors/**/*.cs",
+      "**/Plan/PlanItem/StateMachine/**/*.cs",
+      "**/Plan/Sentry/**/*.cs",
+      "!**/Events/**/*.cs"
+    ],
+
+    "coverage-analysis": "perTest",
+    "concurrency": 2,
+
+    "thresholds": { "high": 80, "low": 60, "break": 0 },
+
+    "reporters": ["html", "progress", "json"],
+    "report-file-name": "stryker-unit"
+  }
+}
