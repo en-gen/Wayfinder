@@ -19,7 +19,7 @@
     <!-- Journaled-grain (LogStorage log-consistency) storage backend: Azure Blob, Azurite in
          Development (work item #54). See Program.cs ConfigureDevelopmentOrleans for the slot
          this is wired into and why. -->
-    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Reminders" Version="10.2.1" />
     <!-- Durable reminder storage for the deployed path (work item #30): Azure Table, same
          cluster-membership table endpoint as Clustering.AzureStorage below. Development keeps
