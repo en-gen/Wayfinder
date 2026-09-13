@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-net/master/src/Stryker.Core/Stryker.Core/schema.json",
+  "_comment": [
+    "Acceptance-gate measurement: does the conformance corpus actually DETECT a",
+    "semantics defect, or does it merely execute the code? D-2026-08-01 makes the",
+    "corpus the gate for the case-grain redesign, so this is the number that matters.",
+    "",
+    "coverage-analysis MUST stay 'off': both 'perTest' and",
+    "'all' report every mutant as NoCoverage against the Orleans TestCluster harness",
+    "(measured - see the skill), so Stryker tests nothing and reports a false 0%.",
+    "With coverage off every mutant runs all 41 scenarios. Measured ~3.3s per mutant",
+    "at concurrency 2, plus ~1 min startup - so scope drives the runtime, not a fixed",
+    "cost. Time a narrow run before launching the full scope."
+  ],
+  "stryker-config": {
+    "solution": "src/Wayfinder.sln",
+    "project": "Wayfinder.Grains.csproj",
+    "test-projects": [
+      "src/Wayfinder.Grains.Tests.Integration/Wayfinder.Grains.Tests.Integration.csproj"
+    ],
+    "test-case-filter": "FullyQualifiedName~Wayfinder.Grains.Tests.Integration.Conformance",
+
+    "mutate": [
+      "**/Plan/PlanItem/Behaviors/**/*.cs",
+      "**/Plan/PlanItem/StateMachine/**/*.cs",
+      "**/Plan/Sentry/**/*.cs",
+      "!**/Events/**/*.cs"
+    ],
+
+    "coverage-analysis": "off",
+    "concurrency": 2,
+    "additional-timeout": 60000,
+
+    "thresholds": { "high": 80, "low": 60, "break": 0 },
+
+    "reporters": ["html", "progress", "json"],
+    "report-file-name": "stryker-conformance"
+  }
+}
