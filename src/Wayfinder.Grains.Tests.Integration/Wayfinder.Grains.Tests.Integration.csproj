@@ -30,7 +30,7 @@
          probe from #54/#17): MIT-licensed, maintained by the Testcontainers org, actively
          released (4.13.0, 2026-07). AzuriteClusterFixture owns the container lifecycle; see
          that file for the AzuriteBuilder/AzuriteContainer wiring. -->
-    <PackageReference Include="Testcontainers.Azurite" Version="4.13.0" />
+    <PackageReference Include="Testcontainers.Azurite" Version="4.15.0" />
     <!-- Docker-availability gate (DockerAvailability/RequiresDockerFact): the same client
          library Testcontainers itself uses to talk to the daemon (pinned to the exact version
          Testcontainers.Azurite 4.13.0 pulls transitively), so the discovery-time probe and the
