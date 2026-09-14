@@ -1,0 +1,6 @@
+case state=Active userCompletable=False required=False repeatable=False repeated=False
+plan
+  PlanItemStageA#00 name=PlanItemStageA type=Stage state=Active required=False repeatable=False repeated=False manuallyActivatable=True userCompletable=True parentSuspendState=-
+    PlanItemNonRequired#00 name=PlanItemNonRequired type=HumanTask state=Active required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+    PlanItemRequired#00 name=PlanItemRequired type=HumanTask state=Completed required=True repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile

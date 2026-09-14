@@ -1,0 +1,6 @@
+case state=Completed userCompletable=False required=False repeatable=False repeated=False
+plan
+  PlanItemA#00 name=PlanItemA type=Milestone state=Completed required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile
+  ItemA name=ItemA state=Available version=3 value={"amount":150}
+  ItemB name=ItemB state=Available version=2 value={"noise":true}

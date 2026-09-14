@@ -1,0 +1,5 @@
+case state=Completed userCompletable=True required=False repeatable=False repeated=False
+plan
+  PlanItemA#00 name=PlanItemA type=Milestone state=Terminated required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile
+  NeverTouchedItem name=NeverTouchedItem (not created)

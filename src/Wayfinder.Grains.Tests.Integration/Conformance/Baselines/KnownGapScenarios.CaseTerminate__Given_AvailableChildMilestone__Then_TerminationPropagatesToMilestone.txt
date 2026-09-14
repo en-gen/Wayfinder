@@ -1,0 +1,4 @@
+case state=Terminated userCompletable=False required=False repeatable=False repeated=False
+plan
+  PlanItemA#00 name=PlanItemA type=Milestone state=Terminated required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile

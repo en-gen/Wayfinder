@@ -1,0 +1,4 @@
+case state=Completed userCompletable=False required=False repeatable=False repeated=False
+plan
+casefile
+  TheItem name=TheItem state=Discarded version=3 value={"v":1}

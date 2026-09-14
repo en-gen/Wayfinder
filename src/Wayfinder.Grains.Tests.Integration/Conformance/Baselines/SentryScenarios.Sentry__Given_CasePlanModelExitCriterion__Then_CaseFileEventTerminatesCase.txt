@@ -1,0 +1,5 @@
+case state=Terminated userCompletable=False required=False repeatable=False repeated=False
+plan
+  PlanItemTaskA#00 name=PlanItemTaskA type=HumanTask state=Terminated required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile
+  ExitItem name=ExitItem state=Available version=3 value={"abort":true}

@@ -1,0 +1,6 @@
+case state=Completed userCompletable=False required=False repeatable=False repeated=False
+plan
+  PlanItemA#00 name=PlanItemA type=Milestone state=Completed required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile
+  ChildItem name=ChildItem state=Available version=2 value={"kind":"child"}
+  ParentItem name=ParentItem state=Available version=3 value={"kind":"parent"}

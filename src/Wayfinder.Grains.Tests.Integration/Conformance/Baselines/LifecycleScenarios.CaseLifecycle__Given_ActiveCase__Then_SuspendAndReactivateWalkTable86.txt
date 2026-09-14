@@ -1,0 +1,4 @@
+case state=Active userCompletable=True required=False repeatable=False repeated=False
+plan
+  PlanItemA#00 name=PlanItemA type=HumanTask state=Active required=False repeatable=False repeated=False manuallyActivatable=False userCompletable=False parentSuspendState=-
+casefile

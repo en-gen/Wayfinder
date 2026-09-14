@@ -53,6 +53,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
             completed.Should().BeTrue(
                 "Table 8.2 (replace): the replace operation must publish its own standardEvent and satisfy the replace-keyed OnPart");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.2 (addChild): "Available -> Available" - one of the eight CaseFileItem
@@ -83,6 +87,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
             completed.Should().BeTrue(
                 "Table 8.2 (addChild): the addChild operation must publish its own standardEvent and satisfy the addChild-keyed OnPart");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.1/8.2 (delete): "Available -> Discarded", and Discarded is terminal: "A
@@ -109,6 +117,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var furtherUpdate = async () => await item.Update(JsonNode.Parse("""{"v": 2}"""));
             await furtherUpdate.Should().ThrowAsync<InvalidOperationException>(
                 "Table 8.1: Discarded is terminal - a deleted CaseFileItem accepts no further operations");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
     }
 }
