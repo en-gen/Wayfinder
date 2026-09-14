@@ -92,6 +92,11 @@
     <!-- ADO #21 - the conformance suite's scenario corpus: every scenario is a real .cmmn file,
          embedded for the same reason as the #20 flagship above. -->
     <EmbeddedResource Include="Conformance\Samples\*.cmmn" />
+    <!-- Issue #247 (P0 characterization) - the committed final-state baselines the conformance
+         scenarios verify against (see Conformance/CaseCharacterization.cs). Embedded for the
+         same reason as the samples above: the comparison must not depend on the test assembly's
+         output directory layout. -->
+    <EmbeddedResource Include="Conformance\Baselines\*.txt" />
   </ItemGroup>
 
   <ItemGroup>

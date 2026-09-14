@@ -1,0 +1,4 @@
+case state=Completed userCompletable=True required=False repeatable=False repeated=False
+plan
+  PlanItemStageEmpty#00 name=PlanItemStageEmpty type=Stage state=Completed required=False repeatable=False repeated=False manuallyActivatable=True userCompletable=False parentSuspendState=-
+casefile

@@ -1,0 +1,5 @@
+case state=Completed userCompletable=True required=False repeatable=False repeated=False
+plan
+  MilestonePlanItem#00 name=MilestonePlanItem type=Milestone state=Completed required=False repeatable=True repeated=True manuallyActivatable=False userCompletable=False parentSuspendState=-
+  SourcePlanItem#00 name=SourcePlanItem type=HumanTask state=Completed required=False repeatable=False repeated=False manuallyActivatable=True userCompletable=False parentSuspendState=-
+casefile

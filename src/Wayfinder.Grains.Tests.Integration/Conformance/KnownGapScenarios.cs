@@ -118,6 +118,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await stageGrain.GetSnapshot()).UserCompletable);
             manualCompletionAvailable.Should().BeTrue(
                 "Table 8.12 (autoComplete=FALSE, Manual-Completion branch): with all REQUIRED children terminal, a Case worker's manual completion must be available regardless of the non-required Active child (D4)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (complete) + 8.6.4: "Stage and Task instances with a RepetitionRule that do
@@ -175,6 +179,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             secondInstanceSpawned.Should().BeTrue(
                 "8.6.4: a no-entry-criteria item with a TRUE RepetitionRule must get a new instance when one completes (D7) - the owning Stage's child bookkeeping must show a second instance");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.5 (Suspended): "A Case instance MUST propagate this state to its outermost
@@ -201,6 +209,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Suspended);
             taskSuspended.Should().BeTrue(
                 "Table 8.5: the Case MUST propagate Suspended down to the outermost Stage instance's contained Task instances (Table 8.8 parent suspend)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (terminate): "This state propagates down to the outermost Stage instance,
@@ -225,6 +237,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
             milestoneTerminated.Should().BeTrue(
                 "Table 8.6 (terminate) propagates down; Table 8.11 (parent terminate): Available -> Terminated when the parent stage terminates");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (re-activate) + Table 8.9's resume-propagation analog (note (2): children
@@ -266,6 +282,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Active);
             taskReleased.Should().BeTrue(
                 "Table 8.9 note (2) analog for the outermost Stage: leaving Suspended must return the cascaded-suspended child to its pre-suspend state (Active) - a reactivated Case whose entire plan stays frozen is not executing (D8)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (parent suspend / parent resume) for a NESTED stage: suspending StageA must
@@ -308,6 +328,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Active);
             taskResumed.Should().BeTrue(
                 "Table 8.8 (parent resume)/Table 8.9 note (2): the child must return to the state it had before the parent suspend - Active");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.9 (exit rows): when a Stage terminates via its exit criterion, its children
@@ -347,6 +371,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
             taskTerminated.Should().BeTrue(
                 "Table 8.7/8.9: a terminating Stage MUST propagate Terminated to its contained Task instances (exit: Active -> Terminated)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (start) for a nested STAGE + 8.7: with a FALSE ManualActivationRule, StageA
@@ -381,6 +409,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 stageAddress);
             (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Active,
                 "8.7: the auto-started Stage must instantiate its planned PlanItems on entry to Active");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 5.4.8/Table 5.34: a Stage aggregates its own planItemDefinitions - declaring a task's
@@ -427,6 +459,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             // TaskA definition resolved and its PlanItem instantiated (5.4.8 + 8.7).
             (await taskGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Enabled,
                 "Table 5.51: TaskA declares no ManualActivationRule, so 8.7's instantiation leaves it waiting Enabled for a Case worker - reaching this state at all proves the nested-declared definition resolved (5.4.8)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
     }
 }

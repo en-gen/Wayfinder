@@ -62,6 +62,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
             completed.Should().BeTrue(
                 "8.5: with both OnParts occurred and no IfPart, the sentry is satisfied - Table 8.11 (occur): the Milestone completes");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 8.5: "All of the OnParts are satisfied AND the IfPart condition evaluates to TRUE" -
@@ -95,6 +99,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
             completed.Should().BeTrue(
                 "8.5: OnPart occurred AND IfPart TRUE (value.status == 'approved') - the sentry fires and the Milestone occurs");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 8.5: "The IfPart condition evaluates to TRUE AND there are no OnParts" (satisfaction
@@ -134,6 +142,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
             completed.Should().BeTrue(
                 "8.5 satisfaction bullet 3: the IfPart evaluates TRUE and there are no OnParts - the sentry is satisfied and the Milestone occurs");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (exit): "Transition when the exit criteria of the Stage or Task instance
@@ -160,6 +172,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await taskGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
             terminated.Should().BeTrue(
                 "Table 8.8 (exit): the Task must transition Active -> Terminated when its exit criterion's sentry is satisfied");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // ADO #183 - Table 8.8 (exit) + 8.5: satisfying a Task's EXIT criterion must journal and
@@ -241,6 +257,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "EntryCriterionSatisfied event for what was actually an exit-criterion satisfaction - exactly " +
                 "the corrupted audit/journal record #183 describes, and any replay/rehydration of this grain " +
                 "from the journal will reproduce the same corrupted EntryCriterionStore every time.");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // ADO #183 companion (positive path): Table 8.7 (entry) + 8.5 sentry semantics - a
@@ -288,6 +308,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "correctly-typed EntryCriterionSatisfied - not merely reflected in the in-memory projection");
             afterEvents.OfType<ExitCriterionSatisfied>().Should().BeEmpty(
                 "TaskA declares no exit criterion at all - no ExitCriterionSatisfied should ever be journaled for it");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (exit) for a STAGE: StageA's exit criterion fires from a case-file event and
@@ -317,6 +341,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await stageGrain.GetSnapshot()).PlanItemState == PlanItemState.Terminated);
             stageTerminated.Should().BeTrue(
                 "Table 8.8 (exit): the Stage must transition Active -> Terminated when its exit criterion's sentry is satisfied");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (terminate) / 8.4.1 for the CasePlanModel ITSELF, as opposed to the sample
@@ -389,6 +417,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             taskATerminated.Should().BeTrue(
                 "Table 8.9: the CasePlanModel's termination must cascade to its child TaskA, whether the " +
                 "CasePlanModel itself reached Terminated via `terminate` or `exit`");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 8.6.4: "Stage and Task instances with a RepetitionRule will try to create a new
@@ -445,6 +477,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await milestoneGrain.GetSnapshot()).Repeated);
             repeated.Should().BeTrue(
                 "8.6.4/Figure 8.5: the second, distinct source occurrence must satisfy the SAME sentry again - it re-arms per occurrence rather than latching Satisfied forever - reaching the milestone's repetition branch");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 5.30 (exit mode) + Bug #82 (D10): "the PlanItemOnPart of the Sentry occurs when
@@ -487,6 +523,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "Table 5.30 (exit mode): ListenerSentry's planItemOnPart names TaskA's own ExitCriterion_1 via " +
                 "exitCriterionRef - TaskA exiting through THAT criterion must occur the OnPart, satisfy " +
                 "ListenerSentry, and complete ListenerMilestone (Table 8.11 occur)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 5.4.4/Table 5.30 + Table 8.11 (occur): a PlanItem's entryCriteria is a collection - MORE
@@ -522,6 +562,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             completed.Should().BeTrue(
                 "Table 8.11 (occur): satisfying EntryCriterion_2/SentryB alone is enough - a PlanItem " +
                 "with multiple entry criteria needs only ONE of its achieving Sentries satisfied");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
     }
 }

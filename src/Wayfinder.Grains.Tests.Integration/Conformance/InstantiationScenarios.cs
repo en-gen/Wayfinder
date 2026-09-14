@@ -44,6 +44,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             deployed.AfterCreateSnapshot.BehaviorExtension.Children.Should().HaveCount(2,
                 "8.7: every PlanItem of the plan - exactly the two declared - must have been instantiated");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 8.7 Planning: "Users (Case workers) are said to 'plan' (in run-time), when they select
@@ -64,6 +68,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "5.4.9.2/8.7: DiscretionaryItems are planned at a Case worker's run-time discretion, never auto-instantiated");
             deployed.AfterCreateSnapshot.BehaviorExtension.Children.Should().HaveCount(1,
                 "only the one fixed PlanItem may exist - the DiscretionaryItem must not have added a second child");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
     }
 }

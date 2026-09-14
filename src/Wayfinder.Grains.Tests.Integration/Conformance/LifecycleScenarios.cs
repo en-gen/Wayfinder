@@ -44,6 +44,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             afterTrigger.PlanItemState.Should().Be(PlanItemState.Active,
                 "Table 8.6 (create): the outermost Stage instance skips Available and MUST transition directly to Active");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 5.51: "If no ManualActivationRule is specified, then the default is considered
@@ -80,6 +84,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 async () => (await deployed.CaseGrain.GetSnapshot()).PlanItemState == PlanItemState.Completed);
             caseCompleted.Should().BeTrue(
                 "Table 8.12 (autoComplete=TRUE): no Active children and all required children terminal - the CasePlanModel must complete (Table 8.6 complete)");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // 8.6.2: "If this rule evaluates to TRUE, the Task or Stage instance transitions from
@@ -98,6 +106,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var snapshot = await taskGrain.GetSnapshot();
             snapshot.PlanItemState.Should().Be(PlanItemState.Active,
                 "8.6.2/Table 8.8 (start): a FALSE ManualActivationRule means Available -> Active directly, never pausing in Enabled");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (disabled): Enabled -> Disabled by Case worker decision; (re-enable):
@@ -126,6 +138,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var active = await taskGrain.Trigger(PlanItemTransition.ManualStart);
             active.PlanItemState.Should().Be(PlanItemState.Active,
                 "after re-enable the Task must be startable exactly as if never disabled");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 5.39: "If isBlocking is set to FALSE, the Task is not waiting for the work to
@@ -145,6 +161,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             completed.Should().BeTrue(
                 "Table 5.39: a non-blocking Task completes immediately upon activation, with no external Complete trigger");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (fault): Active -> Failed, "This state MUST NOT propagate"; (re-activated):
@@ -187,6 +207,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "the lone child now Terminated, Table 8.12's autoComplete=FALSE Branch 1 is satisfied and " +
                 "the Case is guaranteed to complete shortly after, so asserting Active here would just be " +
                 "racing that guaranteed completion, not pinning anything the spec actually mandates");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.11 (create): Milestone -> Available; (suspend): Available -> Suspended by Case
@@ -216,6 +240,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var terminated = await milestoneGrain.Trigger(PlanItemTransition.Terminate);
             terminated.PlanItemState.Should().Be(PlanItemState.Terminated,
                 "Table 8.11 (terminate): Available -> Terminated by Case worker decision");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.8 (manual start) for a STAGE: Enabled -> Active by Case worker decision, and
@@ -260,6 +288,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var stageResumed = await stageGrain.Trigger(PlanItemTransition.Resume);
             stageResumed.PlanItemState.Should().Be(PlanItemState.Active,
                 "Table 8.8 (resume): Suspended -> Active by Case worker decision");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (terminate): Active -> Terminated by Case worker decision; (re-activate):
@@ -280,6 +312,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var reactivatedCase = await deployed.CaseGrain.Trigger(PlanItemTransition.Reactivate);
             reactivatedCase.PlanItemState.Should().Be(PlanItemState.Active,
                 "Table 8.6 (re-activate): Terminated -> Active by a Case worker or administrator");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (suspend): Active -> Suspended by Case worker decision; (re-activate):
@@ -300,6 +336,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var reactivatedCase = await deployed.CaseGrain.Trigger(PlanItemTransition.Reactivate);
             reactivatedCase.PlanItemState.Should().Be(PlanItemState.Active,
                 "Table 8.6 (re-activate): Suspended -> Active by a Case worker or administrator");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (close): {Completed, Terminated, Failed, Suspended} -> Closed "when no
@@ -333,6 +373,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Closed,
                 "the rejected reactivation attempt must not move the Case off Closed");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.6 (fault): Active -> Failed "when the outermost Stage instance reaches the
@@ -350,6 +394,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
             var reactivatedCase = await deployed.CaseGrain.Trigger(PlanItemTransition.Reactivate);
             reactivatedCase.PlanItemState.Should().Be(PlanItemState.Active,
                 "Table 8.6 (re-activate): Failed -> Active once the failure is resolved");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.12, autoComplete=TRUE column: "There are no Active children, AND all required
@@ -398,6 +446,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "Table 8.12 autoComplete=TRUE is satisfied vacuously by a Stage with zero children - " +
                 "if completion were only ever evaluated from inside HandleChildTransitioned (issue #180), " +
                 "a Stage that creates no children could never trigger that evaluation and would be wedged Active forever");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.12, autoComplete=FALSE column: requires EXPLICIT completion (the Manual
@@ -441,6 +493,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "the Stage was never wedged - Table 8.12's Manual Completion branch is vacuously " +
                 "satisfied by zero required children, so an explicit Trigger(Complete) succeeds " +
                 "immediately");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.12, autoComplete=TRUE column, follow-up: the column carries NO "no
@@ -478,6 +534,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
                 "(that conjunct exists only in the autoComplete=FALSE column's Branch 1) - a Stage " +
                 "with zero fixed PlanItems and an un-planned PlanningTable completes exactly as " +
                 "vacuously as one with no PlanningTable at all");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
 
         // Table 8.9 (complete rows / <impossible> cells) + issue #178 - before that fix, a
@@ -594,6 +654,10 @@ namespace Wayfinder.Grains.Tests.Integration.Conformance
 
             (await deployed.CaseGrain.GetSnapshot()).PlanItemState.Should().Be(PlanItemState.Completed,
                 "the CasePlanModel must still be Completed - unaffected by the refused spawn attempt");
+
+            // #247 (P0 characterization): pin this scenario's FULL observable final state,
+            // not only the points its citations assert - see CaseCharacterization.cs.
+            await _harness.VerifyCharacterization(deployed);
         }
     }
 }
