@@ -331,9 +331,8 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CaseFileItem
         //                          IfPart { ContextRef = "TheCaseFileItem",
         //                                   Condition = "value.amount > 100" } }
         //
-        // Before this work item, EvaluateIfPart already called
-        // GrainFactory.GetGrain<IExpressionGrain>(...).ExecuteAsBool(ContextRef, Condition) (see
-        // SentryGrain), but ExpressionGrain.BuildExecutable never bound the referenced
+        // Before this work item, EvaluateIfPart already evaluated (ContextRef, Condition) (see
+        // SentryGrain), but the expression binder never bound the referenced
         // CaseFileItem's Value into the Jint scope - `value.amount` had nothing to see. This test
         // is the D1 unlock: the OnPart occurring is necessary but not sufficient: only once the
         // bound value's amount exceeds 100 does the sentry actually fire.
@@ -438,7 +437,7 @@ namespace Wayfinder.Grains.Tests.Integration.Plan.CaseFileItem
         }
 
         // Same shape, but the CaseFileItem named by IfPart.ContextRef is never created. Per this
-        // work item's documented deviation (see ExpressionGrain.BuildExecutable), this is treated
+        // work item's documented deviation (see ExpressionEvaluator.Bind), this is treated
         // as an expression failure, and per SentryGrain.EvaluateIfPart, an IfPart evaluation
         // failure means the ifPart is NOT satisfied - the OnPart occurring is not enough to fire
         // the sentry, and the Milestone must stay Available indefinitely.

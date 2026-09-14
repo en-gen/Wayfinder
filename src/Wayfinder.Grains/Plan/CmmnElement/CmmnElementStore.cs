@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using Wayfinder.Grains.Plan;
 using Wayfinder.Grains.Plan.CmmnElement.Events;
 using Orleans;
 
@@ -14,6 +15,10 @@ namespace Wayfinder.Grains.Plan.CmmnElement
         [Id(1)]
         public TDefinition Definition { get; private set; }
 
+        // Design 05 section A.5 - see CmmnElementDefined.Pin.
+        [Id(2)]
+        public CaseModelPin Pin { get; private set; }
+
         [IgnoreDataMember]
         public bool Defined => Definition != null;
 
@@ -22,6 +27,7 @@ namespace Wayfinder.Grains.Plan.CmmnElement
             base.Apply(@event);
             CaseDefinitionId = @event.CaseDefinitionId ?? throw new ArgumentNullException(nameof(@event.CaseDefinitionId));
             Definition = @event.Definition;
+            Pin = @event.Pin;
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Interfaces.Model;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -37,6 +38,12 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         IBehaviorStore State { get; }
 
         IGrainFactory GrainFactory { get; }
+
+        // Expression evaluation with its context already bound by this host (design 05 section
+        // D.2). Behaviors MUST go through this rather than reaching for GrainFactory: the
+        // evaluator itself makes no outbound grain calls, and binding belongs to whoever already
+        // holds the data - which after phase P2 is the case grain, locally.
+        IExpressionContext Expressions { get; }
 
         void RaiseEvent<TEvent>(TEvent @event);
         Task ConfirmEvents();

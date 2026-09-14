@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Infrastructure.Mapping;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
@@ -24,8 +25,10 @@ namespace Wayfinder.Grains.Plan.Case
         IBehaviorHost
     {
         private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
+        private readonly IExpressionEvaluator _expressionEvaluator;
 
         private IPlanItemBehavior _casePlanModel;
+        private IExpressionContext _expressions;
 
         #region BehaviorHost
 
@@ -66,6 +69,7 @@ namespace Wayfinder.Grains.Plan.Case
         IBehaviorDefinition IBehaviorHost.Definition => Definition;
         IBehaviorStore IBehaviorHost.State => TentativeState;
         IGrainFactory IBehaviorHost.GrainFactory => GrainFactory;
+        IExpressionContext IBehaviorHost.Expressions => _expressions;
 
         void IBehaviorHost.RaiseEvent<TEvent>(TEvent @event) => RaiseEvent(@event);
         Task IBehaviorHost.ConfirmEvents() => ConfirmEvents();
@@ -84,15 +88,19 @@ namespace Wayfinder.Grains.Plan.Case
 
         public CaseGrain(
             IPlanItemBehaviorConfigurator behaviorConfigurator,
+            IExpressionEvaluator expressionEvaluator,
             ILogger<CaseGrain> logger) :
             base(logger)
         {
             _behaviorConfigurator = behaviorConfigurator ?? throw new ArgumentNullException(nameof(behaviorConfigurator));
+            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
+
+            _expressions = new ExpressionContext(_expressionEvaluator, GrainFactory, _caseInstanceId, () => TentativeState.Pin);
 
             if (State.Defined)
             {
@@ -110,11 +118,22 @@ namespace Wayfinder.Grains.Plan.Case
             var @case = await caseDefinitionGrain.GetDefinition();
             @case.CasePlanModel.IsCasePlanModel = true;
 
+            // Pin the declared caseFileModel item ids with the Case, and thread them down the
+            // plan-item tree. That is what lets a contextRef-less expression bind the case file
+            // (finding I4): an element deep in the tree has no other way to learn which case-file
+            // items its case declares without an outbound call, and an outbound call back to the
+            // case grain is the D3 wait cycle.
+            var pin = new CaseModelPin
+            {
+                CaseFileItemIds = CaseModelPin.CaseFileItemIdsOf(@case.CaseFileModel)
+            };
+
             RaiseEvent(new CaseCreated
             {
                 CaseDefinitionId = @case.Id,
                 Definition = @case,
-                TenantId = CaseRequestContext.TenantId
+                TenantId = CaseRequestContext.TenantId,
+                Pin = pin
             });
 
             // PostDefine() (below) reads State.CaseDefinitionId/State.Definition - the confirmed

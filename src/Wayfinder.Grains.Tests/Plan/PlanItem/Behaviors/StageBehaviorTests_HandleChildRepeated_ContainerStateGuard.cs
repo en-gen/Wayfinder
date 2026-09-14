@@ -349,7 +349,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<RepetitionCeilingExceeded>()), Times.Never);
 
             mockPlanItemGrain.Verify(x => x.DefineRepetition(
-                    testStore.CaseDefinitionId, pi, currentRepetition + 1, stage.Id, definitionScope),
+                    testStore.CaseDefinitionId, pi, currentRepetition + 1, stage.Id, definitionScope, It.IsAny<CaseModelPin>()),
                 Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
 
@@ -556,7 +556,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Once);
 
             mockPlanItemGrain.Verify(x => x.DefineRepetition(
-                    testStore.CaseDefinitionId, pi, currentRepetition + 1, casePlanModel.Id, definitionScope),
+                    testStore.CaseDefinitionId, pi, currentRepetition + 1, casePlanModel.Id, definitionScope, It.IsAny<CaseModelPin>()),
                 Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
 

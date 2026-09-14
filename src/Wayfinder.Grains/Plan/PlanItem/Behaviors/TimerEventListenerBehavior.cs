@@ -222,8 +222,11 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
         {
             if (PlanItemDefinition.TimerExpression == null) return null;
 
-            var timerExpressionResult = await Host.GrainFactory.GetGrain<IExpressionGrain>(Host.CaseInstanceId)
-                .ExecuteAsIso8601(null, PlanItemDefinition.TimerExpression);
+            // Null contextRef: a TimerExpression (Table 5.42) carries no contextRef attribute at
+            // all, so this is genuinely the unspecified case and picks up the caseFileModel
+            // binding I4 introduces - which is what makes a timer expression over case-file data
+            // expressible at all.
+            var timerExpressionResult = await Host.Expressions.EvaluateAsIso8601(null, PlanItemDefinition.TimerExpression);
 
             Host.RaiseEvent(new TimerExpressionEvaluated
             {
