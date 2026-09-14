@@ -11,7 +11,7 @@
 
 ## 0. What this document decides, and what it leaves open
 
-Open questions are recorded inline and collected in [§H](#h-open-questions-collected), sorted by **what has to happen to them**: three are **blocking** and must be answered before the first implementation issue is cut (OQ-7, OQ-3, OQ-6; OQ-11 and OQ-10 were blocking and are now decided — see §E.3 and §D.5.3); five are decisions already taken with their dissent kept on record and are safely deferrable; two turned out not to be questions at all, but unmeasured constants with the benchmark harness already in the repo.
+Open questions are recorded inline and collected in [§H](#h-open-questions-collected), sorted by **what has to happen to them**: two are **blocking** and must be answered before the first implementation issue is cut (OQ-7, OQ-3; OQ-11, OQ-10 and OQ-6 were blocking and are now decided — see §E.3, §D.5.3 and §C.7c); five are decisions already taken with their dissent kept on record and are safely deferrable; two turned out not to be questions at all, but unmeasured constants with the benchmark harness already in the repo.
 
 **Revision note (this pass).** Two independent reviews — one adversarial-design, one spec-conformance — returned FIX-THEN-SHIP. The direction and the spec research survived; a set of *inferences drawn from correctly-quoted text* did not. The corrections are marked in place throughout rather than silently applied, because each one is a place a careful reader would otherwise repeat the same mistake. The load-bearing ones: repetition instances are now **started**, not merely created (§C.6(a)) — the earlier draft structurally re-created #177 while claiming to close it; the **monotonicity theorem is withdrawn** and replaced with a stated bound and a specified fault (§B.4); the `Disabled`/terminal repetition refusal is **removed** as unsupported (§C.6(b)); the §8.5 evaluability gate now has an **insertion point in the algebra** rather than only an assertion (§C.8 step 2, §C.9); `complete` is **removed from the case-worker allowlist** except for HumanTask (§C.5); and §E.3's "not incrementally shippable" is **retracted** as overstated (three seams, §E.3).
 
@@ -725,7 +725,45 @@ All four failing values are conforming per Table 5.19. Today the exception is ca
    - **Deploy time.** A `timerExpression` whose body is a string literal (which every corpus sample is) is statically parseable. Add a `CmmnCapabilityLint` rule that parses it and emits a **blocking** finding on failure — the same tier `ConformanceHarness` already throws on. This catches the overwhelming majority of real cases before a case ever runs.
    - **Runtime.** For a genuinely dynamic expression, journal `TimerExpressionInvalid { error }`, log at Error, and surface it on the case snapshot. It **cannot** fire `fault`: `ConfigureForMilestoneOrEventListener` permits no Failed state for EventListeners, and Table 8.11 (printed pp.120-121) defines none. Making it fire would be a state-machine change the spec does not support, and this design does not make it.
 
-> **Open question OQ-6 — time zone.** Calendar arithmetic needs a zone, and CMMN never mentions one. An offset-less `2026-08-03T12:00:00` is ambiguous. Options: (i) reject offset-less values (status quo — rejects conforming input, so no); (ii) assume UTC everywhere, with a lint warning; (iii) a per-tenant configured zone, defaulting to UTC. This design assumes **(ii)** because it is the smallest change that stops rejecting conforming input, and notes that (iii) is the only option that gets `P1M` and DST right for a real business calendar. Reviewers should decide whether (iii) belongs in this redesign or in a follow-up.
+> **DECIDED — D-2026-09-13. OQ-6 is closed: (iii), a per-tenant IANA zone defaulting to UTC — but scoped much more narrowly than the original framing implied.**
+>
+> The question was posed as "what zone does calendar arithmetic use", with the implied answer applying everywhere. It does not. The two cases split cleanly:
+>
+> **One-shot timers need no zone at all.** An instant with an offset (`2026-10-15T09:00:00-05:00`) or in UTC pins exactly one moment, unambiguously. Authoring in the client's zone, converting to UTC for storage and execution, and rendering back in the client's zone is correct and lossless. Nothing is stored beyond the instant.
+>
+> **Recurring timers must carry the IANA zone id.** An offset is a *reading* of a zone at one instant, not the zone — the zone is a function from instant to offset, and storing one output discards the function. Measured on .NET 10.0.12, `America/Chicago`:
+>
+> ```
+> 2026-10-15 09:00 local   offset -05:00   =  14:00Z
+> 2026-11-15 09:00 local   offset -06:00   =  15:00Z
+>
+> 09:00 Nov 15 with a frozen -05:00  ->  14:00Z   (wrong, an hour early)
+> 09:00 Nov 15 with the real zone     ->  15:00Z
+> ```
+>
+> So each next fire is computed **in the zone**, at fire time, and only then converted to UTC. Computing it by adding to the previous UTC *instant* keeps the offset frozen at its old value and drifts an hour across every DST transition — the same defect wearing a different shape. Computing at fire time rather than precomputing a schedule also makes tzdb rule changes safe.
+>
+> **Store an IANA id (`America/Chicago`), never an offset.** An offset stored as if it were a zone re-creates the bug in a form that looks correct.
+>
+> **A resolver policy for skipped and ambiguous local times is required, not optional.** 02:30 on a spring-forward date does not exist; 01:30 on a fall-back date happens twice. `TimeZoneInfo.IsInvalidTime` and `IsAmbiguousTime` both return `true` for those cases on .NET 10, and NodaTime throws `SkippedTimeException`/`AmbiguousTimeException` unless a resolver is supplied. The policy must be written down and pinned by a test; leaving it unspecified is a runtime exception in production.
+>
+> **The zone belongs to the tenant, not the authoring session.** A browser-derived zone would make the same schedule behave differently depending on who authored it. It is resolvable from inside the case grain without ambient context (R-D5) and therefore pinned at `Create`, which is why this touches P1/P2 and not only P5.
+>
+> **Display in the client's zone stays a presentation concern** and does not enter the engine.
+
+> **Two sub-decisions settled alongside this, recorded because both were raised as plausible simplifications.**
+>
+> **NodaTime stays.** The proposal to drop it in favour of .NET's newer temporal types does not survive measurement — `DateOnly`/`TimeOnly`/`TimeProvider` address wall-clock values and testable clocks, not calendar arithmetic or ISO-8601 durations. On .NET 10.0.12:
+>
+> ```
+> XmlConvert.ToTimeSpan("P1M")  ->  30.00:00:00     (flat 30 days)
+> XmlConvert.ToTimeSpan("P1Y")  ->  365.00:00:00    (flat 365 days)
+> TimeSpan.Parse("PT15S")       ->  FormatException (no ISO-8601 support)
+> ```
+>
+> The BCL has no calendar-correct ISO-8601 duration parser, and `XmlConvert`'s month normalisation *is* the `P1M` defect. IANA ids do now resolve on Windows, and the BCL can *detect* invalid/ambiguous times — but the resolution policy would be hand-rolled. Dropping NodaTime means writing the parser and the zone resolver before fixing M7. **Adopt `TimeProvider` for the clock seam (§F.3) alongside NodaTime**, not instead of it.
+>
+> **Timers are stored as ISO-8601, not cron.** Table 5.19 requires the expression to be ISO-8601, and §5.4.11.3 makes `R<n>/` *the* repetition mechanism for TimerEventListeners. Cron cannot express a repeat count, cannot express sub-minute intervals in its standard form, and has no concept of a `timerStart`-relative anchor — which is a common CMMN shape. Cron was Quartz's language, and Quartz is being removed; storing cron would reintroduce a cron-speaking scheduler. Persist the authored ISO-8601 expression, the resolved anchor, the next-fire instant computed at fire time, the remaining `R<n>` count, and the IANA zone when the expression is a calendar recurrence.
 
 ### C.8 The sentry satisfaction algebra (C4 + M8 + M9 + M10)
 
@@ -1705,7 +1743,7 @@ These change code that early phases write. Answering them late means rewriting t
 | **OQ-7** | C.8 | **P3 — but it is in the P2 object model** | Sentry instance per **criterion instance**, or shared per owning-stage instance? Per-criterion: fresh state per repetition, local evaluability gate, and the `forwardedSatisfaction` machinery of §C.6(a) that goes with it; costs duplicate IfPart evaluation. Shared: cheaper, reintroduces "satisfied for whom?". This is a **class in `CaseRuntime`** (§A.2), so it is written in P2 even though its consequences land in P3. Leaning: per-criterion. |
 | **OQ-3** | C.2 | **P2** | Does a Suspended non-required child block `autoComplete`? Now genuinely two-sided: Table 8.7's `Active` description (printed p.114) — "contain at least one … instance in the Available, Enabled, Active, **Suspended** state" — is direct spec evidence for the dissent, and the earlier draft did not cite it. Changes `EvaluateCompletion`'s predicate **and** the expected final states of corpus scenarios, both of which are P2 deliverables. Provisional decision D-C2-1 is (a), complete-and-cascade. |
 | **~~OQ-10~~ DECIDED** | D.5.3 | — | **Closed D-2026-09-13: `(Guid caseInstanceId, string tenantId)`, id generated with `Guid.CreateVersion7()`.** Retires the `"CPM"` landmine (#162). Note it is access control, not a namespace — and it does **not** enable tenant-scoped enumeration, which stays read-model work (#106). |
-| **OQ-6** | C.7c | **P5, but decide by P2 if the answer might be (iii)** | Time zone for calendar duration arithmetic and offset-less instants. (i) reject conforming input — no; (ii) assume UTC + lint warning; (iii) per-tenant configured zone. Only (iii) gets `P1M` and DST right for a real business calendar, and **(iii) is a data-model change**: a tenant-level setting that must be resolvable from inside the case grain without ambient context (R-D5), which means it is pinned at `Create` like everything else and therefore touches P1/P2, not just P5. If (ii) is chosen it is a P5-local decision; if (iii) is even possible it must be known early. Leaning: (ii) now, (iii) later — but "later" is expensive, so decide deliberately. |
+| **~~OQ-6~~ DECIDED** | C.7c | — | **Closed D-2026-09-13: (iii), narrowly scoped.** One-shot timers need no zone; recurring timers store an **IANA id** (never an offset) and compute next-fire in that zone at fire time. Tenant-level, pinned at `Create`. A skipped/ambiguous resolver policy is **required**. Also settled: **NodaTime stays** (the BCL has no calendar-correct ISO-8601 duration parser — `XmlConvert` flattens `P1M` to 30 days), with `TimeProvider` adopted for the clock seam; and timers are stored as **ISO-8601, not cron**. |
 
 ### H.2 Decided, with the dissent recorded — safely deferrable, and **not** to be re-opened mid-phase
 
