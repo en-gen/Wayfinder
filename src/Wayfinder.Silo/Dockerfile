@@ -24,7 +24,6 @@ COPY global.json Directory.Build.props nuget.config ./
 # Grains.Interfaces. Missing any of these fails restore/build (Api is referenced by the silo's
 # HTTP composition in Program.cs/Startup.cs).
 COPY src/Wayfinder.Silo/Wayfinder.Silo.csproj src/Wayfinder.Silo/
-COPY src/Wayfinder.Api/Wayfinder.Api.csproj src/Wayfinder.Api/
 COPY src/Wayfinder.Application/Wayfinder.Application.csproj src/Wayfinder.Application/
 COPY src/Wayfinder.Contracts/Wayfinder.Contracts.csproj src/Wayfinder.Contracts/
 COPY src/Wayfinder.Grains/Wayfinder.Grains.csproj src/Wayfinder.Grains/
@@ -37,7 +36,6 @@ RUN dotnet restore src/Wayfinder.Silo/Wayfinder.Silo.csproj -p:EnableSourceContr
 
 # Now the rest of the source for those same projects.
 COPY src/Wayfinder.Silo/ src/Wayfinder.Silo/
-COPY src/Wayfinder.Api/ src/Wayfinder.Api/
 COPY src/Wayfinder.Application/ src/Wayfinder.Application/
 COPY src/Wayfinder.Contracts/ src/Wayfinder.Contracts/
 COPY src/Wayfinder.Grains/ src/Wayfinder.Grains/

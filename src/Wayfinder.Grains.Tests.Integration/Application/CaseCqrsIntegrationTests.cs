@@ -16,13 +16,17 @@ using Xunit;
 namespace Wayfinder.Grains.Tests.Integration.Application
 {
     // ADO #32/#33 - the CQRS-layer equivalent of #39's CaseOperationsIntegrationTests: exercises the
-    // exact commands/queries Wayfinder.Api (and a future MCP server) dispatch, but drives them through
-    // the REAL native mediator (ISender / AddWayfinderApplication) over the existing in-memory Orleans
-    // ClusterFixture - no web host, no Azurite/Docker (case ops need no durable storage), and no
-    // JwtBearer/tenant-registry resolution either (that is Wayfinder.Api's IdentityContextMiddleware,
-    // exercised in Wayfinder.Api.Tests instead - see that project). Proves a timer-free flagship .cmmn
-    // file (MilestoneSentryCase.cmmn) becomes a live case and a readable Wayfinder.Contracts.V1.CaseView
-    // entirely through the Application seam.
+    // exact commands/queries any ingress (a future OhData HTTP surface, a future MCP server) would
+    // dispatch, but drives them through the REAL native mediator (ISender / AddWayfinderApplication)
+    // over the existing in-memory Orleans ClusterFixture - no web host, no Azurite/Docker (case ops
+    // need no durable storage), and no authentication/tenant-registry resolution either. Proves a
+    // timer-free flagship .cmmn file (MilestoneSentryCase.cmmn) becomes a live case and a readable
+    // Wayfinder.Contracts.V1.CaseView entirely through the Application seam.
+    //
+    // Since D-2026-09-13 removed the HTTP ingress, this suite and CaseTenantIsolationIntegrationTests
+    // are the surviving coverage of the identity-dependent paths: what is NOT covered anywhere now is
+    // that an authenticated transport correctly populates CaseRequestContext, because there is no
+    // transport. Restoring an ingress must restore that proof with it.
     [Collection(ClusterCollection.Name)]
     public class CaseCqrsIntegrationTests
     {
@@ -35,8 +39,9 @@ namespace Wayfinder.Grains.Tests.Integration.Application
             // wire ISender + every ICommandHandler<,>/IQueryHandler<,> by its own reflection scan.
             //
             // ADO #33 - the handlers no longer default CaseRequestContext themselves (that seam,
-            // CaseRequestContextDefaults, was deleted: Wayfinder.Api's IdentityContextMiddleware is now
-            // the only place that happens, from an authenticated caller's resolved identity). This
+            // CaseRequestContextDefaults, was deleted: an ingress's identity middleware was the only
+            // place that happened, from an authenticated caller's resolved identity - and since
+            // D-2026-09-13 there is no ingress, so nothing populates it in production at all). This
             // fixture has no HTTP pipeline, so it primes CaseRequestContext directly instead - the
             // same values CaseRequestContextDefaults used, and the same pattern every grain-level
             // integration fixture in this solution already uses (see e.g.

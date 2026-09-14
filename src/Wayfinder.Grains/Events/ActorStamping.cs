@@ -4,8 +4,10 @@ using Wayfinder.Grains.Interfaces;
 namespace Wayfinder.Grains.Events
 {
     // ADO #59 - the one place a journaled event's acting identity gets set, from
-    // CaseRequestContext (Orleans RequestContext/AsyncLocal - populated from the authenticated
-    // caller by Wayfinder.Api's IdentityContextMiddleware). Called from exactly two append points -
+    // CaseRequestContext (Orleans RequestContext/AsyncLocal). That context was populated from the
+    // authenticated caller by the HTTP ingress's identity middleware; D-2026-09-13 removed the
+    // ingress, so today only tests set it and production events stamp whatever the default is -
+    // a gap that closes when an ingress returns. Called from exactly two append points -
     // CmmnElementGrain<,>.RaiseEvent (covers Case/PlanItem/CaseFileItem/Sentry/PlanningTable/Role -
     // every grain in that hierarchy, automatically, via a single shadowed method) and
     // CaseDefinitionGrain.Define (the one other JournaledGrain root in this codebase, which does
