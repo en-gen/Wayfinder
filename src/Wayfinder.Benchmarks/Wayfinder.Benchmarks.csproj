@@ -23,6 +23,16 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
 
+    <!-- OQ-9 (GrainCallEnvelopeBenchmarks): the grain-hop half of the expression measurement
+         needs a real in-process silo, so this project hosts one. Server brings the silo host
+         and Orleans code generation for the probe grain declared in this assembly;
+         Serialization.SystemTextJson supplies both the JsonCodec that natively handles
+         JsonNode and the AddJsonSerializer registration the solution uses as its fallback
+         codec for the CMMN model namespace. Versions track Wayfinder.Silo. No test-project
+         reference is introduced - the csproj comment above still holds. -->
+    <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.1" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.1" />
+
     <!-- NU1107 tie-break, not a feature choice. BenchmarkDotNet 0.15.8 pulls
          Microsoft.CodeAnalysis.CSharp 4.14.0, which pins Microsoft.CodeAnalysis.Common to
          *exactly* 4.14.0, while Microsoft.Orleans.EventSourcing 10.2.1 (via Wayfinder.Grains)

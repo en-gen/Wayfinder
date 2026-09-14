@@ -1166,11 +1166,40 @@ One accepted inconsistency, stated rather than hidden: with `contextRef` present
 
 Note that "evaluation starts at" is XPath language; there is no context node in JavaScript. Binding by name is an engine convention, as `ExpressionGrain.cs:28-42` already admits. Real XPath support (finding **I2**) remains unimplemented and orthogonal.
 
-**OQ-9 (was an open question; now a measurement task with a sequencing hazard attached).** Should `ExpressionGrain` remain a grain at all? Once it is a pure function it could be an injected singleton service running in-process. Keeping it a `[StatelessWorker]` releases the case grain's thread during heavy Jint work — but a StatelessWorker call still costs a local message hop plus serialization of the bound JSON, which for a small context may exceed the Jint cost outright. A policy split (in-process below a size/complexity threshold, offload above it) is a third option.
-
-This is **measurable today, with the harness that already exists.** `ExpressionEvaluationBenchmarks.cs` gives all three of the relevant numbers directly: `EvaluateAsWired` (the production shape — fresh engine and fresh executable per call, `[Benchmark(Baseline = true)]`), `EvaluateWithReusedEngine`, and `EvaluateOnWarmEngine` (the evaluation-only floor); `JintEngineBenchmarks.cs` isolates engine construction (#224). Everything needed to compare "Jint cost" against "local hop + serialization" is in `src/Wayfinder.Benchmarks/Expressions/`.
-
-> **Sequencing hazard — this is the part that matters more than the answer.** **P1 is declared independently shippable and it rewrites `IExpressionGrain`'s contract.** If OQ-9 later resolves to "in-process service", the grain interface P1 just rewrote is deleted and that portion of P1 is wasted work — including its Orleans serialization attributes, its `[StatelessWorker]` wiring, and the architecture test written against `IGrainFactory` in a grain that no longer exists. Two acceptable orders, and the choice must be made **before P1 starts**: either (a) run the benchmarks now and settle OQ-9 first, or (b) reorder P1 so that the *bound-request shape* (`ExpressionRequest`, the `contextRef` binding, I4) lands as a plain type and a plain method on whatever hosts it, with the grain-vs-service question deferred behind that seam. Option (b) is cheap and is the recommendation if measuring now is inconvenient; what is not acceptable is shipping P1 with the question still open, which is what the phase list currently implies. This is also the single biggest lever on turn latency (§D.6).
+> **DECIDED — D-2026-09-14. OQ-9 is closed: `ExpressionGrain` stops being a grain. It becomes an in-process service.**
+>
+> Measured, not argued. The Jint half already existed (`ExpressionEvaluationBenchmarks`); the envelope half did **not** — see the correction below — and was added as `GrainCallEnvelopeBenchmarks`. Both were run together on one machine (Windows 11, .NET 10, Release, BenchmarkDotNet 0.15.8).
+>
+> **The hop costs more than the work it wraps.**
+>
+> | | Mean | Allocated |
+> |---|---:|---:|
+> | In-process call (no Orleans) | **8–10 ns** | 104 B |
+> | Today's grain hop — `(string, Expression)` in, `ExecutableResult<bool>` out | **5.8–6.9 µs** | ~2.2 KB |
+> | Bound-request hop, small context (0–1 properties) | **3.3 µs** | ~1.4 KB |
+> | Bound-request hop, 200 properties | **9.1 µs** | 19.3 KB |
+> | Jint, full production shape (`EvaluateAsWired`, BoundContext) | **5.8 µs** | 13.4 KB |
+>
+> Three readings, each independently sufficient:
+>
+> 1. **In-process is ~8–10 ns — three orders of magnitude below the hop, and flat in context size**, because nothing is copied: the bound value is already in the case grain's memory. There is no payload size at which the hop wins, so OQ-9's third option (a size-threshold policy split) is not merely unnecessary, it is unimplementable in a useful form — there is no crossover to place the threshold at.
+> 2. **The envelope is ~52% of today's per-evaluation cost** (6.2 µs hop against 5.81 µs of Jint). Removing it roughly halves the cost of every rule evaluation in the engine; also fixing the transient `Engine` registration takes it to ~67% (12.0 µs → 4.0 µs for the BoundContext shape).
+> 3. **The stated benefit of `[StatelessWorker]` does not survive contact with the numbers.** The argument was that it "releases the case grain's thread during heavy Jint work". Jint work here is 4–6 µs. Spending 6 µs to release a thread for 4–6 µs is net negative, and the case grain is non-reentrant either way — it awaits the call, so its own turn is occupied regardless.
+>
+> **The measured envelope is a lower bound on today's real cost, not an estimate of it.** The probe grain does nothing. Production's `ExpressionGrain` additionally makes a *second* grain call from inside the evaluation — `GrainFactory.GetCaseFileItem(...).GetSnapshot()` (`ExpressionGrain.cs:121`) — to a `JournaledGrain`, which is not cheaper than the outer hop. Today's true per-evaluation cost is therefore materially above 12 µs. The redesign removes both hops at once, because binding the context into the request is what makes the grain unnecessary in the first place.
+>
+> **One result that cuts against the redesign's own preferred shape, recorded because it is inconvenient.** The bound-request contract is *cheaper* than today's shape at small contexts (3.3 µs vs 6.2 µs — `Expression` lives in `Wayfinder.Grains.Interfaces.Model` and so rides the fallback JSON codec, which the `[GenerateSerializer]` request type escapes), but it **scales with payload and crosses over between 25 and 200 properties**, reaching 9.1 µs and 19.3 KB. So adopting the bound-request contract *while keeping the grain* would make large-context evaluation worse than it is today. That combination is precisely what P1 would have shipped had this question been left open. It is not a reason to avoid the bound-request shape — it is a reason not to pair it with a grain.
+>
+> **Honest framing of the size of the win.** This is a cost and cleanliness win, not a timeout rescue. §D.6.2's worst case of ~3N round trips gives, for a 100-item case, ~300 evaluations — today ~3.6 ms, of which ~1.9 ms is pure envelope. Removing it matters at scale and in aggregate; it is not the difference between meeting and missing a 30 s response timeout. Anyone citing this decision as the fix for turn latency is over-reading it.
+>
+> **What this means for P1, concretely.** The sequencing hazard resolved in the direction the hazard warned about, which is why it was worth measuring first rather than guessing:
+>
+> - `IExpressionGrain` is **deleted**, not rewritten. No `[StatelessWorker]`, no Orleans serialization attributes on the request type, no constant-key change (the `Guid.Empty` keying decision below is moot and is retained only as a record of why the case-id key was wrong).
+> - `ExpressionRequest` and the `contextRef` binding, including **I4**, land unchanged — as a plain type and a plain method on an injected service.
+> - **I-4 keeps its architecture test, with a different target.** "No outbound grain calls" is still the invariant that prevents D3's wait cycle from returning; the test now asserts that the evaluator type's dependency graph contains neither `IGrainFactory` nor `IClusterClient`, which is if anything easier to state against a plain service than against a grain.
+> - The four production call sites (`BaseBehavior.cs:322`, `TimerEventListenerBehavior.cs:225`, `PlanningTableGrain.cs:105`, `SentryGrain.cs:382`) all key the grain by `Host.CaseInstanceId` and use that key for nothing but the outbound `GetCaseFileItem` call that is being removed — verified by inspection, so none of them loses anything in the move.
+>
+> **Correction to this section as it previously stood.** It asserted that "everything needed to compare 'Jint cost' against 'local hop + serialization' is in `src/Wayfinder.Benchmarks/Expressions/`." That was false when written. `ExpressionEvaluationBenchmarks.cs`'s own header says the opposite in terms: the grain-call envelope "is out of scope for this harness … and is **UNMEASURED** here, not estimated." The claim has been made true by adding `GrainCallEnvelopeBenchmarks.cs`, which hosts a real in-process silo and a `[StatelessWorker]` probe grain that does no work, so that its time *is* the envelope with nothing to subtract.
 
 ### D.3 Journal growth and snapshotting
 
@@ -1741,7 +1770,7 @@ It is the shared base for `CaseGrain`, `PlanItemGrain`, `CaseFileItemGrain`, `Se
 
 ## H. Open questions, collected
 
-An earlier draft presented twelve questions in one flat list. Five of them were not open at all — they were decisions already taken in the body with a dissent recorded alongside (OQ-1↔§B.4.4, OQ-3↔D-C2-1, OQ-4↔D-C3-1, OQ-5↔D-C6-1, OQ-7↔D-C8-1). Listing a made decision as "open" invites it to be re-opened mid-phase, which is the most expensive time to re-open anything. Two more (OQ-2, OQ-9) were not questions but unmeasured constants, with the benchmark harness already sitting in the repo.
+An earlier draft presented twelve questions in one flat list. Five of them were not open at all — they were decisions already taken in the body with a dissent recorded alongside (OQ-1↔§B.4.4, OQ-3↔D-C2-1, OQ-4↔D-C3-1, OQ-5↔D-C6-1, OQ-7↔D-C8-1). Listing a made decision as "open" invites it to be re-opened mid-phase, which is the most expensive time to re-open anything. Two more (OQ-2, OQ-9) were not questions but unmeasured constants, with the benchmark harness already sitting in the repo — though only partly: the harness covered Jint and not the grain envelope, which had to be built before OQ-9 could be answered (D-2026-09-14).
 
 The list is therefore split three ways by **what has to happen to it**, not by section order.
 
@@ -1773,8 +1802,8 @@ Each of these is a decision made in the body. They are listed so the dissent is 
 
 | # | § | Resolution |
 |---|---|---|
-| **OQ-2** | B.4.4 | `MaxOperationsPerTurn` / `MaxSignatureRepeats` are **measurable now**. `src/Wayfinder.Benchmarks/Expressions/` already contains `ExpressionEvaluationBenchmarks.cs` and `JintEngineBenchmarks.cs`, which measure exactly the cost that dominates per-operation time. Run them, divide `ResponseTimeout` by the result, write the arithmetic next to the constant. An action item, not a decision. |
-| **OQ-9** | D.2 | Grain-vs-in-process for `ExpressionGrain` is **measurable with the same harness**. It carries a **sequencing hazard** that is the real content: P1 is declared independently shippable and rewrites `IExpressionGrain`; if this later resolves to "in-process service", part of P1 is wasted. Either measure it before P1, or reorder P1 so the bound-request shape lands behind a seam that does not commit to a grain. See §D.2. |
+| **OQ-2** | B.4.4 | **Still open, but its expression input is now measured** (D-2026-09-14, §D.2). Post-P1 an evaluation costs ~5.8 µs in-process, ~4.0 µs once the transient `Engine` registration is fixed; at up to three rules per item that is ~12–17 µs per operation, so a 30 s `ResponseTimeout` divided by it gives a bound in the **millions** of operations. The consequence is that `MaxOperationsPerTurn` is **not** meaningfully constrained by timeout arithmetic and must instead be sized for *divergence detection* — the opposite of what this row previously assumed. **Do not close on this alone:** journal append and confirm cost per operation remains unmeasured, and it is the other half of the per-operation figure. |
+| **~~OQ-9~~ MEASURED** | D.2 | **Closed D-2026-09-14: `ExpressionGrain` becomes an in-process service.** In-process call 8–10 ns vs a 5.8–6.9 µs grain hop vs 5.8 µs of Jint — the envelope costs more than the work it wraps, and is flat-free in-process at any context size, so the threshold-policy option has no crossover to sit at. The hazard resolved as warned: `IExpressionGrain` is **deleted**, not rewritten; `ExpressionRequest` + I4 land as a plain service; I-4's architecture test retargets. See §D.2. |
 
 ---
 
