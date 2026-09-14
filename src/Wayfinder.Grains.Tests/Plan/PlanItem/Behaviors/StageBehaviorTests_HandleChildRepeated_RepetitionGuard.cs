@@ -165,7 +165,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Once);
             mockMachine.Verify(x => x.FireAsync(PlanItemTransition.Fault), Times.Never);
 
-            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, currentRepetition + 1, stage.Id, definitionScope, It.IsAny<CaseModelPin>()), Times.Once);
+            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, currentRepetition + 1, stage.Id, definitionScope, It.IsAny<PlanItemDefinition>(), It.IsAny<CaseModelPin>()), Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
         }
 
@@ -235,7 +235,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 "a redelivered event must not record the guard a second time");
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<ChildCreated>()), Times.Once,
                 "#161: a redelivered PlanItemRepetitionCriteriaMetEvent must not spawn a second physical child");
-            mockPlanItemGrain.Verify(x => x.DefineRepetition(It.IsAny<string>(), It.IsAny<Interfaces.Model.PlanItem>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CaseModelPin>()), Times.Once);
+            mockPlanItemGrain.Verify(x => x.DefineRepetition(It.IsAny<string>(), It.IsAny<Interfaces.Model.PlanItem>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<PlanItemDefinition>(), It.IsAny<CaseModelPin>()), Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
         }
 

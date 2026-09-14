@@ -104,7 +104,7 @@ namespace Wayfinder.Grains.Plan.PlanItem
         // root guard, #63) and that its definition lookup falls back to the legacy instance-scope
         // resolution, which only resolves casePlanModel-root declarations (#65).
         public override Task Define(string caseDefinitionId, Interfaces.Model.PlanItem definition) =>
-            DefineRepetition(caseDefinitionId, definition, 0, null, null, null);
+            DefineRepetition(caseDefinitionId, definition, 0, null, null, null, null);
 
         public async Task DefineRepetition(
             string caseDefinitionId,
@@ -112,8 +112,18 @@ namespace Wayfinder.Grains.Plan.PlanItem
             int repetition,
             string parentDefinitionId,
             string parentDefinitionScope,
+            PlanItemDefinition planItemDefinition,
             CaseModelPin pin)
         {
+            // Design 05 section A.5 - definition pinning. planItemDefinition arrives already
+            // resolved, out of the model CaseGrain.Create pinned, so this define - and every
+            // repetition spawn, which is the case that mattered - performs NO outbound call to
+            // ICaseDefinitionGrain at all.
+            //
+            // The null-coalesced fallback below is the bare-2-arg Define() path only, which has no
+            // parent to thread a pin from and is used solely by test scaffolding. It preserves that
+            // path's pre-existing behaviour exactly, #65 note included.
+            //
             // #65: CaseDefinitionGrain.DefinitionIndex is keyed on DEFINITION-id paths
             // (CaseDefinitionGrain.CreateStageDefinitions), so the lookup must be searched with
             // the same shape - parentDefinitionScope (threaded from Host.DefinitionScope via
@@ -122,7 +132,7 @@ namespace Wayfinder.Grains.Plan.PlanItem
             // - that only coincidentally matches at the casePlanModel root). Falls back to _scope
             // for the parentless bare-2-arg Define() path above, preserving its existing
             // root-level-only resolution.
-            var planItemDefinition = await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+            planItemDefinition ??= await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
                 .GetPlanItemDefinition(parentDefinitionScope ?? _scope, definition.DefinitionRef);
 
             if (planItemDefinition == null) throw new InvalidOperationException($"definition {definition.DefinitionRef} not registered");

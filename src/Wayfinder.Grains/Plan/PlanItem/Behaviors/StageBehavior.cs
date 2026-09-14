@@ -1822,10 +1822,20 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // so the child's CaseDefinitionGrain.GetPlanItemDefinition lookup searches from the
             // correct definition-tree position instead of this Stage's runtime instance address
             // (#65).
-            // The pin travels down with the child so that IT, in turn, can bind a
-            // contextRef-less expression against the case's declared caseFileModel (finding I4)
-            // without an outbound call back to the case grain - which would be the D3 wait cycle.
-            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId, Host.DefinitionScope, Host.State.Pin);
+            // Design 05 section A.5 - resolve the child's definition out of the model pinned at
+            // CaseGrain.Create and hand it down, rather than letting the child re-read
+            // ICaseDefinitionGrain on every define (including every repetition spawn). The pin
+            // travels with it because the child, if it is itself a Stage, has to resolve ITS
+            // children the same way; a Stage cannot fetch the pin back from the case grain
+            // without recreating D3's wait cycle, so it is threaded. Non-stage children get the
+            // trimmed ForLeaf() form, which keeps the definition map out of their journals.
+            //
+            // Null pin: only the bare PlanItemGrain.Define path (test scaffolding) reaches this
+            // with no pinned model, and DefineRepetition falls back to the old lookup then.
+            var childDefinition = Host.State.Pin?.Resolve(Host.DefinitionScope, child.DefinitionRef);
+            var childPin = childDefinition is Stage ? Host.State.Pin : Host.State.Pin?.ForLeaf();
+
+            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId, Host.DefinitionScope, childDefinition, childPin);
             await childGrain.Trigger(PlanItemTransition.Create);
 
             Host.RaiseEvent(new ChildCreated
