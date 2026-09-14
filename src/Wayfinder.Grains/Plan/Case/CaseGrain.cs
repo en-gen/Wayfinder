@@ -118,14 +118,32 @@ namespace Wayfinder.Grains.Plan.Case
             var @case = await caseDefinitionGrain.GetDefinition();
             @case.CasePlanModel.IsCasePlanModel = true;
 
-            // Pin the declared caseFileModel item ids with the Case, and thread them down the
-            // plan-item tree. That is what lets a contextRef-less expression bind the case file
-            // (finding I4): an element deep in the tree has no other way to learn which case-file
-            // items its case declares without an outbound call, and an outbound call back to the
-            // case grain is the D3 wait cycle.
+            // Design 05 section A.5 - resolve the ENTIRE definition graph here, once, and journal
+            // it with the Case. After this line nothing in the case's life calls
+            // ICaseDefinitionGrain.GetPlanItemDefinition: every plan item receives its resolved
+            // definition from its parent, which reads it out of this pin (see CaseModelPin and
+            // StageBehavior.CreateChild).
+            //
+            // Two things this buys, beyond removing an outbound call from every turn (section D.6).
+            // First, the model a running case executes is now explicitly the model it was created
+            // with - previously PlanItemGrain.DefineRepetition re-read the definition on EVERY
+            // define, repetition spawns included, so what a live case ran against was whatever the
+            // definition grains held at that moment. (In practice a redeploy under an existing
+            // caseDefinitionId is rejected today by PlanItemDefinitionGrain.Define's write-once
+            // guard, so that was a latent hazard rather than a reachable defect; pinning makes the
+            // guarantee structural instead of incidental.) Second, the declared caseFileModel item
+            // ids travel with it, which is what lets a contextRef-less expression bind the case
+            // file at all (finding I4).
+            //
+            // Cost: journal size, bounded by one copy of the resolved model per case - plus, until
+            // phase P2 collapses plan items into the case grain, one copy per STAGE instance, since
+            // the pin has to be threaded rather than fetched (a plan item calling back into the
+            // case grain would be the D3 wait cycle). Non-stage plan items journal only the trimmed
+            // ForLeaf() form.
             var pin = new CaseModelPin
             {
-                CaseFileItemIds = CaseModelPin.CaseFileItemIdsOf(@case.CaseFileModel)
+                CaseFileItemIds = CaseModelPin.CaseFileItemIdsOf(@case.CaseFileModel),
+                PlanItemDefinitions = await caseDefinitionGrain.GetPlanItemDefinitions()
             };
 
             RaiseEvent(new CaseCreated

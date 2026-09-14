@@ -146,6 +146,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                         It.IsAny<int>(),
                         It.IsAny<string>(),
                         It.IsAny<string>(),
+                        It.IsAny<PlanItemDefinition>(),
                         It.IsAny<CaseModelPin>()))
                     .Callback(() => CallLog.Add("DefineRepetition"))
                     .Returns(Task.CompletedTask);

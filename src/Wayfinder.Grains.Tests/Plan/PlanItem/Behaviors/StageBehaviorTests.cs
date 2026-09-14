@@ -399,7 +399,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 // parentDefinitionScope (#65): CreateChild also threads Host.DefinitionScope (this
                 // Stage's own full definition-scope path) through so the child's definition-index
                 // lookup searches from the correct definition-tree position.
-                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id, definitionScope, It.IsAny<CaseModelPin>()), Times.Once);
+                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id, definitionScope, It.IsAny<PlanItemDefinition>(), It.IsAny<CaseModelPin>()), Times.Once);
 
                 mockHost.Verify(x => x.SubscribeTo(
                         pi.Id,

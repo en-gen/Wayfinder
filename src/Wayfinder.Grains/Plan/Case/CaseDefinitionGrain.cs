@@ -124,6 +124,27 @@ namespace Wayfinder.Grains.Plan.Case
             return null;
         }
 
+        // Design 05 section A.5. Same resolution GetPlanItemDefinition performs, for every node
+        // at once: DefinitionIndex's keys ARE the addresses that method searches, so a map built
+        // here can be walked upwards by CaseModelPin.Resolve with identical results. The index's
+        // root entry is the casePlanModel node itself, which CreateStageDefinitions never
+        // registered a PlanItemDefinitionGrain for - it resolves to null and is dropped.
+        public async Task<Dictionary<string, PlanItemDefinition>> GetPlanItemDefinitions()
+        {
+            if (!State.Defined) throw new InvalidOperationException("case has not yet been defined");
+
+            var resolved = await Task.WhenAll(State.DefinitionIndex.Values
+                .Select(async node => (
+                    node.Address,
+                    definition: await GrainFactory
+                        .GetGrain<IPlanItemDefinitionGrain>(_tenantId, $"{_caseDefinitionId}.{node.Address}")
+                        .Definition())));
+
+            return resolved
+                .Where(x => x.definition != null)
+                .ToDictionary(x => x.Address, x => x.definition);
+        }
+
         private Task CreateStageDefinitions(Stage stage, DefinitionGraphNode node) =>
             Task.WhenAll(stage.PlanItemDefinitions.Select(async planItemDef =>
             {
