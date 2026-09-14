@@ -161,7 +161,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             // definition id) so the repeated child's parent-transition subscription resolves.
             // parentDefinitionScope (#65): threaded from Host.DefinitionScope (this Stage's own
             // full definition-scope path) so the repeated child's definition-index lookup resolves.
-            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 1, stage.Id, definitionScope), Times.Once);
+            mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 1, stage.Id, definitionScope, It.IsAny<CaseModelPin>()), Times.Once);
             mockPlanItemGrain.Verify(x => x.Trigger(PlanItemTransition.Create), Times.Once);
 
             mockHost.Verify(x => x.SubscribeTo(

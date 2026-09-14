@@ -77,17 +77,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var evaluatedSchedule = new Iso8601("PT1H");
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsIso8601(null, timerExpression))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions
+                .Setup(x => x.EvaluateAsIso8601(null, timerExpression))
                 .Returns(Task.FromResult(ExecutableResult<Iso8601>.Success(evaluatedSchedule)));
 
             var mockTimerSchedulerGrain = new Mock<ITimerEventSchedulerGrain>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockGrainFactory
                 .Setup(x => x.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId, null))
                 .Returns(mockTimerSchedulerGrain.Object);
@@ -98,6 +95,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             var callLog = new List<string>();
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.InstanceId).Returns(instanceId);
             mockHost.Setup(x => x.Definition).Returns(pi);
@@ -173,17 +171,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var evaluatedSchedule = new Iso8601("PT1H");
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsIso8601(null, timerExpression))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions
+                .Setup(x => x.EvaluateAsIso8601(null, timerExpression))
                 .Returns(Task.FromResult(ExecutableResult<Iso8601>.Success(evaluatedSchedule)));
 
             var mockTimerSchedulerGrain = new Mock<ITimerEventSchedulerGrain>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockGrainFactory
                 .Setup(x => x.GetGrain<ITimerEventSchedulerGrain>(caseInstanceId, null))
                 .Returns(mockTimerSchedulerGrain.Object);
@@ -195,6 +190,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             Func<PlanItemTransitionedEvent, StreamSequenceToken, Task> capturedHandler = null;
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.InstanceId).Returns(instanceId);
             mockHost.Setup(x => x.Scope).Returns("PlanItemTimerA");

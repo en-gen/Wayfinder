@@ -319,8 +319,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             ExecutableResult<bool> ruleResult = null;
             if (rule?.Condition != null)
             {
-                ruleResult = await Host.GrainFactory.GetGrain<IExpressionGrain>(Host.CaseInstanceId)
-                    .ExecuteAsBool(rule.ContextRef, rule.Condition);
+                ruleResult = await Host.Expressions.EvaluateAsBool(rule.ContextRef, rule.Condition);
             }
             var result = ruleResult?.ValueOr(defaultResult) ?? defaultResult;
 

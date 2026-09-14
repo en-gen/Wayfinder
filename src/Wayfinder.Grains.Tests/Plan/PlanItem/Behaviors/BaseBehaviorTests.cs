@@ -155,15 +155,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()))
                 .Callback<RequiredRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.NotRequiredRule.ContextRef, Rules.NotRequiredRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.NotRequiredRule.ContextRef, Rules.NotRequiredRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(false)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -205,15 +203,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RequiredRuleEvaluated>()))
                 .Callback<RequiredRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.IsRequiredRule.ContextRef, Rules.IsRequiredRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.IsRequiredRule.ContextRef, Rules.IsRequiredRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -270,15 +266,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.LogWithContext(It.IsAny<Action<ILogger>>()))
                 .Callback<Action<ILogger>>(logAction => logAction(fakeLogger));
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.ErroringRequiredRule.ContextRef, Rules.ErroringRequiredRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.ErroringRequiredRule.ContextRef, Rules.ErroringRequiredRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Failure("expression blew up")));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -392,15 +386,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(false)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -442,15 +434,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -557,15 +547,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()))
                 .Callback<ManualActivationRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.NotManuallyActivated.ContextRef, Rules.NotManuallyActivated.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.NotManuallyActivated.ContextRef, Rules.NotManuallyActivated.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(false)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -607,15 +595,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<ManualActivationRuleEvaluated>()))
                 .Callback<ManualActivationRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.IsManuallyActivated.ContextRef, Rules.IsManuallyActivated.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.IsManuallyActivated.ContextRef, Rules.IsManuallyActivated.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -673,15 +659,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.LogWithContext(It.IsAny<Action<ILogger>>()))
                 .Callback<Action<ILogger>>(logAction => logAction(fakeLogger));
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.ErroringManualActivationRule.ContextRef, Rules.ErroringManualActivationRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.ErroringManualActivationRule.ContextRef, Rules.ErroringManualActivationRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Failure("expression blew up")));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -740,15 +724,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);
@@ -792,15 +774,13 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 .Setup(x => x.RaiseEvent(It.IsAny<RepetitionRuleEvaluated>()))
                 .Callback<RepetitionRuleEvaluated>(x => capturedEvent = x);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
             mockHost
                 .Setup(x => x.GrainFactory)
                 .Returns(mockGrainFactory.Object);

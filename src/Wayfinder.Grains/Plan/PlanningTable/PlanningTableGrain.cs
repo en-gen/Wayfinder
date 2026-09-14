@@ -13,9 +13,21 @@ namespace Wayfinder.Grains.Plan.PlanningTable
         CmmnElementGrain<PlanningTableStore, Interfaces.Model.PlanningTable>,
         IPlanningTableGrain
     {
-        public PlanningTableGrain(ILogger<PlanningTableGrain> logger) :
+        private readonly IExpressionEvaluator _expressionEvaluator;
+
+        private IExpressionContext _expressions;
+
+        public PlanningTableGrain(IExpressionEvaluator expressionEvaluator, ILogger<PlanningTableGrain> logger) :
             base(logger)
         {
+            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
+        }
+
+        public override async Task OnActivateAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            await base.OnActivateAsync(cancellationToken);
+
+            _expressions = new ExpressionContext(_expressionEvaluator, GrainFactory, _caseInstanceId, () => TentativeState.Pin);
         }
 
         public Task<DiscretionaryItem[]> GetPlannableItems()
@@ -102,8 +114,7 @@ namespace Wayfinder.Grains.Plan.PlanningTable
             ExecutableResult<bool> ruleResult = null;
             if (rule?.Condition != null)
             {
-                ruleResult = await GrainFactory.GetGrain<IExpressionGrain>(_caseInstanceId)
-                    .ExecuteAsBool(rule.ContextRef, rule.Condition);
+                ruleResult = await _expressions.EvaluateAsBool(rule.ContextRef, rule.Condition);
             }
             var result = ruleResult?.ValueOr(true) ?? true;
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Infrastructure.Mapping;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
@@ -23,8 +24,10 @@ namespace Wayfinder.Grains.Plan.PlanItem
         IBehaviorHost
     {
         private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
+        private readonly IExpressionEvaluator _expressionEvaluator;
 
         private IPlanItemBehavior _behavior;
+        private IExpressionContext _expressions;
 
         #region BehaviorHost
 
@@ -54,6 +57,7 @@ namespace Wayfinder.Grains.Plan.PlanItem
         IBehaviorDefinition IBehaviorHost.Definition => Definition;
         IBehaviorStore IBehaviorHost.State => TentativeState;
         IGrainFactory IBehaviorHost.GrainFactory => GrainFactory;
+        IExpressionContext IBehaviorHost.Expressions => _expressions;
 
         void IBehaviorHost.RaiseEvent<TEvent>(TEvent @event) => RaiseEvent(@event);
         Task IBehaviorHost.ConfirmEvents() => ConfirmEvents();
@@ -72,15 +76,19 @@ namespace Wayfinder.Grains.Plan.PlanItem
 
         public PlanItemGrain(
             IPlanItemBehaviorConfigurator behaviorConfigurator,
+            IExpressionEvaluator expressionEvaluator,
             ILogger<PlanItemGrain> logger) :
             base(logger)
         {
             _behaviorConfigurator = behaviorConfigurator ?? throw new ArgumentNullException(nameof(behaviorConfigurator));
+            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
+
+            _expressions = new ExpressionContext(_expressionEvaluator, GrainFactory, _caseInstanceId, () => TentativeState.Pin);
 
             if (State.Defined)
             {
@@ -96,9 +104,15 @@ namespace Wayfinder.Grains.Plan.PlanItem
         // root guard, #63) and that its definition lookup falls back to the legacy instance-scope
         // resolution, which only resolves casePlanModel-root declarations (#65).
         public override Task Define(string caseDefinitionId, Interfaces.Model.PlanItem definition) =>
-            DefineRepetition(caseDefinitionId, definition, 0, null, null);
+            DefineRepetition(caseDefinitionId, definition, 0, null, null, null);
 
-        public async Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition, string parentDefinitionId, string parentDefinitionScope)
+        public async Task DefineRepetition(
+            string caseDefinitionId,
+            Interfaces.Model.PlanItem definition,
+            int repetition,
+            string parentDefinitionId,
+            string parentDefinitionScope,
+            CaseModelPin pin)
         {
             // #65: CaseDefinitionGrain.DefinitionIndex is keyed on DEFINITION-id paths
             // (CaseDefinitionGrain.CreateStageDefinitions), so the lookup must be searched with
@@ -120,7 +134,8 @@ namespace Wayfinder.Grains.Plan.PlanItem
                 Definition = definition,
                 PlanItemDefinition = planItemDefinition,
                 ParentDefinitionId = parentDefinitionId,
-                ParentDefinitionScope = parentDefinitionScope
+                ParentDefinitionScope = parentDefinitionScope,
+                Pin = pin
             });
 
             await ConfirmEvents();

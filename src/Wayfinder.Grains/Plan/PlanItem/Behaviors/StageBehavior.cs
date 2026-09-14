@@ -129,7 +129,10 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
                             Host.InstanceId,
                             sentryInstanceId));
 
-                        await sentryGrain.Define(Host.State.CaseDefinitionId, sentry);
+                        // ForLeaf(): a sentry can never create plan items, so it journals only
+                        // the caseFileModel ids it needs to bind a contextRef-less IfPart (I4),
+                        // not the definition map (design 05 section A.5).
+                        await sentryGrain.Define(Host.State.CaseDefinitionId, sentry, Host.State.Pin?.ForLeaf());
 
                         // TODO: should raise an event to catalog sentry instance?
                     })),
@@ -145,7 +148,7 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
 
             if (await planningTableGrain.Defined()) return;
 
-            await planningTableGrain.Define(Host.State.CaseDefinitionId, PlanItemDefinition.PlanningTable);
+            await planningTableGrain.Define(Host.State.CaseDefinitionId, PlanItemDefinition.PlanningTable, Host.State.Pin?.ForLeaf());
         }
 
         // 8.8 - Stage and Task instance transitions
@@ -1819,7 +1822,10 @@ namespace Wayfinder.Grains.Plan.PlanItem.Behaviors
             // so the child's CaseDefinitionGrain.GetPlanItemDefinition lookup searches from the
             // correct definition-tree position instead of this Stage's runtime instance address
             // (#65).
-            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId, Host.DefinitionScope);
+            // The pin travels down with the child so that IT, in turn, can bind a
+            // contextRef-less expression against the case's declared caseFileModel (finding I4)
+            // without an outbound call back to the case grain - which would be the D3 wait cycle.
+            await childGrain.DefineRepetition(Host.State.CaseDefinitionId, child, repetition, Host.DefinitionId, Host.DefinitionScope, Host.State.Pin);
             await childGrain.Trigger(PlanItemTransition.Create);
 
             Host.RaiseEvent(new ChildCreated

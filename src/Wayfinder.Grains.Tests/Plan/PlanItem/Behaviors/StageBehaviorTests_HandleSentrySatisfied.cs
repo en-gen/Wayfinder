@@ -183,15 +183,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain.Setup(x => x.ExecuteAsBool(repetitionRule.ContextRef, repetitionRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions.Setup(x => x.EvaluateAsBool(repetitionRule.ContextRef, repetitionRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(false)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId)
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition)
@@ -263,15 +262,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain.Setup(x => x.ExecuteAsBool(repetitionRule.ContextRef, repetitionRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions.Setup(x => x.EvaluateAsBool(repetitionRule.ContextRef, repetitionRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId)
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition)
@@ -578,15 +576,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain.Setup(x => x.ExecuteAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions.Setup(x => x.EvaluateAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId)
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition)
@@ -659,15 +656,14 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain.Setup(x => x.ExecuteAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions.Setup(x => x.EvaluateAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(false)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId)
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition)

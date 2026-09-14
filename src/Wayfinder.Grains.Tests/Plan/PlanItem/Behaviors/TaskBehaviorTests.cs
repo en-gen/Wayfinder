@@ -41,16 +41,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: task, def: pi, initialState: PlanItemState.Uninitialized);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
                 .ThrowsAsync(new InvalidOperationException("boom"));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId)
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition)
