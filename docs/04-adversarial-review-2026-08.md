@@ -189,7 +189,13 @@ Evidence, all in-repo: CMMN's sentry/completion semantics are a case-scoped fixp
 
 ### Finding disposition under D-2026-08-01
 
-**Closed structurally by the redesign** (do not fix on the old topology): C1, C2, C3, C5, M3 (no cascade transport), M8/M9/M12-transport-half (no redelivery concept intra-case), D1, D2, D3, D4, plus the #153 flake class and #161/#177/#181-transport lineage.
+**Closed structurally by the redesign** (do not fix on the old topology): C1, C2, C3, C5, **M3-transport-half**, **M8/M9/M12-transport-half** (no redelivery concept intra-case), D1, D2, D3, D4, **D5's tearing half**, plus the #153 flake class and #161/#177/#181-transport lineage.
+
+> **Correction (2026-09-13, from triaging the open backlog against this table — #240).** Three findings were filed whole where only half of each dies with the topology. Anyone grepping a finding id and reading "closed structurally" would skip the surviving half:
+>
+> - **M3** — its *trigger* (duplicate delivery) is transport and goes away. Its *fix shape* does not: "record `transition.Source` in the event rather than reading current state at apply time", and more broadly that `ParentSuspendState` is captured as a side effect of an audit event rather than by a dedicated one, is a **journal-schema decision that survives R2 untouched**. Same surviving half as [#234](https://github.com/en-gen/Wayfinder/issues/234); the two should carry the same split disposition.
+> - **M8 / M9** — their occurrence-token halves genuinely die (in-process, every event is a distinct occurrence by construction). Their **latching halves** — `SentryStore.Satisfied` as a monotonic latch, and a standalone-IfPart sentry satisfying at most once per case — survive, and are covered here only implicitly under "C4's latch logic and M10".
+> - **D5** — "API views are torn by construction" is *caused by* `CaseViewProjector` walking the tree with sequential unversioned cross-grain `GetSnapshot` calls. R2 deletes that walk, so a view becomes one consistent in-memory read: **the tearing half is closed structurally.** Only "no ETag/version is exposed, and the contract never says it is eventually consistent" is orthogonal. Filed wholly orthogonal, it invites building a reconciliation mechanism the redesign removes.
 
 **Must be designed INTO the new evaluation loop** (the redesign does not fix these by itself — they are semantic, and carrying them over unexamined re-creates them in-process):
 - M1 (RequiredRule re-eval on enable/re-enable — Table 8.8 MUST)
@@ -202,7 +208,16 @@ Evidence, all in-repo: CMMN's sentry/completion semantics are a case-scoped fixp
 - M11 (#176 cross-stage OnParts + bottom-up activation — trivially expressible in-process; specify the duplicate-instance guard)
 - The sentry match predicate precedence/multi-match defect (I7).
 
-**Orthogonal — unaffected by the redesign, schedule independently:** all interchange findings (I1–I7), I5's authorization gaps, D5 (API consistency contract), doc drift (§7), and the conformance-subset honesty items (§6).
+**Orthogonal — unaffected by the redesign, schedule independently:** interchange findings **I1–I6 plus I7's non-sentry bullets**, I5's authorization gaps, **D5's contract half only** (no ETag/version exposed; the contract never states eventual consistency), doc drift (§7), and the conformance-subset honesty items (§6).
+
+> **Correction (2026-09-13, #240).** This list previously read "all interchange findings (I1–I7)" while the design-into-loop list separately claimed I7's sentry-match bullet — **a direct contradiction** a reader could only resolve by guessing. I7 is a bullet list: its sentry match predicate bullet is design-into-loop, the rest is orthogonal. D5 is split as described above.
+
+**Two buckets this table lacked, added 2026-09-13 (#240):**
+
+- **Must be BUILT ON the new loop** — work that is neither a defect nor untouched. [#127](https://github.com/en-gen/Wayfinder/issues/127) (planning-apply surface) and [#133](https://github.com/en-gen/Wayfinder/issues/133) (instantiate CaseFileItems from a caseFileModel graph) are **features whose implementation surface the redesign substantially changes** — building them now is fix-then-discard, but the redesign does not deliver them either. They carry `disposition:design-into-loop`, whose description was widened to "specified into **or built on** the new evaluation loop".
+- **Verification** — this table says what the redesign *fixes* and never what it must **prove**. The only test-facing instruction anywhere is R5's "delete the polling helpers". Since R2 concentrates all durable state into a single fold, [#175](https://github.com/en-gen/Wayfinder/issues/175) (no test replays a real engine grain) stops being backlog and becomes a **done-criterion**: `Apply()`/fold correctness becomes the sole barrier between a journal and a corrupted case.
+
+> **The finding inventory is not exhaustive, and should not be scheduled as if it were.** [#162](https://github.com/en-gen/Wayfinder/issues/162) — closed-case lockdown silently no-ops for any model whose casePlanModel id is not literally `"CPM"` — is a genuine silent failure of a **safety guard** that this review never surfaced as a finding, despite §4's D3 landing on the same call edge (`EnsureCaseNotClosed` → `CaseGrain`). Treat "5 critical, ~15 major, ~25 minor" as what was found, not as what exists.
 
 ---
 
