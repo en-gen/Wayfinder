@@ -28,17 +28,17 @@ Implemented today:
 Known gaps (tracked as work items; see the roadmap):
 
 - ProcessTask / CaseTask / DecisionTask exist in the model but have no runtime behaviors
-- HTTP ingress (`src/Flow.Api`, OData) is in progress — cases and definitions have initial endpoints, but coverage of the full engine surface is not complete yet
+- **No HTTP ingress at all.** `src/Flow.Api` (OData controllers, URL-segment versioning, JWT auth) was removed on 2026-09-13 — decision D-2026-09-13, [`docs/04-adversarial-review-2026-08.md`](docs/04-adversarial-review-2026-08.md) §9. It is rebuilt on [OhData](https://github.com/en-gen/OhData) after the case-grain granularity redesign (D-2026-08-01) rather than carried through it. The engine is driven through `Flow.Application`'s command/query handlers until then
 - No runtime planning-apply surface yet — a discretionary item can be queried (`PlanningTableGrain.GetPlannableItems`) but not yet selected into a live case
 - Orleans streams and the pub/sub store are still in-memory in every environment, including the deployed clustering path (`AddMemoryStreams`, `AddMemoryGrainStorage("PubSubStore")`) — a real durability gap: a deactivated grain's sentries can miss events delivered while it wasn't listening
 - CMMN timers still run on Quartz's volatile in-memory `RAMJobStore`, not a durable job store, even where Orleans clustering itself is durable
-- No MCP ingress yet — agents drive the engine through `Flow.Application`'s command/query handlers or the OData API today, not a dedicated agent protocol
+- No MCP ingress yet — agents drive the engine through `Flow.Application`'s command/query handlers today, not a dedicated agent protocol
 
 **Wayfinder does not claim OMG CMMN conformance** against the OMG spec's own certification process. What it does have: an internal conformance suite (`src/Flow.Grains.Tests.Integration/Conformance`) that drives real `.cmmn` sample files through the public grain surface and checks them against the spec's own lifecycle tables — currently **35 scenarios, 35 green, 0 skipped** (see [`COVERAGE.md`](src/Flow.Grains.Tests.Integration/Conformance/COVERAGE.md) for the row-by-row spec mapping, including the gaps it still tracks honestly as `KnownGap`/`NotApplicable`).
 
 ### Why agent-native
 
-The end goal is an engine that AI agents drive directly, not just humans through a UI — cases, tasks, and case-file data exposed through a protocol agents already speak (MCP), sitting on top of an API that's transport-agnostic by design (`Flow.Application` holds the CQRS command/query handlers; `Flow.Api` is one ingress onto them today, with MCP planned as a fast-follow rather than a rewrite).
+The end goal is an engine that AI agents drive directly, not just humans through a UI — cases, tasks, and case-file data exposed through a protocol agents already speak (MCP), sitting on top of an API that's transport-agnostic by design. `Flow.Application` holds the CQRS command/query handlers, and that seam is the point: an ingress is a thin adapter onto it, which is why removing the HTTP one (D-2026-09-13) cost the engine nothing and why adding MCP later is a fast-follow rather than a rewrite.
 
 ## Naming — rename in progress
 
@@ -51,13 +51,11 @@ This project was recently renamed **Case.Flow → Wayfinder**. The rename is in 
 | `src/Flow.Grains.Interfaces` | Domain model (XSD-generated CMMN metamodel + partials), grain interfaces, snapshots |
 | `src/Flow.Grains` | Core engine — grains, behaviors, state machines, stores |
 | `src/Flow.Silo` | ASP.NET Core Orleans silo host |
-| `src/Flow.Api` | HTTP ingress (OData) |
 | `src/Flow.Application` | Application layer — CQRS-style command/query handlers |
 | `src/Flow.Contracts` | Shared request/response contracts |
 | `src/Flow.Grains.Tests` | Unit tests (xUnit, Moq, AutoFixture) |
 | `src/Flow.Grains.Tests.Integration` | Integration tests (Orleans TestCluster, in-memory) |
 | `src/Flow.Grains.Tests.Utils` | Shared test utilities and mocks |
-| `src/Flow.Api.Tests` | API layer tests |
 | `devops/` | CI pipeline, deploy, and infrastructure (Docker Compose for local dependencies) |
 | `docs/` | Design docs — CMMN overview and architecture evaluations |
 

@@ -19,13 +19,16 @@ dotnet build src/Wayfinder.sln
 dotnet format src/Wayfinder.sln --verify-no-changes
 ```
 
-## The three test projects
+## The two test projects
 
 | Project | Kind | Expected |
 |---|---|---|
 | `src/Wayfinder.Grains.Tests` | unit, fast | ~407 passed |
-| `src/Wayfinder.Api.Tests` | API, fast | 44 passed |
-| `src/Wayfinder.Grains.Tests.Integration` | Orleans TestCluster, ~2 min | 193 passed |
+| `src/Wayfinder.Grains.Tests.Integration` | Orleans TestCluster, ~2 min | 184 passed |
+
+`src/Wayfinder.Api.Tests` (44 tests) was deleted with the HTTP ingress under D-2026-09-13,
+along with the 9-`[Fact]` `Api/` suite inside the integration project — which is why the
+integration count dropped 193 -> 184.
 
 `src/Wayfinder.Grains.Tests.Utils` is a helper library, not a test project.
 
@@ -34,13 +37,13 @@ unexplained drop is worth investigating before you trust a green run.
 
 ## Docker-gated skips are not failures
 
-The integration suite reports **193 passed / 0 skipped** when Docker containers are warm,
-and **188 passed / 5 skipped** when they are not. The five are `RequiresDockerFact`-gated
+The integration suite reports **184 passed / 0 skipped** when Docker containers are warm,
+and **179 passed / 5 skipped** when they are not. The five are `RequiresDockerFact`-gated
 Azurite / Azure-Table storage tests, which skip rather than fail when the probe finds no
 daemon at discovery time.
 
 A merely *responding* Docker daemon is not enough — the containers have to be warm. If you
-see 188/5, that is almost certainly why. Re-run before reporting it as a regression, and
+see 179/5, that is almost certainly why. Re-run before reporting it as a regression, and
 say which variant you saw when you quote a number.
 
 ## Fresh worktrees: restore husky before the first commit

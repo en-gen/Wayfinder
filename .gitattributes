@@ -1,7 +1,8 @@
-# ADO #32/#33 (sub-unit 4) - devops/eval/eval-authenticated.sh needs a real "#!/usr/bin/env bash"
-# shebang line ending to run correctly wherever it is actually executed (a Linux CI box, WSL, a
-# contributor's Linux dev machine) - CRLF line endings on a shebang line make the interpreter path
-# unresolvable ("bad interpreter"). Force LF regardless of the checkout OS's core.autocrlf setting.
+# Any committed shell script needs a real "#!/usr/bin/env bash" shebang line ending to run where
+# it is actually executed (a Linux CI box, WSL, a contributor's Linux dev machine) - CRLF line
+# endings on a shebang line make the interpreter path unresolvable ("bad interpreter"). Force LF
+# regardless of the checkout OS's core.autocrlf setting. (The rule outlived its original subject:
+# devops/eval/eval-authenticated.sh was removed with the HTTP ingress under D-2026-09-13.)
 *.sh text eol=lf
 
 # Husky.NET pre-commit hook is a #!/bin/sh script with no file extension - same

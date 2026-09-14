@@ -42,10 +42,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth + the identity
-         middleware). Wired in via AddWayfinderApi()/MapWayfinderApi() (see Program.cs/Startup.cs) - Wayfinder.Silo
-         stays the composition root, Wayfinder.Api stays a plug-in with no knowledge of Orleans hosting. -->
-    <ProjectReference Include="..\Wayfinder.Api\Wayfinder.Api.csproj" />
+    <!-- Named explicitly since D-2026-09-13 removed Wayfinder.Api, which is how this reference
+         used to arrive transitively. Program.cs's SeedEvalIdentityRegistryAsync resolves
+         IIdentityRegistrySeeder from the Application layer's identity seam
+         (AddWayfinderIdentity), so the silo depends on it directly now rather than by accident of
+         the ingress's own reference graph. -->
+    <ProjectReference Include="..\Wayfinder.Application\Wayfinder.Application.csproj" />
     <ProjectReference Include="..\Wayfinder.Grains.Interfaces\Wayfinder.Grains.Interfaces.csproj" />
     <ProjectReference Include="..\Wayfinder.Grains\Wayfinder.Grains.csproj" />
   </ItemGroup>

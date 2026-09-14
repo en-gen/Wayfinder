@@ -221,6 +221,65 @@ Evidence, all in-repo: CMMN's sentry/completion semantics are a case-scoped fixp
 
 ---
 
+### D-2026-09-13 — HTTP ingress removed; rebuilt on OhData after the redesign
+
+**Decision.** Delete `Wayfinder.Api` (OData controllers, URL-segment API versioning, JwtBearer
+auth, `IdentityContextMiddleware`), `Wayfinder.Api.Tests`, and the `Api/` suite in
+`Wayfinder.Grains.Tests.Integration`, rather than carrying them through the D-2026-08-01
+redesign. When an ingress returns it is built on [OhData](https://github.com/en-gen/OhData)
+— convention-based OData 4.0 profiles over minimal APIs — not on MVC controllers plus
+`[EnableQuery]`.
+
+**Rationale.**
+
+1. **§D.4 of the redesign design doc is a compatibility design, and removal retires its hardest
+   constraint.** §D.4.3 names case-file item versioning "the one hard compatibility constraint"
+   because `GetHistory`/`GetValueAt` were *HTTP-exposed*, pinning per-item journal numbering to a
+   live wire contract and requiring a P0 characterization test to protect it. With no ingress,
+   the numbering must still be *correct*, but it is no longer a published contract that a
+   redesign can silently break — the "if it cannot be made to match exactly, the honest answer is
+   a `V2` route" escape hatch is moot. This is the main reason removal is cheap now and would not
+   be cheap later.
+2. **The ingress was the thinnest layer in the system and the least costly to rebuild.** Six
+   endpoints, all thin over `ISender`, zero direct grain calls (§D.4.1). What is deleted is
+   adapter code, not engine semantics.
+3. **OData query support never paid for itself on this read path.** Exactly one action carried
+   `[EnableQuery]` — a single-entity `GET /cases({key})` where `$select`/`$expand` were applied
+   in memory to one `CaseView`. The `$filter`-able collection was a standing TODO blocked on a
+   queryable read model that does not exist. The redesign's `CaseSnapshot` is what that read
+   model will be built from, so the ingress should be designed against it rather than retrofitted.
+
+**What this costs, stated plainly.**
+
+- `MultiTenantIsolationApiTests` is gone. Tenant isolation itself remains covered at the grain
+  layer (`CaseTenantIsolationIntegrationTests`) and the application layer
+  (`CaseCqrsIntegrationTests`); what is no longer proven is that those layers are correctly
+  **wired up** behind an authenticated HTTP surface. That proof has nothing to assert until an
+  ingress exists, and **restoring one must restore an equivalent end-to-end test in the same PR**
+  — this is the single most important obligation this decision creates.
+- The silo has **no authenticated surface**. `UseAuthentication`/`UseAuthorization` and the
+  fallback `RequireAuthenticatedUser` policy went with the controllers they protected. The
+  remaining routes (`/health`, `/`, `/cluster`) are unauthenticated probes and always were, so
+  exposure does not increase — but auth must come back **together with** the ingress, never after.
+- The eval stack's Zitadel + Postgres pair and `eval-authenticated.sh` are removed. The identity
+  *registry* (`AddWayfinderIdentity`, `ITenantResolver`, the seeded tenant/user grains) survives:
+  it is grain-level, and the redesign still needs it.
+- `Asp.Versioning` goes with it. Its live contribution was a deliberate 400 on an unversioned
+  call (`AssumeDefaultVersionWhenUnspecified = false`); OhData versions by prefixed registration
+  and would return a plain 404 instead. A replacement ingress must decide that behavior
+  explicitly rather than inherit it.
+
+**What OhData does not do, recorded so the rebuild is not planned on a false premise.** OhData is
+built *on* `Microsoft.AspNetCore.OData` — its 1.7.0 package declares
+`Microsoft.AspNetCore.OData [9.5.0, 10.0.0)` — so adopting it changes the programming model from
+controllers to profiles; it does **not** remove the Microsoft OData dependency, which returns
+transitively. It also carries no `Asp.Versioning` integration, no header/query-string version
+readers, and no deprecation signalling, and it versions only the endpoints it maps — anything
+non-OData (the CMMN XML deploy endpoint, the case-file-item history/version reads) needs its own
+answer.
+
+---
+
 ## 10. What is genuinely good
 
 Recorded so the redesign preserves it: near cell-perfect lifecycle tables against the PDF; correct rule defaults on all paths including error paths (the #158 class is closed, including first-evaluation-discard for repetition); the Table 8.9 per-type cascade asymmetries honored in both directions; the #198 blocking/clearing-signal design (sound against interleaving, and the pattern worth keeping where cross-grain edges remain); journal-confirm discipline and source-owned idempotency keys; the XmlSerializer collection-shadow mechanism with reflection coverage test; DTD/XXE-hardened import; sandboxed Jint with honest error paths; CaseFileItem lifecycle fidelity (all eight Table 8.2 transitions, Available-only guards, Closed lockdown); sentryRef/exitCriterionRef OnParts implemented end-to-end; and code comments that state their ordering assumptions and residual windows honestly enough to be verifiable.

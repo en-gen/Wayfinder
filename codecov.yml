@@ -30,4 +30,3 @@ ignore:
   - "src/Wayfinder.Grains.Tests/**"
   - "src/Wayfinder.Grains.Tests.Integration/**"
   - "src/Wayfinder.Grains.Tests.Utils/**"
-  - "src/Wayfinder.Api.Tests/**"
