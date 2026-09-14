@@ -2,8 +2,6 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Wayfinder.Api.DependencyInjection;
-using Wayfinder.Api.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -15,7 +13,7 @@ using Orleans.Runtime;
 
 namespace Wayfinder.Silo
 {
-    // Two endpoint families:
+    // One endpoint family - diagnostics probes:
     //
     //   GET /health          - bare liveness probe: 200 once Kestrel is serving requests at
     //                          all. Backs the container HEALTHCHECK (src/Wayfinder.Silo/Dockerfile).
@@ -28,14 +26,18 @@ namespace Wayfinder.Silo
     //                          serve the identical payload; "/" keeps the endpoint reachable at
     //                          the silo's root the way the previous "Hello World!" placeholder
     //                          was, "/cluster" is the more explicit name for the same query.
-    //   /api/v1/...           - the case-operation REST API (work item #32/#33) - Wayfinder.Api's
-    //                          controllers/OData routes, mapped via MapWayfinderApi below.
+    // The HTTP ingress that used to sit alongside them at /api/v1/... (Wayfinder.Api - OData
+    // controllers, URL-segment versioning, JwtBearer auth against Zitadel, and
+    // IdentityContextMiddleware) was REMOVED under decision D-2026-09-13
+    // (docs/04-adversarial-review-2026-08.md section 9): it is rebuilt on OhData after the
+    // case-grain granularity redesign (D-2026-08-01) rather than carried through it.
     //
-    // All three diagnostics routes are .AllowAnonymous() - they predate auth (#49) and stay public
-    // (a health/cluster probe cannot depend on a caller having a token). Everything under
-    // /api/v1/... requires an authenticated, tenant-provisioned caller by default (the fallback
-    // authorization policy set in Wayfinder.Api's AddWayfinderApi + IdentityContextMiddleware below) - no
-    // [AllowAnonymous] appears on any Wayfinder.Api controller.
+    // Authentication/authorization middleware went with it. That is not a regression in
+    // exposure - these routes are unauthenticated liveness probes and always were - but it does
+    // mean the silo currently has NO authenticated surface, and the fallback
+    // RequireAuthenticatedUser policy that used to protect everything else is gone with the
+    // controllers it protected. Restoring an ingress means restoring both together; see
+    // docs/05-case-grain-redesign.md section D.4.
     //
     // The co-hosted process is BOTH an Orleans silo (UseOrleans in Program.cs) and an Orleans
     // client - Orleans registers a local IClusterClient/IGrainFactory into the SAME DI
@@ -52,30 +54,16 @@ namespace Wayfinder.Silo
 
             app.UseRouting();
 
-            // ADO #33 - AuthN then AuthZ (standard ASP.NET Core order), then the identity
-            // middleware: by the time a request reaches IdentityContextMiddleware, JwtBearer has
-            // already validated the token and the fallback policy has already 401'd anything
-            // unauthenticated on a non-[AllowAnonymous] route. IdentityContextMiddleware is the
-            // ONLY place CaseRequestContext gets set from an authenticated caller - see that type's
-            // remarks. It must run BEFORE UseEndpoints (MapWayfinderApi's controllers dispatch straight
-            // into the CQRS handlers, which now assume CaseRequestContext is already populated -
-            // see CaseRequestContextDefaults' deletion, ADO #32/#33).
-            app.UseAuthentication();
-            app.UseAuthorization();
-            app.UseMiddleware<IdentityContextMiddleware>();
-
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapGet("/health", async context =>
                 {
                     context.Response.StatusCode = StatusCodes.Status200OK;
                     await context.Response.WriteAsync("Healthy");
-                }).AllowAnonymous();
+                });
 
-                endpoints.MapGet("/", context => WriteClusterStatusAsync(context, logger)).AllowAnonymous();
-                endpoints.MapGet("/cluster", context => WriteClusterStatusAsync(context, logger)).AllowAnonymous();
-
-                endpoints.MapWayfinderApi();
+                endpoints.MapGet("/", context => WriteClusterStatusAsync(context, logger));
+                endpoints.MapGet("/cluster", context => WriteClusterStatusAsync(context, logger));
             });
         }
 

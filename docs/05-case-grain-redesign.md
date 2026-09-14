@@ -1234,6 +1234,14 @@ What the redesign **does** change, sharply, is the second half of #105:
 
 The conformance corpus drives the public surface and is the acceptance gate, so this is a compatibility design, not an afterthought.
 
+> **Superseded in part by D-2026-09-13 (2026-09-13).** The HTTP ingress described in §D.4.1 has been **deleted**, and is rebuilt on [OhData](https://github.com/en-gen/OhData) *after* this redesign rather than carried through it. Read §D.4.1 as a record of what the surface was and what a replacement must cover — not as a live contract. The sections below are affected unevenly:
+>
+> - **§D.4.2 (the new grain surface) is unaffected.** `ICaseGrain` is what the engine exposes; it never depended on an ingress existing.
+> - **§D.4.3 is downgraded from a hard constraint to a design note.** Its severity came entirely from `GetHistory`/`GetValueAt` being HTTP-exposed. Per-item logical versioning is still the right design and the P0 characterization test is still worth writing — the numbering must be *correct* — but getting it wrong no longer silently breaks a published wire contract, and the "`V2` route rather than a quiet change" escape hatch no longer applies.
+> - **§D.4.4's cost table row for `Wayfinder.Api.Tests` is void** — those 44 tests are deleted, not migrated.
+>
+> The obligation this creates is recorded in [`04-adversarial-review-2026-08.md`](04-adversarial-review-2026-08.md) §9: a restored ingress must restore an equivalent end-to-end tenant-isolation test, and its authentication, in the same PR.
+
 #### D.4.1 What is actually exposed today
 
 Six HTTP endpoints, all thin over `ISender`; **`Wayfinder.Api` makes zero direct grain calls.** Only three production call sites touch `IPlanItemGrain`/`ICaseFileItemGrain` at all (§A.4). No route addresses a plan-item instance. Two routes address a case-file item by definition id, read-only:
@@ -1311,13 +1319,13 @@ Consequences:
 - **`CaseSnapshot.JournalVersion` gives the API the concurrency token finding D5 says it lacks.** Torn views are no longer possible by construction (the snapshot is built inside the turn), so D5's "torn by construction" half is closed; the "no ETag" half is closed by this field.
 - **Remove `casePlanModel.Id` from the grain key.** `CaseViewProjector.CaseScope` hardcodes `"CPM"` while `CaseFileItemGrain.ResolveCaseScope` *derives* it by round-tripping the definition grain. These agree only for definitions whose `casePlanModel/@id` is literally `"CPM"` — every other model is already broken through the HTTP path. See §D.5 for the replacement key.
 
-#### D.4.3 Case-file item versioning — the one hard compatibility constraint
+#### D.4.3 Case-file item versioning — a design note (was: the one hard compatibility constraint)
 
 `GetHistory`/`GetValueAt` are HTTP-exposed and are defined today over **`JournaledGrain.RetrieveConfirmedEvents`** on the item's *own* journal. `CaseFileItemVersionDescriptor.Version`'s own remarks pin the meaning: "the Nth event `RetrieveConfirmedEvents(0, Version)` would return" — and non-value-carrying events (`ChildAdded`, `ReferenceAdded`, `Discarded`) consume sequence numbers even though they produce no descriptor. Merging every item's journal into one case journal changes those numbers' meaning outright.
 
 **Design.** Each `CaseFileItemInstance` carries a **per-item logical version counter**, incremented on every one of its own Table 8.2 transitions (`create`, `update`, `replace`, `addChild`, `removeChild`, `addReference`, `removeReference`, `delete` — Table 8.2, printed p.108) and stamped onto each of its journal events. `GetCaseFileItemValueAt(itemId, version)` folds the case journal filtered to that item's events up to that logical version. The route, the parameter, and the meaning ("the Nth operation on this item") are preserved.
 
-**This must be pinned before it is changed.** The exact off-by-N relationship between today's raw journal position and a per-item operation counter — in particular whether the `CmmnElementDefined` event occupies version 1 — is not obvious from reading the code, and getting it wrong silently breaks a live HTTP contract. Phase P0 (§E.2) writes a characterization test over the current numbering; the new counter is then made to match. If it *cannot* be made to match exactly, the honest answer is a `V2` route, not a quiet change.
+**This should still be pinned before it is changed** (it was "must" while these routes were HTTP-exposed — see the D-2026-09-13 note at the top of §D.4). The exact off-by-N relationship between today's raw journal position and a per-item operation counter — in particular whether the `CmmnElementDefined` event occupies version 1 — is not obvious from reading the code, and getting it wrong silently breaks a live HTTP contract. Phase P0 (§E.2) writes a characterization test over the current numbering; the new counter is then made to match. If it *cannot* be made to match exactly, the honest answer is a `V2` route, not a quiet change.
 
 #### D.4.4 How the corpus adapts
 
@@ -1340,7 +1348,7 @@ Cost, honestly stated:
 | Conformance scenarios (41 `[Fact]`s, 5 files) | ~35 `PollUntil` + ~10 resolves | Mechanical via the handles; plus **deleting** every `PollUntil` (§F) |
 | Other integration tests (23 files, ~110 grain call sites) | ~110 | Mechanical via the handles; `CaseFileItemGrainTests.cs` alone has 24 |
 | `StageBehaviorTests_*` unit tests (6 files, ~67 `Mock<IPlanItemInternalGrain>` setups) | ~67 | **Rewritten.** `StageBehavior` will operate on in-memory child objects, so these tests get *simpler* (build a real object graph, no `Mock<IGrainFactory>`), but the mocks cannot be ported. This is real, unavoidable cost and belongs in its own phase. |
-| `Wayfinder.Api.Tests` (44 tests) | 0 grain calls | **Unaffected.** All mock `ISender`. |
+| ~~`Wayfinder.Api.Tests` (44 tests)~~ | — | **Void — deleted** under D-2026-09-13 with the ingress they covered. |
 
 `Conformance/COVERAGE.md` is also stale, but **less wrong than an earlier draft made it look**, and the distinction matters because it changes what has to be regenerated. The file is an append-only log of successive verification passes, and the quarantine line quoted previously (`:39`, "33 scenarios — 25 executed green, 8 quarantined") is **superseded later in the same file** by `:80-81`: "the suite is now 33/33 green, 0 skipped." Quoting the earlier line as the current claim implies a quarantine protocol that the file itself already records as retired. (`:22` carries an earlier pass still: "23 executed green, 10 quarantined".)
 

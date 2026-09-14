@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Azure.Identity;
 using Azure.Storage.Blobs;
-using Wayfinder.Api.DependencyInjection;
+using Wayfinder.Application.DependencyInjection;
 using Wayfinder.Application.Identity;
 using Wayfinder.Grains.Infrastructure.Extensions;
 using Wayfinder.Grains.Infrastructure.Quartz;
@@ -67,12 +67,14 @@ namespace Wayfinder.Silo
 
         // See EvalIdentityOptions' remarks - reads the "EvalIdentity:Tenants" config section
         // (devops/eval/docker-compose.yml's EvalIdentity__Tenants__<n>__* env vars) and seeds each
-        // entry through the SAME IIdentityRegistrySeeder seam sub-unit 4's isolation tests use.  A
-        // tenant entry with a blank Subject is skipped rather than seeded with an empty key - the
-        // compose file ships with placeholder/blank subjects until a developer completes the
-        // manual Zitadel bootstrap (org/human users - see devops/eval/README.md) and fills in the
-        // real ones; seeding a blank subject would otherwise silently register a
-        // IUserIdentityGrain no real token could ever match.
+        // entry through the IIdentityRegistrySeeder seam.
+        //
+        // Since D-2026-09-13 removed the HTTP ingress there is no token path for a seeded subject
+        // to arrive on, so this seeds the tenant/user GRAINS only - kept because the registry is
+        // grain-level state the redesign still needs populated in the eval stack, and because
+        // re-deriving these entries when an OhData ingress lands is pointless churn. A tenant
+        // entry with a blank Subject is still skipped rather than seeded with an empty key, which
+        // is what the shipped compose file now does for both slots.
         private static async Task SeedEvalIdentityRegistryAsync(IServiceProvider services)
         {
             using var scope = services.CreateScope();
@@ -512,11 +514,17 @@ namespace Wayfinder.Silo
                 .AddSingleton<IPlanItemStateMachineConfigurator, PlanItemStateMachineConfiguratorService>()
                 .AddQuartz(QuartzSchedulerConfig.Volatile(QuartzSchedulerInstanceName(context)));
 
-            // ADO #32/#33 - the HTTP ingress (OData + versioning + JwtBearer auth against our
-            // Zitadel + the identity middleware's services). See Wayfinder.Api's AddWayfinderApi for the full
-            // composition; Startup.cs's Configure maps it (MapWayfinderApi) and wires the identity
-            // middleware into the pipeline.
-            services.AddWayfinderApi();
+            // No HTTP ingress is registered here. Wayfinder.Api (OData + versioning + JwtBearer
+            // auth + the identity middleware) was removed under decision D-2026-09-13 and is
+            // rebuilt on OhData after the case-grain granularity redesign (D-2026-08-01).
+            //
+            // The identity REGISTRY survives - it is grain-level, not ingress-level - so the eval
+            // stack's seeded tenants still work; what is gone is the HTTP binding that resolved a
+            // caller onto one of them. AddWayfinderIdentity is the standalone seam its own remarks
+            // anticipated ("a host that only needs the resolver could call it standalone"); the
+            // full AddWayfinderApplication (ISender + the handler-assembly scan) is deliberately
+            // NOT called, because with no ingress nothing in this process dispatches a command.
+            services.AddWayfinderIdentity();
         }
 
         // #197 - QuartzSchedulerConfig.Volatile used to hardcode quartz.scheduler.instanceName to
