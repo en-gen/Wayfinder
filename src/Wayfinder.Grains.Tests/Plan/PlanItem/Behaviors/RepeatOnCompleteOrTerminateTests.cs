@@ -47,17 +47,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(def: planItem, piDef: taskDefinition, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.IsRepeatableRule.ContextRef, Rules.IsRepeatableRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(true)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition).Returns(planItem);
             mockHost.Setup(x => x.State).Returns(testStore);
@@ -99,14 +97,12 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(def: planItem, piDef: taskDefinition, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            var mockExpressions = new Mock<IExpressionContext>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition).Returns(planItem);
             mockHost.Setup(x => x.State).Returns(testStore);
@@ -118,7 +114,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             await subject.Trigger(PlanItemTransition.Exit);
 
-            mockExpressionGrain.Verify(x => x.ExecuteAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
+            mockExpressions.Verify(x => x.EvaluateAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
             mockHost.Verify(x => x.Publish(It.IsAny<PlanItemRepetitionCriteriaMetEvent>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<Repeated>()), Times.Never);
         }
@@ -140,17 +136,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(def: planItem, piDef: taskDefinition, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition))
                 .Returns(Task.FromResult(ExecutableResult<bool>.Success(false)));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition).Returns(planItem);
             mockHost.Setup(x => x.State).Returns(testStore);
@@ -163,7 +157,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             await subject.Trigger(PlanItemTransition.Complete);
 
             // the rule WAS re-evaluated (that is the D7 requirement) ...
-            mockExpressionGrain.Verify(x => x.ExecuteAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition), Times.Once);
+            mockExpressions.Verify(x => x.EvaluateAsBool(Rules.NotRepeatableRule.ContextRef, Rules.NotRepeatableRule.Condition), Times.Once);
             // ... but no repetition results from a FALSE evaluation
             mockHost.Verify(x => x.Publish(It.IsAny<PlanItemRepetitionCriteriaMetEvent>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<Repeated>()), Times.Never);
@@ -193,14 +187,12 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(def: planItem, piDef: taskDefinition, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            var mockExpressions = new Mock<IExpressionContext>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition).Returns(planItem);
             mockHost.Setup(x => x.State).Returns(testStore);
@@ -212,7 +204,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             await subject.Trigger(PlanItemTransition.Complete);
 
-            mockExpressionGrain.Verify(x => x.ExecuteAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
+            mockExpressions.Verify(x => x.EvaluateAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
             mockHost.Verify(x => x.Publish(It.IsAny<PlanItemRepetitionCriteriaMetEvent>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<Repeated>()), Times.Never);
         }
@@ -258,14 +250,12 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(def: planItem, piDef: milestoneDefinition, initialState: PlanItemState.Available);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            var mockExpressions = new Mock<IExpressionContext>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition).Returns(planItem);
             mockHost.Setup(x => x.State).Returns(testStore);
@@ -278,7 +268,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             // Milestone lifecycle: Available -[Occur]-> Completed (Table 8.10/8.11)
             await subject.Trigger(PlanItemTransition.Occur);
 
-            mockExpressionGrain.Verify(x => x.ExecuteAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
+            mockExpressions.Verify(x => x.EvaluateAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
             mockHost.Verify(x => x.Publish(It.IsAny<PlanItemRepetitionCriteriaMetEvent>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<Repeated>()), Times.Never);
         }
@@ -305,14 +295,12 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: casePlanModel, initialState: PlanItemState.Active);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
+            var mockExpressions = new Mock<IExpressionContext>();
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory
-                .Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId).Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition).Returns(caseDefinition);
             mockHost.Setup(x => x.State).Returns(testStore);
@@ -324,7 +312,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             await subject.Trigger(PlanItemTransition.Complete);
 
-            mockExpressionGrain.Verify(x => x.ExecuteAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
+            mockExpressions.Verify(x => x.EvaluateAsBool(It.IsAny<string>(), It.IsAny<Expression>()), Times.Never);
             mockHost.Verify(x => x.Publish(It.IsAny<PlanItemRepetitionCriteriaMetEvent>()), Times.Never);
             mockHost.Verify(x => x.RaiseEvent(It.IsAny<Repeated>()), Times.Never);
         }

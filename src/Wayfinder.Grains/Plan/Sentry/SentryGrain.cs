@@ -104,14 +104,21 @@ namespace Wayfinder.Grains.Plan.Sentry
         CmmnElementGrain<SentryStore, Interfaces.Model.Sentry>,
         ISentryGrain
     {
-        public SentryGrain(ILogger<SentryGrain> logger) :
+        private readonly IExpressionEvaluator _expressionEvaluator;
+
+        private IExpressionContext _expressions;
+
+        public SentryGrain(IExpressionEvaluator expressionEvaluator, ILogger<SentryGrain> logger) :
             base(logger)
         {
+            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
+
+            _expressions = new ExpressionContext(_expressionEvaluator, GrainFactory, _caseInstanceId, () => TentativeState.Pin);
 
             if (TentativeState.Defined)
             {
@@ -119,9 +126,9 @@ namespace Wayfinder.Grains.Plan.Sentry
             }
         }
 
-        public override async Task Define(string caseDefinitionId, Interfaces.Model.Sentry definition)
+        public override async Task Define(string caseDefinitionId, Interfaces.Model.Sentry definition, CaseModelPin pin)
         {
-            await base.Define(caseDefinitionId, definition);
+            await base.Define(caseDefinitionId, definition, pin);
             await SubscribeToOnPartTransitions(StreamFlags.Create);
         }
 
@@ -379,8 +386,7 @@ namespace Wayfinder.Grains.Plan.Sentry
         {
             if (Definition.IfPart?.Condition == null) return IfPartResult.True;
 
-            var result = await GrainFactory.GetGrain<IExpressionGrain>(_caseInstanceId)
-                .ExecuteAsBool(Definition.IfPart.ContextRef, Definition.IfPart.Condition);
+            var result = await _expressions.EvaluateAsBool(Definition.IfPart.ContextRef, Definition.IfPart.Condition);
 
             return result.IsError
                 ? IfPartResult.Fault(result.Message)

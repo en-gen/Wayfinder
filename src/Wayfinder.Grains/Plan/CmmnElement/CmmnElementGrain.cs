@@ -98,12 +98,18 @@ namespace Wayfinder.Grains.Plan.CmmnElement
             base.RaiseEvent(@event);
         }
 
-        public virtual Task Define(string caseDefinitionId, TDefinition definition)
+        public virtual Task Define(string caseDefinitionId, TDefinition definition) =>
+            Define(caseDefinitionId, definition, null);
+
+        // pin: design 05 section A.5 - the case model resolved at CaseGrain.Create, handed down
+        // by whoever defined this element. Null when there is none to hand down.
+        public virtual Task Define(string caseDefinitionId, TDefinition definition, CaseModelPin pin)
         {
             RaiseEvent(new CmmnElementDefined<TDefinition>
             {
                 CaseDefinitionId = caseDefinitionId,
-                Definition = definition
+                Definition = definition,
+                Pin = pin
             });
 
             LogContext["CaseDefinitionId"] = caseDefinitionId;

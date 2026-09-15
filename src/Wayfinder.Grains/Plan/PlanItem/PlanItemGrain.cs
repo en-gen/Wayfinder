@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Infrastructure.Mapping;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
@@ -23,8 +24,10 @@ namespace Wayfinder.Grains.Plan.PlanItem
         IBehaviorHost
     {
         private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
+        private readonly IExpressionEvaluator _expressionEvaluator;
 
         private IPlanItemBehavior _behavior;
+        private IExpressionContext _expressions;
 
         #region BehaviorHost
 
@@ -54,6 +57,7 @@ namespace Wayfinder.Grains.Plan.PlanItem
         IBehaviorDefinition IBehaviorHost.Definition => Definition;
         IBehaviorStore IBehaviorHost.State => TentativeState;
         IGrainFactory IBehaviorHost.GrainFactory => GrainFactory;
+        IExpressionContext IBehaviorHost.Expressions => _expressions;
 
         void IBehaviorHost.RaiseEvent<TEvent>(TEvent @event) => RaiseEvent(@event);
         Task IBehaviorHost.ConfirmEvents() => ConfirmEvents();
@@ -72,15 +76,19 @@ namespace Wayfinder.Grains.Plan.PlanItem
 
         public PlanItemGrain(
             IPlanItemBehaviorConfigurator behaviorConfigurator,
+            IExpressionEvaluator expressionEvaluator,
             ILogger<PlanItemGrain> logger) :
             base(logger)
         {
             _behaviorConfigurator = behaviorConfigurator ?? throw new ArgumentNullException(nameof(behaviorConfigurator));
+            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
+
+            _expressions = new ExpressionContext(_expressionEvaluator, GrainFactory, _caseInstanceId, () => TentativeState.Pin);
 
             if (State.Defined)
             {
@@ -96,10 +104,26 @@ namespace Wayfinder.Grains.Plan.PlanItem
         // root guard, #63) and that its definition lookup falls back to the legacy instance-scope
         // resolution, which only resolves casePlanModel-root declarations (#65).
         public override Task Define(string caseDefinitionId, Interfaces.Model.PlanItem definition) =>
-            DefineRepetition(caseDefinitionId, definition, 0, null, null);
+            DefineRepetition(caseDefinitionId, definition, 0, null, null, null, null);
 
-        public async Task DefineRepetition(string caseDefinitionId, Interfaces.Model.PlanItem definition, int repetition, string parentDefinitionId, string parentDefinitionScope)
+        public async Task DefineRepetition(
+            string caseDefinitionId,
+            Interfaces.Model.PlanItem definition,
+            int repetition,
+            string parentDefinitionId,
+            string parentDefinitionScope,
+            PlanItemDefinition planItemDefinition,
+            CaseModelPin pin)
         {
+            // Design 05 section A.5 - definition pinning. planItemDefinition arrives already
+            // resolved, out of the model CaseGrain.Create pinned, so this define - and every
+            // repetition spawn, which is the case that mattered - performs NO outbound call to
+            // ICaseDefinitionGrain at all.
+            //
+            // The null-coalesced fallback below is the bare-2-arg Define() path only, which has no
+            // parent to thread a pin from and is used solely by test scaffolding. It preserves that
+            // path's pre-existing behaviour exactly, #65 note included.
+            //
             // #65: CaseDefinitionGrain.DefinitionIndex is keyed on DEFINITION-id paths
             // (CaseDefinitionGrain.CreateStageDefinitions), so the lookup must be searched with
             // the same shape - parentDefinitionScope (threaded from Host.DefinitionScope via
@@ -108,7 +132,7 @@ namespace Wayfinder.Grains.Plan.PlanItem
             // - that only coincidentally matches at the casePlanModel root). Falls back to _scope
             // for the parentless bare-2-arg Define() path above, preserving its existing
             // root-level-only resolution.
-            var planItemDefinition = await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
+            planItemDefinition ??= await GrainFactory.GetGrain<ICaseDefinitionGrain>(CaseRequestContext.TenantId, caseDefinitionId)
                 .GetPlanItemDefinition(parentDefinitionScope ?? _scope, definition.DefinitionRef);
 
             if (planItemDefinition == null) throw new InvalidOperationException($"definition {definition.DefinitionRef} not registered");
@@ -120,7 +144,8 @@ namespace Wayfinder.Grains.Plan.PlanItem
                 Definition = definition,
                 PlanItemDefinition = planItemDefinition,
                 ParentDefinitionId = parentDefinitionId,
-                ParentDefinitionScope = parentDefinitionScope
+                ParentDefinitionScope = parentDefinitionScope,
+                Pin = pin
             });
 
             await ConfirmEvents();

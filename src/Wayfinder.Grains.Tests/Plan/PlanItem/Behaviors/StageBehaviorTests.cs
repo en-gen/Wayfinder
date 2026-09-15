@@ -80,16 +80,15 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
 
             var testStore = new TestPlanItemStore(piDef: stage, def: pi, initialState: PlanItemState.Uninitialized);
 
-            var mockExpressionGrain = new Mock<IExpressionGrain>();
-            mockExpressionGrain
-                .Setup(x => x.ExecuteAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
+            var mockExpressions = new Mock<IExpressionContext>();
+            mockExpressions
+                .Setup(x => x.EvaluateAsBool(manualActivationRule.ContextRef, manualActivationRule.Condition))
                 .ThrowsAsync(new InvalidOperationException("boom"));
 
             var mockGrainFactory = new Mock<IGrainFactory>();
-            mockGrainFactory.Setup(x => x.GetGrain<IExpressionGrain>(caseInstanceId, null))
-                .Returns(mockExpressionGrain.Object);
 
             var mockHost = new Mock<IBehaviorHost>();
+            mockHost.Setup(x => x.Expressions).Returns(mockExpressions.Object);
             mockHost.Setup(x => x.CaseInstanceId)
                 .Returns(caseInstanceId);
             mockHost.Setup(x => x.Definition)
@@ -288,11 +287,11 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
             mockSentryGrain.Verify(x => x.Defined(), Times.Exactly(2));
             foreach (var sentry in stage.Sentries)
             {
-                mockSentryGrain.Verify(x => x.Define(testStore.CaseDefinitionId, sentry), Times.Once);
+                mockSentryGrain.Verify(x => x.Define(testStore.CaseDefinitionId, sentry, It.IsAny<CaseModelPin>()), Times.Once);
             }
 
             mockPlanningTableGrain.Verify(x => x.Defined(), Times.Once);
-            mockPlanningTableGrain.Verify(x => x.Define(testStore.CaseDefinitionId, stage.PlanningTable), Times.Once);
+            mockPlanningTableGrain.Verify(x => x.Define(testStore.CaseDefinitionId, stage.PlanningTable, It.IsAny<CaseModelPin>()), Times.Once);
         }
 
         // D6 - a Stage's ExitCriteria must be subscribed on the create path, not left to
@@ -400,7 +399,7 @@ namespace Wayfinder.Grains.Tests.Plan.PlanItem.Behaviors
                 // parentDefinitionScope (#65): CreateChild also threads Host.DefinitionScope (this
                 // Stage's own full definition-scope path) through so the child's definition-index
                 // lookup searches from the correct definition-tree position.
-                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id, definitionScope), Times.Once);
+                mockPlanItemGrain.Verify(x => x.DefineRepetition(testStore.CaseDefinitionId, pi, 0, stage.Id, definitionScope, It.IsAny<PlanItemDefinition>(), It.IsAny<CaseModelPin>()), Times.Once);
 
                 mockHost.Verify(x => x.SubscribeTo(
                         pi.Id,

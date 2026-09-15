@@ -46,5 +46,7 @@ namespace Wayfinder.Benchmarks.Support
         public PlanItemState? ParentSuspendState => null;
 
         public object BehaviorExtension => null;
+
+        public CaseModelPin Pin => null;
     }
 }

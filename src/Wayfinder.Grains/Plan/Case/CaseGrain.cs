@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Wayfinder.Grains.Expressions;
 using Wayfinder.Grains.Infrastructure.Mapping;
 using Wayfinder.Grains.Interfaces;
 using Wayfinder.Grains.Interfaces.Model;
@@ -24,8 +25,10 @@ namespace Wayfinder.Grains.Plan.Case
         IBehaviorHost
     {
         private readonly IPlanItemBehaviorConfigurator _behaviorConfigurator;
+        private readonly IExpressionEvaluator _expressionEvaluator;
 
         private IPlanItemBehavior _casePlanModel;
+        private IExpressionContext _expressions;
 
         #region BehaviorHost
 
@@ -66,6 +69,7 @@ namespace Wayfinder.Grains.Plan.Case
         IBehaviorDefinition IBehaviorHost.Definition => Definition;
         IBehaviorStore IBehaviorHost.State => TentativeState;
         IGrainFactory IBehaviorHost.GrainFactory => GrainFactory;
+        IExpressionContext IBehaviorHost.Expressions => _expressions;
 
         void IBehaviorHost.RaiseEvent<TEvent>(TEvent @event) => RaiseEvent(@event);
         Task IBehaviorHost.ConfirmEvents() => ConfirmEvents();
@@ -84,15 +88,19 @@ namespace Wayfinder.Grains.Plan.Case
 
         public CaseGrain(
             IPlanItemBehaviorConfigurator behaviorConfigurator,
+            IExpressionEvaluator expressionEvaluator,
             ILogger<CaseGrain> logger) :
             base(logger)
         {
             _behaviorConfigurator = behaviorConfigurator ?? throw new ArgumentNullException(nameof(behaviorConfigurator));
+            _expressionEvaluator = expressionEvaluator ?? throw new ArgumentNullException(nameof(expressionEvaluator));
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             await base.OnActivateAsync(cancellationToken);
+
+            _expressions = new ExpressionContext(_expressionEvaluator, GrainFactory, _caseInstanceId, () => TentativeState.Pin);
 
             if (State.Defined)
             {
@@ -110,11 +118,40 @@ namespace Wayfinder.Grains.Plan.Case
             var @case = await caseDefinitionGrain.GetDefinition();
             @case.CasePlanModel.IsCasePlanModel = true;
 
+            // Design 05 section A.5 - resolve the ENTIRE definition graph here, once, and journal
+            // it with the Case. After this line nothing in the case's life calls
+            // ICaseDefinitionGrain.GetPlanItemDefinition: every plan item receives its resolved
+            // definition from its parent, which reads it out of this pin (see CaseModelPin and
+            // StageBehavior.CreateChild).
+            //
+            // Two things this buys, beyond removing an outbound call from every turn (section D.6).
+            // First, the model a running case executes is now explicitly the model it was created
+            // with - previously PlanItemGrain.DefineRepetition re-read the definition on EVERY
+            // define, repetition spawns included, so what a live case ran against was whatever the
+            // definition grains held at that moment. (In practice a redeploy under an existing
+            // caseDefinitionId is rejected today by PlanItemDefinitionGrain.Define's write-once
+            // guard, so that was a latent hazard rather than a reachable defect; pinning makes the
+            // guarantee structural instead of incidental.) Second, the declared caseFileModel item
+            // ids travel with it, which is what lets a contextRef-less expression bind the case
+            // file at all (finding I4).
+            //
+            // Cost: journal size, bounded by one copy of the resolved model per case - plus, until
+            // phase P2 collapses plan items into the case grain, one copy per STAGE instance, since
+            // the pin has to be threaded rather than fetched (a plan item calling back into the
+            // case grain would be the D3 wait cycle). Non-stage plan items journal only the trimmed
+            // ForLeaf() form.
+            var pin = new CaseModelPin
+            {
+                CaseFileItemIds = CaseModelPin.CaseFileItemIdsOf(@case.CaseFileModel),
+                PlanItemDefinitions = await caseDefinitionGrain.GetPlanItemDefinitions()
+            };
+
             RaiseEvent(new CaseCreated
             {
                 CaseDefinitionId = @case.Id,
                 Definition = @case,
-                TenantId = CaseRequestContext.TenantId
+                TenantId = CaseRequestContext.TenantId,
+                Pin = pin
             });
 
             // PostDefine() (below) reads State.CaseDefinitionId/State.Definition - the confirmed
