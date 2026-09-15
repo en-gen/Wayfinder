@@ -1,6 +1,6 @@
 ---
 name: dotnet-test
-description: Build, test, and mutation-test Wayfinder. Use whenever running dotnet build/test/format on this repo, interpreting a suite result, or running Stryker. Covers the sandbox requirement, the three test projects and their expected counts, Docker-gated skips, husky in fresh worktrees, and the conformance corpus.
+description: Build, test, and mutation-test Wayfinder. Use whenever running dotnet build/test/format on this repo, interpreting a suite result, or running Stryker. Covers the sandbox requirement, the two test projects and their expected counts, Docker-gated skips, husky in fresh worktrees, and the conformance corpus.
 ---
 
 # Building and testing Wayfinder
@@ -23,12 +23,25 @@ dotnet format src/Wayfinder.sln --verify-no-changes
 
 | Project | Kind | Expected |
 |---|---|---|
-| `src/Wayfinder.Grains.Tests` | unit, fast | ~407 passed |
-| `src/Wayfinder.Grains.Tests.Integration` | Orleans TestCluster, ~2 min | 184 passed |
+| `src/Wayfinder.Grains.Tests` | unit, fast | 442 passed |
+| `src/Wayfinder.Grains.Tests.Integration` | Orleans TestCluster, ~2 min | 194 passed |
 
-`src/Wayfinder.Api.Tests` (44 tests) was deleted with the HTTP ingress under D-2026-09-13,
-along with the 9-`[Fact]` `Api/` suite inside the integration project — which is why the
-integration count dropped 193 -> 184.
+**Measured 2026-09-14 at `96661b1`** (the merge of #259, P1 of the case-grain redesign).
+Both numbers moved sharply that day, so the full accounting is worth keeping:
+
+| Change | Unit | Integration |
+|---|---:|---:|
+| Before the redesign phases | ~407 | 193 |
+| #258 — P0 characterization (version numbering, `R<n>`) | — | +6 |
+| #259 — P1 I4 binding tests | — | +4 |
+| #259 — P1 architecture tests | +2 | — |
+| #259 — `ExpressionEvaluator` + `CaseModelPin` unit tests | +33 | — |
+| #256 — HTTP ingress removed: the 9-`[Fact]` `Api/` suite | — | −9 |
+| **Now** | **442** | **194** |
+
+`src/Wayfinder.Api.Tests` (44 tests) was deleted outright with the HTTP ingress under
+D-2026-09-13, which is why this section names **two** test projects where it used to name
+three. A run that still reports a third is on a branch predating #256.
 
 `src/Wayfinder.Grains.Tests.Utils` is a helper library, not a test project.
 
@@ -37,8 +50,8 @@ unexplained drop is worth investigating before you trust a green run.
 
 ## Docker-gated skips are not failures
 
-The integration suite reports **184 passed / 0 skipped** when Docker containers are warm,
-and **179 passed / 5 skipped** when they are not. The five are `RequiresDockerFact`-gated
+The integration suite reports **194 passed / 0 skipped** when Docker containers are warm,
+and **189 passed / 5 skipped** when they are not. The five are `RequiresDockerFact`-gated
 Azurite / Azure-Table storage tests, which skip rather than fail when the probe finds no
 daemon at discovery time.
 
@@ -154,7 +167,10 @@ suspect the tests.**
 - **Timeout** counts as killed (the mutant probably caused a loop), but a lot of timeouts
   usually means `additional-timeout` is too tight for this suite, not that tests are strong.
 - **NoCoverage** = nothing exercises that code. See the warning above first.
-- **CompileError** ≈ 116 of 1889 mutants here. Stryker's "safe mode" discards every mutant
+- **CompileError** ≈ 116 of 1889 mutants — **measured 2026-08 on the pre-redesign tree, and
+  not re-measured since.** #259 deleted `ExpressionGrain` and added `ExpressionEvaluator` and
+  `CaseModelPin`, so the mutant totals below have certainly drifted; the *ratios* and the
+  reasoning still hold, the absolute numbers are stale. Re-run the sweep before quoting them. Stryker's "safe mode" discards every mutant
   in a method whose mutation will not compile (two methods trip this: `StageBehavior.Define`
   and `CmmnXmlSerializer.Walk`). Expected, not a misconfiguration.
 
